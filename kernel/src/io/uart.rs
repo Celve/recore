@@ -130,4 +130,5 @@ impl SerialPort {
     }
 }
 
+/// UART can only be initialized as MaybeUninit<SerialPort>, instead of being wrapped inside lazy_static!, which leads to unknown error.
 pub static mut UART: MaybeUninit<SerialPort> = MaybeUninit::uninit();

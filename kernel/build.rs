@@ -28,7 +28,7 @@ SECTIONS {
         *(.sdata .sdata.*)
     } > DRAM
     .bss (NOLOAD) : {
-        *(.bss.uninit)
+        *(.bss.stack)
         . = ALIGN(8);
         sbss = .;
         *(.bss .bss.*)

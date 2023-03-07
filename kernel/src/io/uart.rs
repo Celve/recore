@@ -1,8 +1,8 @@
 use bitflags::bitflags;
-use core::{
-    mem::MaybeUninit,
-    sync::atomic::{AtomicPtr, Ordering},
-};
+use core::sync::atomic::{AtomicPtr, Ordering};
+use lazy_static::*;
+
+use crate::config::UART_BASE_ADDRESS;
 
 const BS: u8 = 0x8;
 const DEL: u8 = 0x7F;
@@ -130,5 +130,6 @@ impl SerialPort {
     }
 }
 
-/// UART can only be initialized as MaybeUninit<SerialPort>, instead of being wrapped inside lazy_static!, which leads to unknown error.
-pub static mut UART: MaybeUninit<SerialPort> = MaybeUninit::uninit();
+lazy_static! {
+    pub static ref UART: SerialPort = unsafe { SerialPort::new(UART_BASE_ADDRESS) };
+}

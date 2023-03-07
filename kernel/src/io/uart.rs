@@ -3,7 +3,6 @@ use core::{
     mem::MaybeUninit,
     sync::atomic::{AtomicPtr, Ordering},
 };
-use lazy_static::*;
 
 const BS: u8 = 0x8;
 const DEL: u8 = 0x7F;
@@ -131,8 +130,4 @@ impl SerialPort {
     }
 }
 
-// TODO: decide whether to init in here or in the run time
-// lazy_static! {
-// pub static ref UART: SerialPort = unsafe { SerialPort::new(0x10_000_000) };
-// }
 pub static mut UART: MaybeUninit<SerialPort> = MaybeUninit::uninit();

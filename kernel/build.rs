@@ -39,4 +39,5 @@ SECTIONS {
     /DISCARD/ : {
         *(.eh_frame)
     }
-}";
+}
+";

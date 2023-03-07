@@ -29,7 +29,7 @@ unsafe extern "C" fn _start() {
 #[no_mangle]
 extern "C" fn rust_main() {
     unsafe {
-        UART = MaybeUninit::new(SerialPort::new(0x10_000_000));
+        UART = MaybeUninit::new(SerialPort::new(UART_BASE_ADDRESS));
         UART.assume_init_mut().init();
     }
     println!("Hello, world!");

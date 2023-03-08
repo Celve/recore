@@ -8,6 +8,7 @@ mod complement;
 mod config;
 mod heap;
 mod io;
+mod mm;
 mod sync;
 
 use alloc::boxed::Box;

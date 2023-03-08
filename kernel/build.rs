@@ -12,7 +12,7 @@ const LINKER: &[u8] = b"
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 MEMORY {
-    DRAM : ORIGIN = 0x80000000, LENGTH = 2M
+    DRAM : ORIGIN = 0x80000000, LENGTH = 512M
 }
 SECTIONS {
     .text : {

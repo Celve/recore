@@ -30,15 +30,15 @@ impl LinkedList {
         self.head.is_null()
     }
 
-    pub fn iter(&self) -> LinkedListIter {
-        LinkedListIter {
+    pub fn iter(&self) -> Iter {
+        Iter {
             curr: self.head,
             linked_list: self,
         }
     }
 
-    pub fn iter_mut(&mut self) -> LinkedListIterMut {
-        LinkedListIterMut {
+    pub fn iter_mut(&mut self) -> IterMut {
+        IterMut {
             prev: &mut self.head as *mut *mut usize as *mut usize,
             curr: self.head,
             linked_list: self,
@@ -46,12 +46,12 @@ impl LinkedList {
     }
 }
 
-pub struct LinkedListIter<'a> {
+pub struct Iter<'a> {
     curr: *mut usize,
     linked_list: &'a LinkedList,
 }
 
-impl<'a> Iterator for LinkedListIter<'a> {
+impl<'a> Iterator for Iter<'a> {
     type Item = *mut usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -83,13 +83,13 @@ impl LinkedListNode {
     }
 }
 
-pub struct LinkedListIterMut<'a> {
+pub struct IterMut<'a> {
     prev: *mut usize,
     curr: *mut usize,
     linked_list: &'a mut LinkedList,
 }
 
-impl<'a> Iterator for LinkedListIterMut<'a> {
+impl<'a> Iterator for IterMut<'a> {
     type Item = LinkedListNode;
 
     fn next(&mut self) -> Option<Self::Item> {

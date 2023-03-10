@@ -131,5 +131,17 @@ impl SerialPort {
 }
 
 lazy_static! {
-    pub static ref UART: SerialPort = unsafe { SerialPort::new(UART_BASE_ADDRESS) };
+    static ref UART: SerialPort = unsafe { SerialPort::new(UART_BASE_ADDRESS) };
+}
+
+pub fn send_to_uart(data: u8) {
+    UART.send(data);
+}
+
+pub fn receive_from_uart() -> u8 {
+    UART.receive()
+}
+
+pub fn init_uart() {
+    UART.init();
 }

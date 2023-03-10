@@ -11,31 +11,57 @@ fn main() {
 const LINKER: &[u8] = b"
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
-MEMORY {
-    DRAM : ORIGIN = 0x80000000, LENGTH = 512M
-}
-SECTIONS {
+BASE_ADDRESS = 0x80000000;
+
+SECTIONS
+{
+    . = BASE_ADDRESS;
+    skernel = .;
+
+    stext = .;
     .text : {
         *(.text.entry)
+        . = ALIGN(4K);
+        strampoline = .;
+        *(.text.trampoline);
+        . = ALIGN(4K);
         *(.text .text.*)
-    } > DRAM
+    }
+
+    . = ALIGN(4K);
+    etext = .;
+
+    srodata = .;
     .rodata : {
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
-    } > DRAM
+    }
+
+    . = ALIGN(4K);
+    erodata = .;
+
+    sdata = .;
     .data : {
         *(.data .data.*)
         *(.sdata .sdata.*)
-    } > DRAM
-    .bss (NOLOAD) : {
+    }
+
+    . = ALIGN(4K);
+    edata = .;
+
+    sbss_with_stack = .;
+    .bss : {
         *(.bss.stack)
-        . = ALIGN(8);
         sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
-        . = ALIGN(8);
-        ebss = .;
-    } > DRAM
+    }
+
+    . = ALIGN(4K);
+    ebss = .;
+    
+    ekernel = .;
+
     /DISCARD/ : {
         *(.eh_frame)
     }

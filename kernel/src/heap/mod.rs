@@ -50,4 +50,8 @@ unsafe impl GlobalAlloc for UpBuddyAllocator {
 }
 
 #[global_allocator]
-pub static HEAP_ALLOCATOR: UpBuddyAllocator = UpBuddyAllocator::empty(KERNEL_HEAP_GRANULARITY);
+static HEAP_ALLOCATOR: UpBuddyAllocator = UpBuddyAllocator::empty(KERNEL_HEAP_GRANULARITY);
+
+pub fn init_heap() {
+    HEAP_ALLOCATOR.init();
+}

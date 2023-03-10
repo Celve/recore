@@ -1,19 +1,22 @@
+use super::page_table::PageTableEntry;
+use super::range::Step;
 use crate::config::*;
+use core::ops::{self, AddAssign};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PhyAddr(usize);
+pub struct PhyAddr(pub usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct VirAddr(usize);
+pub struct VirAddr(pub usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PhyPageNum(usize);
+pub struct PhyPageNum(pub usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct VirPageNum(usize);
+pub struct VirPageNum(pub usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct GenOffset(usize);
+pub struct GenOffset(pub usize);
 
 macro_rules! truncate_phy_addr {
     ($e: expr) => {
@@ -55,13 +58,13 @@ impl From<usize> for VirAddr {
 
 impl From<usize> for PhyPageNum {
     fn from(value: usize) -> Self {
-        Self(truncate_page_num!(truncate_phy_addr!(value)))
+        Self(truncate_page_num!(truncate_phy_addr!(value)) >> PAGE_SIZE_BITS)
     }
 }
 
 impl From<usize> for VirPageNum {
     fn from(value: usize) -> Self {
-        Self(truncate_page_num!(truncate_vir_addr!(value)))
+        Self(truncate_page_num!(truncate_vir_addr!(value)) >> PAGE_SIZE_BITS)
     }
 }
 
@@ -87,13 +90,13 @@ impl From<VirAddr> for usize {
 
 impl From<PhyPageNum> for usize {
     fn from(value: PhyPageNum) -> Self {
-        value.0
+        value.0 << PAGE_SIZE_BITS
     }
 }
 
 impl From<VirPageNum> for usize {
     fn from(value: VirPageNum) -> Self {
-        value.0
+        value.0 << PAGE_SIZE_BITS
     }
 }
 
@@ -107,25 +110,49 @@ impl From<GenOffset> for usize {
 
 impl From<PhyPageNum> for PhyAddr {
     fn from(value: PhyPageNum) -> Self {
+        Self(value.0 << PAGE_SIZE_BITS)
+    }
+}
+
+impl From<VirAddr> for PhyAddr {
+    fn from(value: VirAddr) -> Self {
         Self(value.0)
     }
 }
 
 impl From<VirPageNum> for VirAddr {
     fn from(value: VirPageNum) -> Self {
+        Self(value.0 << PAGE_SIZE_BITS)
+    }
+}
+
+impl From<PhyAddr> for VirAddr {
+    fn from(value: PhyAddr) -> Self {
         Self(value.0)
     }
 }
 
 impl From<PhyAddr> for PhyPageNum {
     fn from(value: PhyAddr) -> Self {
-        Self(truncate_page_num!(value.0))
+        Self(truncate_page_num!(value.0) >> PAGE_SIZE_BITS)
+    }
+}
+
+impl From<VirPageNum> for PhyPageNum {
+    fn from(value: VirPageNum) -> Self {
+        Self(value.0)
     }
 }
 
 impl From<VirAddr> for VirPageNum {
     fn from(value: VirAddr) -> Self {
-        Self(truncate_page_num!(value.0))
+        Self(truncate_page_num!(value.0) >> PAGE_SIZE_BITS)
+    }
+}
+
+impl From<PhyPageNum> for VirPageNum {
+    fn from(value: PhyPageNum) -> Self {
+        Self(value.0)
     }
 }
 
@@ -138,5 +165,281 @@ impl From<PhyAddr> for GenOffset {
 impl From<VirAddr> for GenOffset {
     fn from(value: VirAddr) -> Self {
         Self(truncate_offset!(value.0))
+    }
+}
+
+// utilities
+
+impl PhyAddr {
+    pub fn new(ppn: PhyPageNum, go: GenOffset) -> Self {
+        Self(ppn.0 << PAGE_SIZE_BITS | go.0)
+    }
+
+    pub fn phy_page_num(&self) -> PhyPageNum {
+        PhyPageNum(truncate_page_num!(self.0) >> PAGE_SIZE_BITS)
+    }
+
+    pub fn gen_offset(&self) -> GenOffset {
+        GenOffset(truncate_offset!(self.0))
+    }
+
+    pub fn ceil_to_phy_page_num(&self) -> PhyPageNum {
+        (self.0 + PAGE_SIZE - 1).into()
+    }
+
+    /// This function is equivalent to `phy_page_num()`, with different semantic.
+    pub fn floor_to_phy_page_num(&self) -> PhyPageNum {
+        PhyPageNum(truncate_page_num!(self.0) >> PAGE_SIZE_BITS)
+    }
+}
+
+impl VirAddr {
+    pub fn new(vpn: VirPageNum, go: GenOffset) -> Self {
+        Self(vpn.0 << PAGE_SIZE_BITS | go.0)
+    }
+
+    pub fn vir_page_num(&self) -> VirPageNum {
+        VirPageNum(truncate_page_num!(self.0) >> PAGE_SIZE_BITS)
+    }
+
+    pub fn gen_offset(&self) -> GenOffset {
+        GenOffset(truncate_offset!(self.0))
+    }
+
+    pub fn ceil_to_vir_page_num(&self) -> VirPageNum {
+        (self.0 + PAGE_SIZE - 1).into()
+    }
+
+    pub fn floor_to_vir_page_num(&self) -> VirPageNum {
+        VirPageNum(truncate_page_num!(self.0) >> PAGE_SIZE_BITS)
+    }
+}
+
+impl PhyPageNum {
+    pub fn as_raw_ptes(&self) -> &'static mut [PageTableEntry] {
+        let start_ptr = usize::from(*self) as *mut PageTableEntry;
+        unsafe { core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE) }
+    }
+}
+
+impl VirPageNum {
+    pub fn indices(&self) -> [usize; 3] {
+        let mask = (1 << 9) - 1;
+        let l0 = self.0 & mask;
+        let l1 = self.0 >> 9 & mask;
+        let l2 = self.0 >> 18 & mask;
+        [l0, l1, l2]
+    }
+}
+
+// operator overloading
+
+impl ops::Add<usize> for PhyAddr {
+    type Output = PhyAddr;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        PhyAddr(self.0 + rhs)
+    }
+}
+
+impl ops::AddAssign<usize> for PhyAddr {
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 += rhs;
+    }
+}
+
+impl ops::Sub<usize> for PhyAddr {
+    type Output = PhyAddr;
+
+    fn sub(self, rhs: usize) -> Self::Output {
+        PhyAddr(self.0 - rhs)
+    }
+}
+
+impl ops::Sub<PhyAddr> for PhyAddr {
+    type Output = usize;
+
+    fn sub(self, rhs: PhyAddr) -> Self::Output {
+        self.0 - rhs.0
+    }
+}
+
+impl ops::SubAssign<usize> for PhyAddr {
+    fn sub_assign(&mut self, rhs: usize) {
+        self.0 -= rhs;
+    }
+}
+
+impl ops::Add<usize> for VirAddr {
+    type Output = VirAddr;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        VirAddr(self.0 + rhs)
+    }
+}
+
+impl ops::AddAssign<usize> for VirAddr {
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 += rhs;
+    }
+}
+
+impl ops::Sub<usize> for VirAddr {
+    type Output = VirAddr;
+
+    fn sub(self, rhs: usize) -> Self::Output {
+        VirAddr(self.0 - rhs)
+    }
+}
+
+impl ops::Sub<VirAddr> for VirAddr {
+    type Output = usize;
+
+    fn sub(self, rhs: VirAddr) -> Self::Output {
+        self.0 - rhs.0
+    }
+}
+
+impl ops::SubAssign<usize> for VirAddr {
+    fn sub_assign(&mut self, rhs: usize) {
+        self.0 -= rhs;
+    }
+}
+
+impl ops::Add<usize> for PhyPageNum {
+    type Output = PhyPageNum;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        PhyPageNum(self.0 + rhs)
+    }
+}
+
+impl ops::AddAssign<usize> for PhyPageNum {
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 += rhs;
+    }
+}
+
+impl ops::Sub<usize> for PhyPageNum {
+    type Output = PhyPageNum;
+
+    fn sub(self, rhs: usize) -> Self::Output {
+        PhyPageNum(self.0 - rhs)
+    }
+}
+
+impl ops::Sub<PhyPageNum> for PhyPageNum {
+    type Output = usize;
+
+    fn sub(self, rhs: PhyPageNum) -> Self::Output {
+        self.0 - rhs.0
+    }
+}
+
+impl ops::SubAssign<usize> for PhyPageNum {
+    fn sub_assign(&mut self, rhs: usize) {
+        self.0 -= rhs;
+    }
+}
+
+impl ops::Add<usize> for VirPageNum {
+    type Output = VirPageNum;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        VirPageNum(self.0 + rhs)
+    }
+}
+
+impl ops::AddAssign<usize> for VirPageNum {
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 += rhs;
+    }
+}
+
+impl ops::Sub<usize> for VirPageNum {
+    type Output = VirPageNum;
+
+    fn sub(self, rhs: usize) -> Self::Output {
+        VirPageNum(self.0 - rhs)
+    }
+}
+
+impl ops::Sub<VirPageNum> for VirPageNum {
+    type Output = usize;
+
+    fn sub(self, rhs: VirPageNum) -> Self::Output {
+        self.0 - rhs.0
+    }
+}
+
+impl ops::SubAssign<usize> for VirPageNum {
+    fn sub_assign(&mut self, rhs: usize) {
+        self.0 -= rhs;
+    }
+}
+
+impl ops::Add<usize> for GenOffset {
+    type Output = GenOffset;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        GenOffset(self.0 + rhs)
+    }
+}
+
+impl ops::AddAssign<usize> for GenOffset {
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 += rhs;
+    }
+}
+
+impl ops::Sub<usize> for GenOffset {
+    type Output = GenOffset;
+
+    fn sub(self, rhs: usize) -> Self::Output {
+        GenOffset(self.0 - rhs)
+    }
+}
+
+impl ops::Sub<GenOffset> for GenOffset {
+    type Output = usize;
+
+    fn sub(self, rhs: GenOffset) -> Self::Output {
+        self.0 - rhs.0
+    }
+}
+
+impl ops::SubAssign<usize> for GenOffset {
+    fn sub_assign(&mut self, rhs: usize) {
+        self.0 -= rhs;
+    }
+}
+
+impl Step for PhyAddr {
+    fn step(&mut self) {
+        self.add_assign(1);
+    }
+}
+
+impl Step for VirAddr {
+    fn step(&mut self) {
+        self.add_assign(1);
+    }
+}
+
+impl Step for PhyPageNum {
+    fn step(&mut self) {
+        self.add_assign(1);
+    }
+}
+
+impl Step for VirPageNum {
+    fn step(&mut self) {
+        self.add_assign(1);
+    }
+}
+
+impl Step for GenOffset {
+    fn step(&mut self) {
+        self.add_assign(1);
     }
 }

@@ -1,11 +1,11 @@
-use super::uart::UART;
+use super::uart::send_to_uart;
 use core::fmt::{Arguments, Write};
 
 pub struct Stdout;
 
 impl Stdout {
     pub fn putchar(&self, c: char) {
-        UART.send(c as u8);
+        send_to_uart(c as u8);
     }
 
     pub fn print(&mut self, args: Arguments) {

@@ -1,9 +1,7 @@
-use core::alloc::GlobalAlloc;
-use core::cmp::{max, min};
-use core::mem::size_of;
-
 use super::linked_list::LinkedList;
 use alloc::alloc::Layout;
+use core::cmp::{max, min};
+use core::mem::size_of;
 
 const BUDDY_ALLOCATOR_LEVEL: usize = 32;
 
@@ -83,7 +81,6 @@ impl BuddyAllocator {
     pub unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
         let size = self.calculate_size(&layout);
         let level = size.trailing_zeros() as usize;
-
         self.merge(level, ptr);
     }
 

@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(naked_functions, asm_const, const_cmp)]
 
+#[macro_use]
 extern crate alloc;
 
 mod complement;
@@ -11,11 +12,12 @@ mod io;
 mod mm;
 mod sync;
 
-use alloc::boxed::Box;
 use config::*;
 use core::arch::asm;
-use heap::HEAP_ALLOCATOR;
-use io::uart::UART;
+use heap::init_heap;
+use io::uart::init_uart;
+
+use crate::mm::{frame_allocator::init_frame_allocator, share::init_kernel_space};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [u8; BOOTLOADER_STACK_SIZE] = [0; BOOTLOADER_STACK_SIZE];
@@ -36,11 +38,30 @@ unsafe extern "C" fn _start() {
     );
 }
 
-#[no_mangle]
 extern "C" fn rust_main() {
-    UART.init();
-    HEAP_ALLOCATOR.init();
-    let a = Box::new(1);
-    println!("Hello, world!");
-    println!("This is the {} message", a);
+    init_bss();
+    init_uart();
+    println!("[kernel] Section bss cleared.");
+    println!("[kernel] UART initialized.");
+
+    init_heap();
+    println!("[kernel] Heap initialized.");
+
+    init_frame_allocator();
+    println!("[kernel] Frame allocator initialized.");
+
+    init_kernel_space();
+    println!("[kernel] Kernel mapping done.");
+
+    panic!("[kernel] All works have been done.");
+}
+
+fn init_bss() {
+    extern "C" {
+        fn sbss();
+        fn ebss();
+    }
+    unsafe {
+        core::slice::from_raw_parts_mut(sbss as *mut u8, ebss as usize - sbss as usize).fill(0);
+    }
 }

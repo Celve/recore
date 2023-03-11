@@ -223,6 +223,9 @@ impl PhyPageNum {
 }
 
 impl VirPageNum {
+    /// Convert virtual page number to three parts for page table to index.
+    ///
+    /// Please pay attention to the order, which I have made a mistake.
     pub fn indices(&self) -> [usize; 3] {
         let mask = (1 << 9) - 1;
         let l2 = self.0 & mask;

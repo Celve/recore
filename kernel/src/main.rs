@@ -41,6 +41,9 @@ unsafe extern "C" fn _start() {
     );
 }
 
+/// An entry for rust program that transfers mmode to smode.
+///
+/// We spare a little bit of kernel stack to use as its stack, which would never be recovered.
 unsafe fn rust_start() -> ! {
     use riscv::register::*;
     mstatus::set_mpp(riscv::register::mstatus::MPP::Supervisor);
@@ -48,6 +51,8 @@ unsafe fn rust_start() -> ! {
     sie::set_sext();
     sie::set_stimer();
     sie::set_ssoft();
+
+    // the following two lines are necessary, but I don't know why
     pmpaddr0::write(0x3fffffffffffffusize);
     pmpcfg0::write(0xf);
 

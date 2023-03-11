@@ -105,10 +105,12 @@ impl PageTable {
         self.find_pte(vpn).map(|pte| *pte)
     }
 
+    /// Convert the root physical page number of page table to a form that can be used by `satp` register.
     pub fn to_satp(&self) -> usize {
         8usize << 60 | self.satp.0
     }
 
+    /// Find the page table entry with given virtual page number, creating new page table entry when necessary.
     fn create_pte(&mut self, vpn: VirPageNum) -> &mut PageTableEntry {
         let indices = vpn.indices();
         let mut ptes = self.satp.as_raw_ptes();
@@ -128,6 +130,7 @@ impl PageTable {
         unreachable!();
     }
 
+    /// Find the page table entry with given virtual page number without creating new page table entry on the way.
     fn find_pte(&self, vpn: VirPageNum) -> Option<&mut PageTableEntry> {
         let indices = vpn.indices();
         let mut ptes = self.satp.as_raw_ptes();

@@ -17,7 +17,10 @@ use core::arch::asm;
 use heap::init_heap;
 use io::uart::init_uart;
 
-use crate::mm::{frame_allocator::init_frame_allocator, share::init_kernel_space};
+use crate::mm::{
+    frame_allocator::init_frame_allocator,
+    share::{activate_page_table, init_kernel_space},
+};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [u8; BOOTLOADER_STACK_SIZE] = [0; BOOTLOADER_STACK_SIZE];
@@ -30,10 +33,32 @@ unsafe extern "C" fn _start() {
         "la sp, {bootloader_stack}",
         "li t0, {bootloader_stack_size}",
         "add sp, sp, t0",
-        "j {rust_main}",
+        "j {rust_start}",
         bootloader_stack = sym BOOTLOADER_STACK_SPACE,
         bootloader_stack_size = const BOOTLOADER_STACK_SIZE,
-        rust_main = sym rust_main,
+        rust_start = sym rust_start,
+        options(noreturn),
+    );
+}
+
+unsafe fn rust_start() -> ! {
+    use riscv::register::*;
+    mstatus::set_mpp(riscv::register::mstatus::MPP::Supervisor);
+    mepc::write(rust_main as usize);
+    sie::set_sext();
+    sie::set_stimer();
+    sie::set_ssoft();
+    pmpaddr0::write(0x3fffffffffffffusize);
+    pmpcfg0::write(0xf);
+
+    asm!(
+        "li t0, {medeleg}",
+        "csrw medeleg, t0",
+        "li t0, {mideleg}",
+        "csrw mideleg, t0",
+        "mret",
+        medeleg = const 0xffff,
+        mideleg = const 0xffff,
         options(noreturn),
     );
 }
@@ -53,7 +78,8 @@ extern "C" fn rust_main() {
     init_kernel_space();
     println!("[kernel] Kernel mapping done.");
 
-    panic!("[kernel] All works have been done.");
+    activate_page_table();
+    println!("[kernel] Page table activated.");
 }
 
 fn init_bss() {

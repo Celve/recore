@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use lazy_static::lazy_static;
 
 use crate::{
@@ -6,7 +8,7 @@ use crate::{
     sync::up::UpCell,
 };
 
-use super::memory::MemorySet;
+use super::{memory::MemorySet, page_table};
 
 lazy_static! {
     static ref KERNEL_SPACE: UpCell<MemorySet> = UpCell::new(MemorySet::new());
@@ -75,4 +77,14 @@ pub fn init_kernel_space() {
         MappingType::Identical,
         PTEFlags::R | PTEFlags::W,
     );
+}
+
+pub fn activate_page_table() {
+    let kernel_space = KERNEL_SPACE.borrow_mut();
+    let page_table = kernel_space.page_table().borrow_mut();
+    let satp = page_table.to_satp();
+    riscv::register::satp::write(satp);
+    unsafe {
+        asm!("sfence.vma");
+    }
 }

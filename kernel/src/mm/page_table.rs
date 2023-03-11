@@ -129,6 +129,10 @@ impl PageTable {
         }
         unreachable!();
     }
+
+    pub fn to_satp(&self) -> usize {
+        8usize << 60 | self.satp.0
+    }
 }
 
 impl Drop for PageTable {

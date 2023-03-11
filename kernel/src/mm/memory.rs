@@ -65,6 +65,10 @@ impl MemorySet {
             None => false,
         }
     }
+
+    pub fn page_table(&self) -> &Arc<UpCell<PageTable>> {
+        &self.page_table
+    }
 }
 
 impl MappingArea {

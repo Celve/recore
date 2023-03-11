@@ -1,7 +1,10 @@
 use super::page_table::PageTableEntry;
 use super::range::Step;
 use crate::config::*;
-use core::ops::{self, AddAssign};
+use core::{
+    mem::size_of,
+    ops::{self, AddAssign},
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PhyAddr(pub usize);
@@ -218,7 +221,7 @@ impl VirAddr {
 impl PhyPageNum {
     pub fn as_raw_ptes(&self) -> &'static mut [PageTableEntry] {
         let start_ptr = usize::from(*self) as *mut PageTableEntry;
-        unsafe { core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE) }
+        unsafe { core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE / size_of::<usize>()) }
     }
 }
 

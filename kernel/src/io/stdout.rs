@@ -22,14 +22,14 @@ impl Write for Stdout {
 
 #[macro_export]
 macro_rules! print {
-    ($fmt: literal $(, $t: tt)*) => {
-        $crate::io::stdout().print(format_args!($fmt $(, $t)*));
+    ($fmt: literal $($t: tt)*) => {
+        $crate::io::stdout().print(format_args!($fmt $($t)*));
     };
 }
 
 #[macro_export]
 macro_rules! println {
-    ($fmt: literal $(, $t: tt)*) => {
-        $crate::io::stdout().print(format_args!(concat!($fmt, "\n") $(, $t)*));
+    ($fmt: literal $($t: tt)*) => {
+        $crate::io::stdout().print(format_args!(concat!($fmt, "\n") $($t)*));
     };
 }

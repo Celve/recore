@@ -11,12 +11,12 @@ use lazy_static::lazy_static;
 ///
 /// The creation of frame is equivalent to the allocation of frame allocator,
 /// while the dropping of frame is equivalent to the deallocation of frame allocator.
-pub struct FrameSet {
-    frames: Vec<Frame>,
-}
-
 pub struct Frame {
     ppn: PhyPageNum,
+}
+
+pub struct Series {
+    ppns: Vec<PhyPageNum>,
     is_allocated: bool,
 }
 
@@ -26,19 +26,36 @@ pub struct FrameAllocator {
     recycled: Vec<PhyPageNum>,
 }
 
-impl FrameSet {
-    pub fn new(frames: Vec<Frame>) -> Self {
-        Self { frames }
+impl Series {
+    pub fn new(ppns: Vec<PhyPageNum>, is_allocated: bool) -> Self {
+        Self { ppns, is_allocated }
     }
 
-    pub fn frames(&self, index: usize) -> &Frame {
-        &self.frames[index]
+    pub fn init(&self) {
+        self.ppns.iter().for_each(|ppn| {
+            let ptr = usize::from(*ppn) as *mut u8;
+            unsafe {
+                core::slice::from_raw_parts_mut(ptr, PAGE_SIZE).fill(0);
+            }
+        })
+    }
+
+    pub fn ppn(&self, index: usize) -> PhyPageNum {
+        self.ppns[index]
+    }
+}
+
+impl Drop for Series {
+    fn drop(&mut self) {
+        if self.is_allocated {
+            dealloc_series(self);
+        }
     }
 }
 
 impl Frame {
-    pub fn new(ppn: PhyPageNum, is_allocated: bool) -> Self {
-        Self { ppn, is_allocated }
+    pub fn new(ppn: PhyPageNum) -> Self {
+        Self { ppn }
     }
 
     pub fn init(&self) {
@@ -85,22 +102,21 @@ impl FrameAllocator {
         self.end = PhyAddr::from(end).floor_to_phy_page_num();
     }
 
-    pub fn alloc(&mut self) -> Option<Frame> {
+    pub fn alloc(&mut self) -> Option<PhyPageNum> {
         let candidate = self.recycled.pop();
         if let Some(ppn) = candidate {
-            Some(Frame::new(ppn, true))
+            Some(ppn)
         } else if self.start < self.end {
             let ppn = self.start;
-            let test = usize::from(PhyAddr::from(ppn));
             self.start += 1;
-            Some(Frame::new(ppn, true))
+            Some(ppn)
         } else {
             None
         }
     }
 
-    pub fn dealloc(&mut self, frame: &Frame) {
-        self.recycled.push(frame.ppn());
+    pub fn dealloc(&mut self, ppn: PhyPageNum) {
+        self.recycled.push(ppn);
     }
 }
 
@@ -118,31 +134,37 @@ pub fn init_frame_allocator() {
 }
 #[no_mangle]
 pub fn alloc_frame() -> Frame {
-    let result = FRAME_ALLOCATOR
-        .borrow_mut()
-        .alloc()
-        .expect("[frame_allocator] Cannot fetch any more frame.");
+    let result = Frame::new(
+        FRAME_ALLOCATOR
+            .borrow_mut()
+            .alloc()
+            .expect("[frame_allocator] Cannot fetch any more frame."),
+    );
     result.init();
     result
 }
 
 pub fn dealloc_frame(frame: &Frame) {
-    FRAME_ALLOCATOR.borrow_mut().dealloc(frame);
+    FRAME_ALLOCATOR.borrow_mut().dealloc(frame.ppn());
 }
 
 /// Allocate a set of frames with the given number.
 ///
 /// `num` means the number of frames, instead of the number of bytes or something else.
-pub fn alloc_frame_set(num: usize) -> FrameSet {
-    let mut frames = Vec::new();
+pub fn alloc_series(num: usize) -> Series {
+    let mut frame_allocator = FRAME_ALLOCATOR.borrow_mut();
+    let mut ppns = Vec::new();
     for _ in 0..num {
-        frames.push(alloc_frame());
+        ppns.push(frame_allocator.alloc().unwrap());
     }
-    FrameSet::new(frames)
+    let result = Series::new(ppns, true);
+    result.init();
+    result
 }
 
-pub fn dealloc_frame_set(frames: FrameSet) {
-    for frame in frames.frames.iter() {
-        dealloc_frame(frame);
+pub fn dealloc_series(series: &Series) {
+    let mut frame_allocator = FRAME_ALLOCATOR.borrow_mut();
+    for ppn in series.ppns.iter() {
+        frame_allocator.dealloc(*ppn);
     }
 }

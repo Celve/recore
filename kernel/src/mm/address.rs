@@ -225,9 +225,9 @@ impl PhyPageNum {
 impl VirPageNum {
     pub fn indices(&self) -> [usize; 3] {
         let mask = (1 << 9) - 1;
-        let l0 = self.0 & mask;
+        let l2 = self.0 & mask;
         let l1 = self.0 >> 9 & mask;
-        let l2 = self.0 >> 18 & mask;
+        let l0 = self.0 >> 18 & mask;
         [l0, l1, l2]
     }
 }

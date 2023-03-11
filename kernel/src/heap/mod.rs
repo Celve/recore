@@ -1,8 +1,7 @@
-use core::alloc::GlobalAlloc;
-use core::ops::Deref;
-
 use crate::config::{KERNEL_HEAP_GRANULARITY, KERNEL_HEAP_SIZE};
 use crate::sync::up::UpCell;
+use core::alloc::GlobalAlloc;
+use core::ops::Deref;
 
 use self::buddy_allocator::BuddyAllocator;
 

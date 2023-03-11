@@ -1,11 +1,11 @@
-use alloc::vec::{self, Vec};
+use alloc::vec::Vec;
 use bitflags::bitflags;
 
-use crate::config::{PAGE_SIZE_BITS, PPN_WIDTH, PTE_FLAG_WIDTH};
+use crate::config::{PPN_WIDTH, PTE_FLAG_WIDTH};
 
 use super::{
     address::{PhyPageNum, VirPageNum},
-    frame_allocator::{alloc_frame, dealloc_frame, Frame, FRAME_ALLOCATOR},
+    frame_allocator::{alloc_frame, Frame},
 };
 
 bitflags! {
@@ -28,9 +28,10 @@ bitflags! {
 /// Page table entry structure.
 ///
 /// Only contain bits to cater memory layout required by SV39.
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct PageTableEntry {
-    bits: usize,
+    pub bits: usize,
 }
 
 impl PageTableEntry {
@@ -44,8 +45,7 @@ impl PageTableEntry {
         let mut bits = self.bits;
         bits = bits >> PTE_FLAG_WIDTH;
         bits = bits & ((1 << PPN_WIDTH) - 1);
-        bits = bits << PAGE_SIZE_BITS;
-        bits.into()
+        PhyPageNum(bits)
     }
 
     pub fn set_ppn(&mut self, ppn: PhyPageNum) {
@@ -53,7 +53,10 @@ impl PageTableEntry {
         self.bits = ppn.0 << PTE_FLAG_WIDTH | flags;
     }
 
-    pub fn set_flags(&mut self, ppn: PTEFlags) {}
+    pub fn set_flags(&mut self, flags: PTEFlags) {
+        let ppn = self.get_ppn();
+        self.bits = ppn.0 << PTE_FLAG_WIDTH | flags.bits as usize;
+    }
 
     pub fn get_flags(&self) -> PTEFlags {
         // truncate
@@ -85,40 +88,51 @@ impl PageTable {
     }
 
     pub fn map(&mut self, vpn: VirPageNum, ppn: PhyPageNum, flags: PTEFlags) {
-        let pte = self.create_pte(vpn.indices());
+        let pte = self.create_pte(vpn);
         pte.set_ppn(ppn);
-        pte.set_flags(flags);
+        pte.set_flags(flags | PTEFlags::V);
     }
 
     pub fn unmap(&mut self, vpn: VirPageNum) {
         // TODO: some frames in page table might never be used again, hence deallocation is meaningful
         let pte = self
-            .find_pte(vpn.indices())
+            .find_pte(vpn)
             .expect("[page_table] Unmap a non-exist page table entry.");
         pte.set_flags(PTEFlags::empty());
     }
 
-    pub fn create_pte(&mut self, indices: [usize; 3]) -> &mut PageTableEntry {
+    pub fn translate(&self, vpn: VirPageNum) -> Option<PageTableEntry> {
+        self.find_pte(vpn).map(|pte| *pte)
+    }
+
+    pub fn to_satp(&self) -> usize {
+        8usize << 60 | self.satp.0
+    }
+
+    fn create_pte(&mut self, vpn: VirPageNum) -> &mut PageTableEntry {
+        let indices = vpn.indices();
         let mut ptes = self.satp.as_raw_ptes();
-        for i in 0..3 {
-            let pte = &mut ptes[indices[i]];
+        for (i, idx) in indices.iter().enumerate() {
+            let pte = &mut ptes[*idx];
+            if i == 2 {
+                return pte;
+            }
             if !pte.is_valid() {
                 let frame = alloc_frame();
                 pte.set_ppn(frame.ppn());
                 pte.set_flags(PTEFlags::V);
-            }
-            if i == 2 {
-                return pte;
+                self.frames.push(frame);
             }
             ptes = pte.get_ppn().as_raw_ptes();
         }
         unreachable!();
     }
 
-    pub fn find_pte(&self, indices: [usize; 3]) -> Option<&mut PageTableEntry> {
+    fn find_pte(&self, vpn: VirPageNum) -> Option<&mut PageTableEntry> {
+        let indices = vpn.indices();
         let mut ptes = self.satp.as_raw_ptes();
-        for i in 0..3 {
-            let pte = &mut ptes[indices[i]];
+        for (i, idx) in indices.iter().enumerate() {
+            let pte = &mut ptes[*idx];
             if !pte.is_valid() {
                 return None;
             }
@@ -128,10 +142,6 @@ impl PageTable {
             ptes = pte.get_ppn().as_raw_ptes();
         }
         unreachable!();
-    }
-
-    pub fn to_satp(&self) -> usize {
-        8usize << 60 | self.satp.0
     }
 }
 

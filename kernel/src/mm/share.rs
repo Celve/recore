@@ -1,14 +1,14 @@
+use crate::println;
 use core::arch::asm;
-
 use lazy_static::lazy_static;
 
 use crate::{
+    config::{MEMORY_END, UART_BASE_ADDRESS, UART_MAP_LENGTH},
     mm::{address::VirAddr, memory::MappingType, page_table::PTEFlags},
-    println,
     sync::up::UpCell,
 };
 
-use super::{memory::MemorySet, page_table};
+use super::memory::MemorySet;
 
 lazy_static! {
     static ref KERNEL_SPACE: UpCell<MemorySet> = UpCell::new(MemorySet::new());
@@ -18,14 +18,15 @@ lazy_static! {
 #[no_mangle]
 pub fn init_kernel_space() {
     extern "C" {
-        fn skernel();
-        fn ekernel();
+        fn stext();
+        fn etext();
         fn srodata();
         fn erodata();
         fn sdata();
         fn edata();
-        fn sbss();
+        fn sbss_with_stack();
         fn ebss();
+        fn ekernel();
     }
 
     let mut kernel_space = KERNEL_SPACE.borrow_mut();
@@ -33,11 +34,11 @@ pub fn init_kernel_space() {
     // map .text section
     println!(
         "[kernel] Mapping .text section [{:#x}, {:#x})",
-        skernel as usize, ekernel as usize
+        stext as usize, etext as usize
     );
     kernel_space.push(
-        VirAddr::from(skernel as usize).floor_to_vir_page_num(),
-        VirAddr::from(ekernel as usize).ceil_to_vir_page_num(),
+        VirAddr::from(stext as usize).floor_to_vir_page_num(),
+        VirAddr::from(etext as usize).ceil_to_vir_page_num(),
         MappingType::Identical,
         PTEFlags::R | PTEFlags::X,
     );
@@ -69,11 +70,34 @@ pub fn init_kernel_space() {
     // map .bss section
     println!(
         "[kernel] Mapping .bss section [{:#x}, {:#x})",
-        sbss as usize, ebss as usize
+        sbss_with_stack as usize, ebss as usize
     );
     kernel_space.push(
-        VirAddr::from(sbss as usize).ceil_to_vir_page_num(),
+        VirAddr::from(sbss_with_stack as usize).ceil_to_vir_page_num(),
         VirAddr::from(ebss as usize).ceil_to_vir_page_num(),
+        MappingType::Identical,
+        PTEFlags::R | PTEFlags::W,
+    );
+
+    println!(
+        "[kernel] Mapping allocated section [{:#x}, {:#x})",
+        ekernel as usize, MEMORY_END,
+    );
+    kernel_space.push(
+        VirAddr::from(ekernel as usize).ceil_to_vir_page_num(),
+        VirAddr::from(MEMORY_END).ceil_to_vir_page_num(),
+        MappingType::Identical,
+        PTEFlags::R | PTEFlags::W,
+    );
+
+    println!(
+        "[kernel] Mapping memory-mapped registers for IO [{:#x}, {:#x})",
+        UART_BASE_ADDRESS,
+        UART_BASE_ADDRESS + UART_MAP_LENGTH,
+    );
+    kernel_space.push(
+        VirAddr::from(UART_BASE_ADDRESS).ceil_to_vir_page_num(),
+        VirAddr::from(UART_BASE_ADDRESS + UART_MAP_LENGTH).ceil_to_vir_page_num(),
         MappingType::Identical,
         PTEFlags::R | PTEFlags::W,
     );

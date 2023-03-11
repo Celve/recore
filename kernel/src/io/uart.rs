@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use core::sync::atomic::{AtomicPtr, Ordering};
-use lazy_static::*;
+use lazy_static::lazy_static;
 
 use crate::config::UART_BASE_ADDRESS;
 

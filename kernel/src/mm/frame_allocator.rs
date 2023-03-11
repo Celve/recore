@@ -132,7 +132,7 @@ pub fn init_frame_allocator() {
         .borrow_mut()
         .init(ekernel as usize, MEMORY_END);
 }
-#[no_mangle]
+
 pub fn alloc_frame() -> Frame {
     let result = Frame::new(
         FRAME_ALLOCATOR

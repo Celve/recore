@@ -13,7 +13,7 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 OBJDUMP := rust-objdump --arch-name=riscv64
 
 # Disassembly
-DISASM ?= -x
+DISASM ?= -d
 
 build: env $(KERNEL_BIN)
 

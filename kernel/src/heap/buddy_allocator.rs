@@ -72,7 +72,10 @@ impl BuddyAllocator {
                 return result as *mut u8;
             }
         }
-        panic!("[buddy_allocator] Unable to allocate more space.");
+        panic!(
+            "[buddy_allocator] Unable to allocate more space for size {}.",
+            size
+        );
     }
 
     /// Deallocate memory according to the address provided.

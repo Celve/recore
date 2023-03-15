@@ -20,6 +20,11 @@ pub struct Series {
     is_allocated: bool,
 }
 
+pub struct Iter<'a> {
+    series: &'a Series,
+    idx: usize,
+}
+
 pub struct FrameAllocator {
     start: PhyPageNum,
     end: PhyPageNum,
@@ -43,12 +48,37 @@ impl Series {
     pub fn ppn(&self, index: usize) -> PhyPageNum {
         self.ppns[index]
     }
+
+    pub fn iter(&self) -> Iter {
+        Iter {
+            series: self,
+            idx: 0,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.ppns.len()
+    }
 }
 
 impl Drop for Series {
     fn drop(&mut self) {
         if self.is_allocated {
             dealloc_series(self);
+        }
+    }
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = PhyPageNum;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx < self.series.ppns.len() {
+            let result = self.series.ppns[self.idx];
+            self.idx += 1;
+            Some(result)
+        } else {
+            None
         }
     }
 }

@@ -1,12 +1,14 @@
-use alloc::vec::Vec;
-use bitflags::bitflags;
+use core::arch::asm;
 
-use crate::config::{PPN_WIDTH, PTE_FLAG_WIDTH};
-
+use super::memory::KERNEL_SPACE;
 use super::{
     address::{PhyPageNum, VirPageNum},
     frame_allocator::{alloc_frame, Frame},
+    memory::MappingPermission,
 };
+use crate::config::{PPN_WIDTH, PTE_FLAG_WIDTH};
+use alloc::vec::Vec;
+use bitflags::bitflags;
 
 bitflags! {
     /// This data structure is used to define the flags of page table entry.
@@ -151,5 +153,23 @@ impl PageTable {
 impl Drop for PageTable {
     fn drop(&mut self) {
         self.frames.iter().for_each(|frame| drop(frame));
+    }
+}
+
+impl From<MappingPermission> for PTEFlags {
+    fn from(value: MappingPermission) -> Self {
+        PTEFlags {
+            bits: value.bits() as u8,
+        }
+    }
+}
+
+pub fn activate_page_table() {
+    let kernel_space = KERNEL_SPACE.borrow_mut();
+    let page_table = kernel_space.page_table().borrow_mut();
+    let satp = page_table.to_satp();
+    riscv::register::satp::write(satp);
+    unsafe {
+        asm!("sfence.vma");
     }
 }

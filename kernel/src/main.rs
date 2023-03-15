@@ -11,16 +11,14 @@ mod heap;
 mod io;
 mod mm;
 mod sync;
+mod task;
+mod trap;
 
 use config::*;
 use core::arch::asm;
 use heap::init_heap;
 use io::uart::init_uart;
-
-use crate::mm::{
-    frame_allocator::init_frame_allocator,
-    share::{activate_page_table, init_kernel_space},
-};
+use mm::{frame_allocator::init_frame_allocator, page_table::activate_page_table};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [u8; BOOTLOADER_STACK_SIZE] = [0; BOOTLOADER_STACK_SIZE];
@@ -80,10 +78,7 @@ extern "C" fn rust_main() {
     init_frame_allocator();
     println!("[kernel] Frame allocator initialized.");
 
-    init_kernel_space();
-    println!("[kernel] Kernel mapping done.");
-
-    activate_page_table();
+    activate_page_table(); // the kernel space is automatically init before activating page table because of the lazy_static!
     println!("[kernel] Page table activated.");
 }
 

@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 pub const BOOTLOADER_STACK_SIZE: usize = 0x4096;
 pub const UART_BASE_ADDRESS: usize = 0x10_000_000;
-pub const UART_MAP_LENGTH: usize = 0x6;
+pub const UART_MAP_SIZE: usize = 0x6;
 
 pub const KERNEL_HEAP_GRANULARITY: usize = size_of::<usize>();
 // pub const KERNEL_HEAP_GRANULARITY: usize = PAGE_SIZE;
@@ -18,3 +18,6 @@ pub const VPN_WIDTH: usize = VA_WIDTH - PAGE_SIZE_BITS;
 pub const PTE_FLAG_WIDTH: usize = 10;
 
 pub const MEMORY_END: usize = 0x88_000_000;
+
+pub const TRAMPOLINE_START_ADDRESS: usize = usize::MAX - PAGE_SIZE + 1; // `usize::MAX` is included.
+pub const TRAP_CONTEXT_START_ADDRESS: usize = TRAMPOLINE_START_ADDRESS - PAGE_SIZE;

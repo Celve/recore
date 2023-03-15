@@ -223,6 +223,11 @@ impl PhyPageNum {
         let start_ptr = usize::from(*self) as *mut PageTableEntry;
         unsafe { core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE / size_of::<usize>()) }
     }
+
+    pub fn as_raw_bytes(&self) -> &'static mut [u8] {
+        let start_ptr = usize::from(*self) as *mut u8;
+        unsafe { core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE) }
+    }
 }
 
 impl VirPageNum {

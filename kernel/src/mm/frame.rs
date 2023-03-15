@@ -1,4 +1,10 @@
-use super::address::{PhyAddr, PhyPageNum};
+use core::cmp::min;
+
+use super::{
+    address::{PhyAddr, PhyPageNum, VirPageNum},
+    memory::{MappingPermission, MappingType},
+    page_table::PageTable,
+};
 use crate::{
     config::{MEMORY_END, PAGE_SIZE},
     sync::up::UpCell,
@@ -7,7 +13,6 @@ use alloc::vec::Vec;
 use lazy_static::lazy_static;
 
 /// The frame is the smallest granularity provided by frame allocator.
-/// And it's the main approach to dealing with allocation and deallocation.  
 ///
 /// The creation of frame is equivalent to the allocation of frame allocator,
 /// while the dropping of frame is equivalent to the deallocation of frame allocator.
@@ -15,13 +20,14 @@ pub struct Frame {
     ppn: PhyPageNum,
 }
 
-pub struct Series {
+pub struct Area {
     ppns: Vec<PhyPageNum>,
-    is_allocated: bool,
+    map_type: MappingType,
+    map_perm: MappingPermission,
 }
 
 pub struct Iter<'a> {
-    series: &'a Series,
+    series: &'a Area,
     idx: usize,
 }
 
@@ -31,9 +37,41 @@ pub struct FrameAllocator {
     recycled: Vec<PhyPageNum>,
 }
 
-impl Series {
-    pub fn new(ppns: Vec<PhyPageNum>, is_allocated: bool) -> Self {
-        Self { ppns, is_allocated }
+impl Area {
+    pub fn new_framed(len: usize, map_perm: MappingPermission) -> Self {
+        let result = Self {
+            ppns: (0..len).map(|_| alloc_frame()).collect(),
+            map_type: MappingType::Framed,
+            map_perm,
+        };
+        result.init();
+        result
+    }
+
+    /// Create a new area with identical mapping.
+    ///
+    /// `start` is included while `end` is not excluded.
+    pub fn new_identical(start: VirPageNum, end: VirPageNum, map_perm: MappingPermission) -> Self {
+        let len = end - start;
+        Self {
+            ppns: (0..len).map(|i| PhyPageNum(start.0 + i)).collect(),
+            map_type: MappingType::Identical,
+            map_perm,
+        }
+    }
+
+    pub fn copy_from(&self, data: &[u8]) {
+        let mut start = 0;
+        let len = data.len();
+        for ppn in self.ppns.iter() {
+            let src = &data[start..min(len, start + PAGE_SIZE)];
+            let dst = ppn.as_raw_bytes();
+            dst.copy_from_slice(src);
+            start += PAGE_SIZE;
+            if start >= len {
+                break;
+            }
+        }
     }
 
     pub fn init(&self) {
@@ -49,6 +87,10 @@ impl Series {
         self.ppns[index]
     }
 
+    pub fn map_perm(&self) -> MappingPermission {
+        self.map_perm
+    }
+
     pub fn iter(&self) -> Iter {
         Iter {
             series: self,
@@ -61,10 +103,12 @@ impl Series {
     }
 }
 
-impl Drop for Series {
+impl Drop for Area {
     fn drop(&mut self) {
-        if self.is_allocated {
-            dealloc_series(self);
+        if self.map_type != MappingType::Identical {
+            for ppn in self.ppns.iter() {
+                dealloc_frame(*ppn);
+            }
         }
     }
 }
@@ -84,8 +128,10 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 impl Frame {
-    pub fn new(ppn: PhyPageNum) -> Self {
-        Self { ppn }
+    pub fn new() -> Self {
+        let result = Self { ppn: alloc_frame() };
+        result.init();
+        result
     }
 
     pub fn init(&self) {
@@ -102,7 +148,7 @@ impl Frame {
 
 impl Drop for Frame {
     fn drop(&mut self) {
-        dealloc_frame(self);
+        dealloc_frame(self.ppn);
     }
 }
 
@@ -163,38 +209,13 @@ pub fn init_frame_allocator() {
         .init(ekernel as usize, MEMORY_END);
 }
 
-pub fn alloc_frame() -> Frame {
-    let result = Frame::new(
-        FRAME_ALLOCATOR
-            .borrow_mut()
-            .alloc()
-            .expect("[frame_allocator] Cannot fetch any more frame."),
-    );
-    result.init();
-    result
+fn alloc_frame() -> PhyPageNum {
+    FRAME_ALLOCATOR
+        .borrow_mut()
+        .alloc()
+        .expect("[frame_allocator] Cannot fetch any more frame.")
 }
 
-pub fn dealloc_frame(frame: &Frame) {
-    FRAME_ALLOCATOR.borrow_mut().dealloc(frame.ppn());
-}
-
-/// Allocate a set of frames with the given number.
-///
-/// `num` means the number of frames, instead of the number of bytes or something else.
-pub fn alloc_series(num: usize) -> Series {
-    let mut frame_allocator = FRAME_ALLOCATOR.borrow_mut();
-    let mut ppns = Vec::new();
-    for _ in 0..num {
-        ppns.push(frame_allocator.alloc().unwrap());
-    }
-    let result = Series::new(ppns, true);
-    result.init();
-    result
-}
-
-pub fn dealloc_series(series: &Series) {
-    let mut frame_allocator = FRAME_ALLOCATOR.borrow_mut();
-    for ppn in series.ppns.iter() {
-        frame_allocator.dealloc(*ppn);
-    }
+fn dealloc_frame(ppn: PhyPageNum) {
+    FRAME_ALLOCATOR.borrow_mut().dealloc(ppn);
 }

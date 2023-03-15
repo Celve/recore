@@ -24,6 +24,7 @@ SECTIONS
         . = ALIGN(4K);
         strampoline = .;
         *(.text.trampoline);
+        etrampoline = .;
         . = ALIGN(4K);
         *(.text .text.*)
     }

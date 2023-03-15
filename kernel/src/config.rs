@@ -1,6 +1,6 @@
 use core::mem::size_of;
 
-pub const BOOTLOADER_STACK_SIZE: usize = 0x4096;
+pub const BOOTLOADER_STACK_SIZE: usize = 0x1000;
 pub const UART_BASE_ADDRESS: usize = 0x10_000_000;
 pub const UART_MAP_SIZE: usize = 0x6;
 
@@ -21,3 +21,5 @@ pub const MEMORY_END: usize = 0x88_000_000;
 
 pub const TRAMPOLINE_START_ADDRESS: usize = usize::MAX - PAGE_SIZE + 1; // `usize::MAX` is included.
 pub const TRAP_CONTEXT_START_ADDRESS: usize = TRAMPOLINE_START_ADDRESS - PAGE_SIZE;
+
+pub const USER_STACK_SIZE: usize = 0x1000;

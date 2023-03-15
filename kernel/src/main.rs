@@ -18,7 +18,7 @@ use config::*;
 use core::arch::asm;
 use heap::init_heap;
 use io::uart::init_uart;
-use mm::{frame_allocator::init_frame_allocator, page_table::activate_page_table};
+use mm::{frame::init_frame_allocator, page_table::activate_page_table};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [u8; BOOTLOADER_STACK_SIZE] = [0; BOOTLOADER_STACK_SIZE];

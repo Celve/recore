@@ -1,3 +1,4 @@
+.altmacro
 .macro STORE_REG n
     sd x\n, \n*8(sp)
 .endm
@@ -15,7 +16,7 @@ _alltraps:
     sd ra, 1*8(sp) # store ra of user
     sd gp, 3*8(sp) # store gp of user
     .set n, 5
-    .repr 27
+    .rept 27
         STORE_REG %n
         .set n, n+1
     .endr
@@ -43,7 +44,7 @@ _restore:
     ld ra, 1*8(sp)
     ld gp, 3*8(sp)
     .set n, 5
-    .repr 27
+    .rept 27
         LOAD_REG %n
         .set n, n+1
     .endr

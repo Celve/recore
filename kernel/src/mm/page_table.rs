@@ -3,10 +3,11 @@ use core::arch::asm;
 use super::memory::KERNEL_SPACE;
 use super::{
     address::{PhyPageNum, VirPageNum},
-    frame_allocator::{alloc_frame, Frame},
+    frame::Frame,
     memory::MappingPermission,
 };
 use crate::config::{PPN_WIDTH, PTE_FLAG_WIDTH};
+use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 
@@ -82,7 +83,7 @@ pub struct PageTable {
 
 impl PageTable {
     pub fn new() -> Self {
-        let frame = alloc_frame();
+        let frame = Frame::new();
         Self {
             satp: frame.ppn(),
             frames: vec![frame],
@@ -122,7 +123,7 @@ impl PageTable {
                 return pte;
             }
             if !pte.is_valid() {
-                let frame = alloc_frame();
+                let frame = Frame::new();
                 pte.set_ppn(frame.ppn());
                 pte.set_flags(PTEFlags::V);
                 self.frames.push(frame);
@@ -166,7 +167,7 @@ impl From<MappingPermission> for PTEFlags {
 
 pub fn activate_page_table() {
     let kernel_space = KERNEL_SPACE.borrow_mut();
-    let page_table = kernel_space.page_table().borrow_mut();
+    let page_table = kernel_space.page_table();
     let satp = page_table.to_satp();
     riscv::register::satp::write(satp);
     unsafe {

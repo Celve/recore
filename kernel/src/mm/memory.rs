@@ -12,7 +12,6 @@ use crate::{
     mm::address::PhyAddr,
     println,
     sync::up::UpCell,
-    trap::trampoline::TRAMPOLINE,
 };
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use bitflags::bitflags;

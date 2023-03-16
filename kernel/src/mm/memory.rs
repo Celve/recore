@@ -1,7 +1,13 @@
+use super::{
+    address::{PhyPageNum, VirAddr, VirPageNum},
+    area::Area,
+    page_table::PageTable,
+    range::Range,
+};
 use crate::{
     config::{
-        MEMORY_END, PAGE_SIZE, TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_START_ADDRESS,
-        UART_BASE_ADDRESS, UART_MAP_SIZE, USER_STACK_SIZE,
+        MEMORY_END, PAGE_SIZE, TRAMPOLINE_END_ADDRESS, TRAMPOLINE_START_ADDRESS,
+        TRAP_CONTEXT_START_ADDRESS, UART_BASE_ADDRESS, UART_MAP_SIZE, USER_STACK_SIZE,
     },
     mm::address::PhyAddr,
     println,
@@ -13,16 +19,9 @@ use bitflags::bitflags;
 use core::cmp::min;
 use lazy_static::lazy_static;
 
-use super::{
-    address::{PhyPageNum, VirAddr, VirPageNum},
-    frame::Area,
-    page_table::PageTable,
-    range::Range,
-};
-
-pub struct MemorySet {
+pub struct Memory {
     page_table: PageTable,
-    areas: BTreeMap<VirPageNum, Arc<UpCell<Area>>>,
+    areas: Vec<Area>,
 }
 
 bitflags! {
@@ -41,11 +40,11 @@ pub enum MappingType {
     Linear,
 }
 
-impl MemorySet {
+impl Memory {
     pub fn empty() -> Self {
         Self {
             page_table: PageTable::new(),
-            areas: BTreeMap::new(),
+            areas: Vec::new(),
         }
     }
 
@@ -70,83 +69,65 @@ impl MemorySet {
             "[kernel] Mapping .text section [{:#x}, {:#x})",
             stext as usize, etext as usize
         );
-        result.map(
+        result.map(Area::new_identical(
             VirAddr::from(stext as usize).floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_identical(
-                VirAddr::from(stext as usize).floor_to_vir_page_num(),
-                VirAddr::from(etext as usize).ceil_to_vir_page_num(),
-                MappingPermission::R | MappingPermission::X,
-            ))),
-        );
+            VirAddr::from(etext as usize).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::X,
+        ));
 
         // map .rodata section
         println!(
             "[kernel] Mapping .rodata section [{:#x}, {:#x})",
             srodata as usize, erodata as usize
         );
-        result.map(
+        result.map(Area::new_identical(
             VirAddr::from(srodata as usize).floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_identical(
-                VirAddr::from(srodata as usize).floor_to_vir_page_num(),
-                VirAddr::from(erodata as usize).ceil_to_vir_page_num(),
-                MappingPermission::R,
-            ))),
-        );
+            VirAddr::from(erodata as usize).ceil_to_vir_page_num(),
+            MappingPermission::R,
+        ));
 
         // map .data section
         println!(
             "[kernel] Mapping .data section [{:#x}, {:#x})",
             sdata as usize, edata as usize
         );
-        result.map(
+        result.map(Area::new_identical(
             VirAddr::from(sdata as usize).floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_identical(
-                VirAddr::from(sdata as usize).floor_to_vir_page_num(),
-                VirAddr::from(edata as usize).ceil_to_vir_page_num(),
-                MappingPermission::R | MappingPermission::W,
-            ))),
-        );
+            VirAddr::from(edata as usize).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
 
         // map .bss section
         println!(
             "[kernel] Mapping .bss section [{:#x}, {:#x})",
             sbss_with_stack as usize, ebss as usize
         );
-        result.map(
+        result.map(Area::new_identical(
             VirAddr::from(sbss_with_stack as usize).floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_identical(
-                VirAddr::from(sbss_with_stack as usize).floor_to_vir_page_num(),
-                VirAddr::from(ebss as usize).ceil_to_vir_page_num(),
-                MappingPermission::R | MappingPermission::W,
-            ))),
-        );
+            VirAddr::from(ebss as usize).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
 
         println!(
             "[kernel] Mapping allocated section [{:#x}, {:#x})",
             ekernel as usize, MEMORY_END,
         );
-        result.map(
+        result.map(Area::new_identical(
             VirAddr::from(ekernel as usize).floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_identical(
-                VirAddr::from(ekernel as usize).floor_to_vir_page_num(),
-                VirAddr::from(MEMORY_END).ceil_to_vir_page_num(),
-                MappingPermission::R | MappingPermission::W,
-            ))),
-        );
+            VirAddr::from(MEMORY_END).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
 
         println!(
             "[kernel] Mapping memory-mapped registers for IO [{:#x}, {:#x})",
             UART_BASE_ADDRESS,
             UART_BASE_ADDRESS + UART_MAP_SIZE,
         );
-        result.map(
+        result.map(Area::new_identical(
             VirAddr::from(UART_BASE_ADDRESS).floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_identical(
-                VirAddr::from(UART_BASE_ADDRESS).floor_to_vir_page_num(),
-                VirAddr::from(UART_BASE_ADDRESS + UART_MAP_SIZE).ceil_to_vir_page_num(),
-                MappingPermission::R | MappingPermission::W,
-            ))),
-        );
+            VirAddr::from(UART_BASE_ADDRESS + UART_MAP_SIZE).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
 
         result.map_trampoline();
 
@@ -195,10 +176,7 @@ impl MemorySet {
                 area.copy_from(
                     &elf_file.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
                 );
-                result.map(
-                    start_va.floor_to_vir_page_num(),
-                    Arc::new(UpCell::new(area)),
-                );
+                result.map(area);
             }
         }
 
@@ -209,44 +187,43 @@ impl MemorySet {
         // map user stack
         let start_va: VirAddr = (end_vpn + 1).into();
         let end_va = start_va + USER_STACK_SIZE;
-        result.map(
+        result.map(Area::new_framed(
             start_va.floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_framed(
-                end_va - start_va,
-                MappingPermission::R | MappingPermission::W | MappingPermission::U,
-            ))),
-        );
+            end_va.ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W | MappingPermission::U,
+        ));
 
         result
     }
 
-    fn map(&mut self, vpn: VirPageNum, area: Arc<UpCell<Area>>) {
-        let mut_area = area.borrow_mut();
-        let range = Range::new(vpn, vpn + mut_area.len());
-        range.iter().enumerate().for_each(|(i, vpn)| {
+    fn map(&mut self, area: Area) {
+        area.range().iter().enumerate().for_each(|(i, vpn)| {
             self.page_table
-                .map(vpn, mut_area.ppn(i), mut_area.map_perm().into())
+                .map(vpn, area.frame(i).ppn(), area.map_perm().into())
         });
-        drop(mut_area);
-
-        self.areas.insert(vpn, area);
+        self.areas.push(area);
     }
 
     fn map_trampoline(&mut self) {
-        self.map(
+        self.map(Area::new_linear(
             VirAddr::from(TRAMPOLINE_START_ADDRESS).floor_to_vir_page_num(),
-            TRAMPOLINE.clone(),
-        );
+            PhyAddr::from(TRAMPOLINE_END_ADDRESS).ceil_to_phy_page_num(),
+            1,
+            MappingPermission::R | MappingPermission::X,
+        ));
     }
 
     fn map_trap_context(&mut self) {
-        self.map(
+        extern "C" {
+            fn strampoline();
+            fn etrampoline();
+        }
+        self.map(Area::new_linear(
             VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num(),
-            Arc::new(UpCell::new(Area::new_framed(
-                1,
-                MappingPermission::R | MappingPermission::W,
-            ))),
-        );
+            PhyAddr::from(strampoline as usize).floor_to_phy_page_num(),
+            1,
+            MappingPermission::R | MappingPermission::W,
+        ));
     }
 
     pub fn page_table(&self) -> &PageTable {
@@ -255,5 +232,5 @@ impl MemorySet {
 }
 
 lazy_static! {
-    pub static ref KERNEL_SPACE: UpCell<MemorySet> = UpCell::new(MemorySet::new_kernel());
+    pub static ref KERNEL_SPACE: UpCell<Memory> = UpCell::new(Memory::new_kernel());
 }

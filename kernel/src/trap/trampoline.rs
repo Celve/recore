@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use lazy_static::lazy_static;
 
 use crate::{
-    mm::{address::VirAddr, frame::Area, memory::MappingPermission},
+    mm::{address::VirAddr, area::Area, memory::MappingPermission},
     sync::up::UpCell,
 };
 

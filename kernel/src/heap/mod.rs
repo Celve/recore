@@ -3,10 +3,7 @@ use crate::sync::up::UpCell;
 use core::alloc::GlobalAlloc;
 use core::ops::Deref;
 
-use self::buddy_allocator::BuddyAllocator;
-
-mod buddy_allocator;
-mod linked_list;
+use heap::buddy_allocator::BuddyAllocator;
 
 static mut KERNEL_HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 

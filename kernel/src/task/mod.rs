@@ -1,7 +1,5 @@
 use crate::{
-    config::TRAMPOLINE_START_ADDRESS,
     mm::{address::VirPageNum, memory::KERNEL_SPACE},
-    println,
     task::{manager::fetch_idle_task_ctx, task::TaskContext},
 };
 
@@ -19,21 +17,20 @@ pub fn suspend_and_yield() {
 }
 
 pub fn exit_and_yield(exit_code: isize) {
-    let curr_task_cell = fetch_curr_task();
-    let mut curr_task = curr_task_cell.borrow_mut();
-    *curr_task.task_status_mut() = TaskStatus::Zombie;
-    *curr_task.exit_code_mut() = exit_code;
+    let curr_task = fetch_curr_task();
+    *curr_task.lock().task_status_mut() = TaskStatus::Zombie;
+    *curr_task.lock().exit_code_mut() = exit_code;
+    drop(curr_task);
     schedule();
 }
 
 pub fn schedule() {
-    let curr_task_cell = fetch_curr_task();
-    let mut curr_task = curr_task_cell.borrow_mut();
+    let task_ctx = fetch_curr_task().lock().task_ctx_ptr();
     println!(
         "checking: {:#x}\n",
         usize::from(
             KERNEL_SPACE
-                .borrow_mut()
+                .lock()
                 .page_table()
                 .translate(VirPageNum::from(0x10000))
                 .unwrap()
@@ -43,5 +40,5 @@ pub fn schedule() {
     extern "C" {
         fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
     }
-    unsafe { _switch(curr_task.task_ctx_mut(), fetch_idle_task_ctx()) }
+    unsafe { _switch(task_ctx, fetch_idle_task_ctx()) }
 }

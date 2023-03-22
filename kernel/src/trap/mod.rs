@@ -22,20 +22,18 @@ pub fn trap_handler() {
         },
         scause::Trap::Exception(excp) => match excp {
             scause::Exception::UserEnvCall => {
-                let curr_task_ptr = fetch_curr_task();
-                let curr_task = curr_task_ptr.borrow_mut();
-                let curr_trap_ctx = curr_task.trap_ctx_mut();
-                let id = curr_trap_ctx.saved_regs[17];
-                let arg1 = curr_trap_ctx.saved_regs[10];
-                let arg2 = curr_trap_ctx.saved_regs[11];
-                let arg3 = curr_trap_ctx.saved_regs[12];
+                let task = fetch_curr_task();
+                let task_guard = task.lock();
+                let trap_ctx = task_guard.trap_ctx_mut();
+                let id = trap_ctx.saved_regs[17];
+                let arg1 = trap_ctx.saved_regs[10];
+                let arg2 = trap_ctx.saved_regs[11];
+                let arg3 = trap_ctx.saved_regs[12];
 
                 // move it on
-                curr_trap_ctx.user_sepc += 4;
+                trap_ctx.user_sepc += 4;
 
-                drop(curr_trap_ctx);
-                drop(curr_task);
-                drop(curr_task_ptr);
+                drop(task_guard);
 
                 syscall(id, [arg1, arg2, arg3]);
             }

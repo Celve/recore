@@ -5,21 +5,20 @@
 #[macro_use]
 extern crate alloc;
 
+#[macro_use]
+mod io;
+
 mod complement;
 mod config;
-mod heap;
-mod io;
 mod mm;
-mod sync;
 mod syscall;
 mod task;
 mod trap;
 
 use config::*;
 use core::arch::{asm, global_asm};
-use heap::init_heap;
 use io::uart::init_uart;
-use mm::{frame::init_frame_allocator, page_table::activate_page_table};
+use mm::{frame::init_frame_allocator, heap::init_heap, page_table::activate_page_table};
 
 use crate::task::manager::run_tasks;
 

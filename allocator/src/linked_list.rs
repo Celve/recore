@@ -5,6 +5,8 @@ pub struct LinkedList {
     head: *mut usize,
 }
 
+unsafe impl Send for LinkedList {}
+
 impl LinkedList {
     pub const fn new() -> LinkedList {
         LinkedList { head: null_mut() }

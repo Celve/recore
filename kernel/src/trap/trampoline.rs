@@ -4,23 +4,18 @@ use riscv::register::utvec::TrapMode;
 
 use crate::config::{TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_START_ADDRESS};
 use crate::mm::address::VirPageNum;
-use crate::task::manager::{fetch_curr_task, TASK_MANAGER};
+use crate::task::manager::fetch_curr_task;
 
 global_asm!(include_str!("trampoline.s"));
 
 #[no_mangle]
 pub fn restore() {
-    TASK_MANAGER.borrow_mut();
     fetch_curr_task()
-        .borrow_mut()
+        .lock()
         .user_mem()
         .page_table()
         .translate(VirPageNum::from(0x10000));
-    let user_satp = fetch_curr_task()
-        .borrow_mut()
-        .user_mem()
-        .page_table()
-        .to_satp();
+    let user_satp = fetch_curr_task().lock().user_mem().page_table().to_satp();
 
     extern "C" {
         fn _restore();

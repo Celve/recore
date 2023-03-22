@@ -1,4 +1,6 @@
+#[macro_use]
 pub mod stdout;
+
 pub mod uart;
 
 use stdout::Stdout;

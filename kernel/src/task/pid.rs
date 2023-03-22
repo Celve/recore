@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-
-use crate::sync::up::UpCell;
+use spin::mutex::Mutex;
 
 pub struct Pid(pub usize);
 
@@ -46,13 +45,13 @@ impl PidAllocator {
 }
 
 lazy_static! {
-    pub static ref PID_ALLOCATOR: UpCell<PidAllocator> = UpCell::new(PidAllocator::new());
+    pub static ref PID_ALLOCATOR: Mutex<PidAllocator> = Mutex::new(PidAllocator::new());
 }
 
 pub fn alloc_pid() -> Pid {
-    PID_ALLOCATOR.borrow_mut().alloc()
+    PID_ALLOCATOR.lock().alloc()
 }
 
 pub fn dealloc_pid(pid: &Pid) {
-    PID_ALLOCATOR.borrow_mut().dealloc(pid);
+    PID_ALLOCATOR.lock().dealloc(pid);
 }

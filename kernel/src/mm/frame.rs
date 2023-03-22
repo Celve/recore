@@ -1,16 +1,10 @@
-use core::cmp::min;
-
-use super::{
-    address::{PhyAddr, PhyPageNum, VirPageNum},
-    memory::{MappingPermission, MappingType},
-    page_table::PageTable,
-};
-use crate::{
-    config::{MEMORY_END, PAGE_SIZE},
-    sync::up::UpCell,
-};
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
+use spin::mutex::Mutex;
+
+use crate::config::{MEMORY_END, PAGE_SIZE};
+
+use super::address::{PhyAddr, PhyPageNum};
 
 /// The frame is the smallest granularity provided by frame allocator.
 ///
@@ -100,25 +94,23 @@ impl FrameAllocator {
 }
 
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: UpCell<FrameAllocator> = UpCell::new(FrameAllocator::empty());
+    pub static ref FRAME_ALLOCATOR: Mutex<FrameAllocator> = Mutex::new(FrameAllocator::empty());
 }
 
 pub fn init_frame_allocator() {
     extern "C" {
         fn ekernel();
     }
-    FRAME_ALLOCATOR
-        .borrow_mut()
-        .init(ekernel as usize, MEMORY_END);
+    FRAME_ALLOCATOR.lock().init(ekernel as usize, MEMORY_END);
 }
 
 fn alloc_frame() -> PhyPageNum {
     FRAME_ALLOCATOR
-        .borrow_mut()
+        .lock()
         .alloc()
         .expect("[frame_allocator] Cannot fetch any more frame.")
 }
 
 fn dealloc_frame(ppn: PhyPageNum) {
-    FRAME_ALLOCATOR.borrow_mut().dealloc(ppn);
+    FRAME_ALLOCATOR.lock().dealloc(ppn);
 }

@@ -1,9 +1,3 @@
-use riscv::register::mcause::Trap;
-
-use crate::println;
-
-use super::trap_handler;
-
 #[repr(C)]
 pub struct TrapContext {
     pub saved_regs: [usize; 32],

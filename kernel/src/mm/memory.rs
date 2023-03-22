@@ -1,9 +1,9 @@
 use super::{
-    address::{PhyPageNum, VirAddr, VirPageNum},
+    address::{VirAddr, VirPageNum},
     area::Area,
     page_table::PageTable,
-    range::Range,
 };
+
 use crate::{
     config::{
         MEMORY_END, PAGE_SIZE, TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_END_ADDRESS,
@@ -11,12 +11,12 @@ use crate::{
     },
     mm::address::PhyAddr,
     println,
-    sync::up::UpCell,
 };
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+
+use alloc::vec::Vec;
 use bitflags::bitflags;
-use core::cmp::min;
 use lazy_static::lazy_static;
+use spin::mutex::Mutex;
 
 pub struct Memory {
     page_table: PageTable,
@@ -264,5 +264,5 @@ impl Memory {
 }
 
 lazy_static! {
-    pub static ref KERNEL_SPACE: UpCell<Memory> = UpCell::new(Memory::new_kernel());
+    pub static ref KERNEL_SPACE: Mutex<Memory> = Mutex::new(Memory::new_kernel());
 }

@@ -14,7 +14,7 @@ const USER_HEAP_GRANULARITY: usize = 8;
 static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
 #[global_allocator]
-static HEAP: LockedHeap = LockedHeap::new(USER_HEAP_GRANULARITY);
+static HEAP: LockedHeap = LockedHeap::empty(USER_HEAP_GRANULARITY);
 
 #[no_mangle]
 #[link_section = ".text.entry"]

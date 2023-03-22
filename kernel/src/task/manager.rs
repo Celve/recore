@@ -1,19 +1,14 @@
-use core::borrow::Borrow;
-
 use super::task::Task;
 
-use crate::{
-    println,
-    sync::up::UpCell,
-    task::{loader::get_app_data, task::TaskContext},
-};
+use crate::task::{loader::get_app_data, task::TaskContext};
 
 use alloc::{collections::VecDeque, sync::Arc, sync::Weak};
 use lazy_static::lazy_static;
+use spin::mutex::Mutex;
 
 pub struct Manager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    tasks: VecDeque<Arc<UpCell<Task>>>,
+    tasks: VecDeque<Arc<Mutex<Task>>>,
 
     /// A special task context that is used for thread switching.
     idle_task_ctx: TaskContext,
@@ -21,15 +16,15 @@ pub struct Manager {
 
 impl Manager {
     pub fn new(task: Task) -> Self {
-        let mut tasks: VecDeque<Arc<UpCell<Task>>> = VecDeque::new();
-        tasks.push_back(Arc::new(UpCell::new(task)));
+        let mut tasks: VecDeque<Arc<Mutex<Task>>> = VecDeque::new();
+        tasks.push_back(Arc::new(Mutex::new(task)));
         Self {
             tasks,
             idle_task_ctx: TaskContext::empty(),
         }
     }
 
-    pub fn current_task(&self) -> Weak<UpCell<Task>> {
+    pub fn current_task(&self) -> Weak<Mutex<Task>> {
         Arc::downgrade(
             self.tasks
                 .front()
@@ -43,23 +38,23 @@ impl Manager {
 }
 
 lazy_static! {
-    pub static ref TASK_MANAGER: UpCell<Manager> =
-        UpCell::new(Manager::new(Task::from_elf(get_app_data(0), None)));
+    pub static ref TASK_MANAGER: Mutex<Manager> =
+        Mutex::new(Manager::new(Task::from_elf(get_app_data(0), None)));
 }
 
-pub fn fetch_curr_task() -> Arc<UpCell<Task>> {
-    TASK_MANAGER.borrow_mut().current_task().upgrade().unwrap()
+pub fn fetch_curr_task() -> Arc<Mutex<Task>> {
+    TASK_MANAGER.lock().current_task().upgrade().unwrap()
 }
 
 pub fn fetch_idle_task_ctx() -> *mut TaskContext {
-    &mut TASK_MANAGER.borrow_mut().idle_task_ctx
+    &mut TASK_MANAGER.lock().idle_task_ctx
 }
 
 pub fn switch() {
-    let mut task_manager = TASK_MANAGER.borrow_mut();
+    let mut task_manager = TASK_MANAGER.lock();
     let task = task_manager.tasks.pop_front();
     if let Some(task) = task {
-        let task_ctx = task.borrow_mut().task_ctx_ptr();
+        let task_ctx = task.lock().task_ctx_ptr();
         let idle_task_ctx = task_manager.idle_task_ctx_ptr();
         task_manager.tasks.push_back(task);
         drop(task_manager);

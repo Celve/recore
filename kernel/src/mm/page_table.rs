@@ -1,3 +1,6 @@
+use alloc::vec::Vec;
+use bitflags::bitflags;
+
 use core::arch::asm;
 use core::cmp::{max, min};
 
@@ -9,8 +12,6 @@ use super::{
 };
 use crate::config::{PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH};
 use crate::println;
-use alloc::vec::Vec;
-use bitflags::bitflags;
 
 bitflags! {
     /// This data structure is used to define the flags of page table entry.
@@ -170,7 +171,7 @@ impl From<MappingPermission> for PTEFlags {
 }
 
 pub fn activate_page_table() {
-    let satp = KERNEL_SPACE.borrow_mut().page_table().to_satp();
+    let satp = KERNEL_SPACE.lock().page_table().to_satp();
     riscv::register::satp::write(satp);
     unsafe {
         asm!("sfence.vma");

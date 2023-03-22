@@ -2,19 +2,14 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use riscv::register::{
-    mcause::Trap,
-    sstatus::{self, set_spp, Sstatus, SPP},
-};
+use riscv::register::sstatus::{self, SPP};
 
 use crate::{
-    config::{TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_START_ADDRESS},
+    config::TRAP_CONTEXT_START_ADDRESS,
     mm::{
-        address::{PhyAddr, VirAddr, VirPageNum},
+        address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
-        page_table::PageTable,
     },
-    println,
     trap::{context::TrapContext, trampoline::restore, trap_handler},
 };
 
@@ -76,7 +71,7 @@ impl Task {
                 sstatus.bits(),
                 kernel_stack.top().into(),
                 trap_handler as usize,
-                KERNEL_SPACE.borrow_mut().page_table().to_satp(),
+                KERNEL_SPACE.lock().page_table().to_satp(),
             );
         }
         Self {

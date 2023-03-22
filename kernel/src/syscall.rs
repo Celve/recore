@@ -1,7 +1,6 @@
 use crate::{
     io::stdout::Stdout,
     mm::page_table::translate_bytes,
-    println,
     task::{exit_and_yield, manager::fetch_curr_task},
 };
 
@@ -22,9 +21,9 @@ pub fn syscall_write(fd: usize, buffer_ptr: usize, buffer_len: usize) {
     if fd != 1 {
         panic!("[syscall] Doesn't support file write.");
     }
-    let task_cell = fetch_curr_task();
-    let task = task_cell.borrow_mut();
-    let page_table = task.user_mem().page_table();
+    let task = fetch_curr_task();
+    let task_guard = task.lock();
+    let page_table = task_guard.user_mem().page_table();
     let buffer = translate_bytes(page_table, buffer_ptr as *const u8, buffer_len);
     let stdout = Stdout;
     buffer.iter().for_each(|b| stdout.putchar(*b as char));

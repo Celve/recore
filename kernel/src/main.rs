@@ -11,14 +11,19 @@ mod heap;
 mod io;
 mod mm;
 mod sync;
+mod syscall;
 mod task;
 mod trap;
 
 use config::*;
-use core::arch::asm;
+use core::arch::{asm, global_asm};
 use heap::init_heap;
 use io::uart::init_uart;
 use mm::{frame::init_frame_allocator, page_table::activate_page_table};
+
+use crate::task::manager::run_tasks;
+
+global_asm!(include_str!("app.s"));
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [u8; BOOTLOADER_STACK_SIZE] = [0; BOOTLOADER_STACK_SIZE];
@@ -46,6 +51,8 @@ unsafe fn rust_start() -> ! {
     use riscv::register::*;
     mstatus::set_mpp(riscv::register::mstatus::MPP::Supervisor);
     mepc::write(rust_main as usize);
+
+    satp::write(0);
     sie::set_sext();
     sie::set_stimer();
     sie::set_ssoft();
@@ -56,9 +63,9 @@ unsafe fn rust_start() -> ! {
 
     asm!(
         "li t0, {medeleg}",
+        "li t1, {mideleg}",
         "csrw medeleg, t0",
-        "li t0, {mideleg}",
-        "csrw mideleg, t0",
+        "csrw mideleg, t1",
         "mret",
         medeleg = const 0xffff,
         mideleg = const 0xffff,
@@ -66,6 +73,7 @@ unsafe fn rust_start() -> ! {
     );
 }
 
+#[no_mangle]
 extern "C" fn rust_main() {
     init_bss();
     init_uart();
@@ -80,6 +88,9 @@ extern "C" fn rust_main() {
 
     activate_page_table(); // the kernel space is automatically init before activating page table because of the lazy_static!
     println!("[kernel] Page table activated.");
+
+    println!("[kernel] Begin to run kernel tasks.");
+    run_tasks();
 }
 
 fn init_bss() {

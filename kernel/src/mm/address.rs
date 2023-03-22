@@ -87,7 +87,11 @@ impl From<PhyAddr> for usize {
 
 impl From<VirAddr> for usize {
     fn from(value: VirAddr) -> Self {
-        value.0
+        if value.0 >> (VA_WIDTH - 1) != 0 {
+            value.0 | !((1 << VA_WIDTH) - 1)
+        } else {
+            value.0
+        }
     }
 }
 
@@ -99,7 +103,12 @@ impl From<PhyPageNum> for usize {
 
 impl From<VirPageNum> for usize {
     fn from(value: VirPageNum) -> Self {
-        value.0 << PAGE_SIZE_BITS
+        let va = value.0 << PAGE_SIZE_BITS;
+        if va >> (VA_WIDTH - 1) != 0 {
+            va | !((1 << VA_WIDTH) - 1)
+        } else {
+            va
+        }
     }
 }
 
@@ -194,6 +203,14 @@ impl PhyAddr {
     pub fn floor_to_phy_page_num(&self) -> PhyPageNum {
         PhyPageNum(truncate_page_num!(self.0) >> PAGE_SIZE_BITS)
     }
+
+    pub fn as_ref<T>(&self) -> Option<&T> {
+        unsafe { (self.0 as *mut T).as_ref() }
+    }
+
+    pub fn as_mut<T>(&self) -> Option<&mut T> {
+        unsafe { (self.0 as *mut T).as_mut() }
+    }
 }
 
 impl VirAddr {
@@ -221,7 +238,9 @@ impl VirAddr {
 impl PhyPageNum {
     pub fn as_raw_ptes(&self) -> &'static mut [PageTableEntry] {
         let start_ptr = usize::from(*self) as *mut PageTableEntry;
-        unsafe { core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE / size_of::<usize>()) }
+        unsafe {
+            core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE / size_of::<PageTableEntry>())
+        }
     }
 
     pub fn as_raw_bytes(&self) -> &'static mut [u8] {

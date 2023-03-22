@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 allocator = { path = "../allocator" }
+
+[profile.release]
+debug = true

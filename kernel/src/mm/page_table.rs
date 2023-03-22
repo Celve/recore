@@ -1,4 +1,5 @@
 use core::arch::asm;
+use core::cmp::{max, min};
 
 use super::memory::KERNEL_SPACE;
 use super::{
@@ -6,7 +7,7 @@ use super::{
     frame::Frame,
     memory::MappingPermission,
 };
-use crate::config::{PPN_WIDTH, PTE_FLAG_WIDTH};
+use crate::config::{PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH};
 use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
@@ -77,15 +78,19 @@ impl PageTableEntry {
 ///
 /// RAII is used here. The frame collections control when to free those allocated frames used by page tables.
 pub struct PageTable {
-    satp: PhyPageNum,
+    root: PhyPageNum,
     frames: Vec<Frame>,
 }
 
 impl PageTable {
     pub fn new() -> Self {
         let frame = Frame::new();
+        println!(
+            "[page_table] Root of page table is {:#x}.",
+            usize::from(frame.ppn())
+        );
         Self {
-            satp: frame.ppn(),
+            root: frame.ppn(),
             frames: vec![frame],
         }
     }
@@ -105,18 +110,19 @@ impl PageTable {
     }
 
     pub fn translate(&self, vpn: VirPageNum) -> Option<PageTableEntry> {
+        let indices = vpn.indices();
         self.find_pte(vpn).map(|pte| *pte)
     }
 
     /// Convert the root physical page number of page table to a form that can be used by `satp` register.
     pub fn to_satp(&self) -> usize {
-        8usize << 60 | self.satp.0
+        8usize << 60 | self.root.0
     }
 
     /// Find the page table entry with given virtual page number, creating new page table entry when necessary.
     fn create_pte(&mut self, vpn: VirPageNum) -> &mut PageTableEntry {
         let indices = vpn.indices();
-        let mut ptes = self.satp.as_raw_ptes();
+        let mut ptes = self.root.as_raw_ptes();
         for (i, idx) in indices.iter().enumerate() {
             let pte = &mut ptes[*idx];
             if i == 2 {
@@ -136,7 +142,7 @@ impl PageTable {
     /// Find the page table entry with given virtual page number without creating new page table entry on the way.
     fn find_pte(&self, vpn: VirPageNum) -> Option<&mut PageTableEntry> {
         let indices = vpn.indices();
-        let mut ptes = self.satp.as_raw_ptes();
+        let mut ptes = self.root.as_raw_ptes();
         for (i, idx) in indices.iter().enumerate() {
             let pte = &mut ptes[*idx];
             if !pte.is_valid() {
@@ -159,18 +165,30 @@ impl Drop for PageTable {
 
 impl From<MappingPermission> for PTEFlags {
     fn from(value: MappingPermission) -> Self {
-        PTEFlags {
-            bits: value.bits() as u8,
-        }
+        PTEFlags::from_bits(value.bits()).unwrap()
     }
 }
 
 pub fn activate_page_table() {
-    let kernel_space = KERNEL_SPACE.borrow_mut();
-    let page_table = kernel_space.page_table();
-    let satp = page_table.to_satp();
+    let satp = KERNEL_SPACE.borrow_mut().page_table().to_satp();
     riscv::register::satp::write(satp);
     unsafe {
         asm!("sfence.vma");
     }
+}
+
+pub fn translate_bytes(page_table: &PageTable, ptr: *const u8, len: usize) -> Vec<u8> {
+    let ptr = ptr as usize;
+    let mut vpn = VirPageNum::from(ptr);
+    let mut result: Vec<u8> = Vec::new();
+    while usize::from(vpn) <= ptr as usize + len {
+        let ppn = page_table.find_pte(vpn).unwrap().get_ppn();
+        let start = max(ptr - usize::from(vpn), 0);
+        let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
+        ppn.as_raw_bytes()[start..end]
+            .iter()
+            .for_each(|byte| result.push(*byte));
+        vpn += 1;
+    }
+    result
 }

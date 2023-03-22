@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     config::{
-        MEMORY_END, PAGE_SIZE, TRAMPOLINE_END_ADDRESS, TRAMPOLINE_START_ADDRESS,
+        MEMORY_END, PAGE_SIZE, TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_END_ADDRESS,
         TRAP_CONTEXT_START_ADDRESS, UART_BASE_ADDRESS, UART_MAP_SIZE, USER_STACK_SIZE,
     },
     mm::address::PhyAddr,
@@ -24,7 +24,7 @@ pub struct Memory {
 }
 
 bitflags! {
-    pub struct MappingPermission: usize {
+    pub struct MappingPermission: u8 {
         const R = 1 << 1; // Bit used to indicate readability.
         const W = 1 << 2; // Bit used to indicate writability.
         const X = 1 << 3; // Bit used to indicate whether executable.
@@ -128,15 +128,19 @@ impl Memory {
             MappingPermission::R | MappingPermission::W,
         ));
 
+        println!(
+            "[kernel] Mapping trampoline [{:#x}, {:#x})",
+            usize::from(VirAddr::from(TRAMPOLINE_START_ADDRESS)),
+            usize::from(VirAddr::from(TRAMPOLINE_START_ADDRESS) + PAGE_SIZE),
+        );
         result.map_trampoline();
 
         result
     }
 
-    pub fn from_elf(elf_data: &[u8]) -> Self {
+    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
         let mut result = Self::empty();
 
-        // TODO: map trampoline
         let elf_file =
             xmas_elf::ElfFile::new(elf_data).expect("[memory_set] Fail to parse ELF file.");
         let elf_header = elf_file.header;
@@ -166,7 +170,12 @@ impl Memory {
                 if ph_flags.is_execute() {
                     map_perm |= MappingPermission::X;
                 }
-                let area = Area::new_identical(
+                println!(
+                    "[mem] Start va is {:#x} and end va is {:#x}",
+                    usize::from(start_va),
+                    usize::from(end_va)
+                );
+                let area = Area::new_framed(
                     start_va.floor_to_vir_page_num(),
                     end_va.ceil_to_vir_page_num(),
                     map_perm,
@@ -180,11 +189,10 @@ impl Memory {
         }
 
         result.map_trampoline();
-
         result.map_trap_context();
 
         // map user stack
-        let start_va: VirAddr = (end_vpn + 1).into();
+        let start_va: VirAddr = (end_vpn + 1).into(); // for guard page
         let end_va = start_va + USER_STACK_SIZE;
         result.map(Area::new_framed(
             start_va.floor_to_vir_page_num(),
@@ -192,10 +200,19 @@ impl Memory {
             MappingPermission::R | MappingPermission::W | MappingPermission::U,
         ));
 
-        result
+        (
+            result,
+            end_va.into(),
+            elf_file.header.pt2.entry_point() as usize,
+        )
     }
 
-    fn map(&mut self, area: Area) {
+    pub fn map(&mut self, area: Area) {
+        println!(
+            "[mem] Map area [{:#x}, {:#x})",
+            area.range().start.0,
+            area.range().end.0,
+        );
         area.range().iter().enumerate().for_each(|(i, vpn)| {
             self.page_table
                 .map(vpn, area.frame(i).ppn(), area.map_perm().into())
@@ -203,24 +220,40 @@ impl Memory {
         self.areas.push(area);
     }
 
+    pub fn unmap(&mut self, vpn: VirPageNum) {
+        let pos = self
+            .areas
+            .iter()
+            .position(|area| area.range().start == vpn)
+            .expect("[memory_set] Fail to find vpn in areas.");
+        let area = &self.areas[pos];
+        area.range().iter().for_each(|vpn| {
+            self.page_table.unmap(vpn);
+        });
+        self.areas.remove(pos);
+    }
+
     fn map_trampoline(&mut self) {
+        extern "C" {
+            fn strampoline();
+        }
+        println!(
+            "trampoline: [{:#x}, {:#x})",
+            TRAMPOLINE_START_ADDRESS,
+            TRAMPOLINE_START_ADDRESS + PAGE_SIZE,
+        );
         self.map(Area::new_linear(
             VirAddr::from(TRAMPOLINE_START_ADDRESS).floor_to_vir_page_num(),
-            PhyAddr::from(TRAMPOLINE_END_ADDRESS).ceil_to_phy_page_num(),
+            PhyAddr::from(strampoline as usize).floor_to_phy_page_num(),
             1,
             MappingPermission::R | MappingPermission::X,
         ));
     }
 
     fn map_trap_context(&mut self) {
-        extern "C" {
-            fn strampoline();
-            fn etrampoline();
-        }
-        self.map(Area::new_linear(
+        self.map(Area::new_framed(
             VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num(),
-            PhyAddr::from(strampoline as usize).floor_to_phy_page_num(),
-            1,
+            VirAddr::from(TRAP_CONTEXT_END_ADDRESS).ceil_to_vir_page_num(),
             MappingPermission::R | MappingPermission::W,
         ));
     }

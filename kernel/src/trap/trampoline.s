@@ -2,7 +2,6 @@
 .macro STORE_REG n
     sd x\n, \n*8(sp)
 .endm
-
 .macro LOAD_REG n
     ld x\n, \n*8(sp)
 .endm 
@@ -24,23 +23,25 @@ _alltraps:
     sd t0, 2*8(sp) # store sp of user
     csrw sscratch, sp # restore modifid sscratch
     csrr t0, sepc
-    csrr t1, satp 
+    csrr t1, sstatus 
     sd t0, 32*8(sp) # store sepc of user
-    sd t1, 33*8(sp) # store satp of user
+    sd t1, 33*8(sp) # store sstatus of user
     ld t0, 36*8(sp) # load satp of kernel 
     ld t1, 35*8(sp) # load pc of kernel
     ld sp, 34*8(sp) # load sp of kernel
     csrw satp, t0
     sfence.vma
-    j t1
+    jr t1
 
 _restore: 
-    csrr sp, sscratch
+    csrw satp, a1
+    sfence.vma
+    csrw sscratch, a0
+    mv sp, a0
     ld t0, 32*8(sp) 
     ld t1, 33*8(sp)
     csrw sepc, t0
-    csrw satp, t1
-    sfence.vma
+    csrw sstatus, t1
     ld ra, 1*8(sp)
     ld gp, 3*8(sp)
     .set n, 5

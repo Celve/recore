@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-#![feature(linkage)]
+#![feature(linkage, panic_info_message)]
 
 pub mod complement;
 pub mod console;
@@ -16,8 +16,8 @@ static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 #[global_allocator]
 static HEAP: LockedHeap = LockedHeap::new(USER_HEAP_GRANULARITY);
 
-#[link_section = ".text.entry"]
 #[no_mangle]
+#[link_section = ".text.entry"]
 extern "C" fn _start() {
     unsafe {
         let start = USER_HEAP_SPACE.as_ptr() as usize;

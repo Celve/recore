@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate user;
 
+#[no_mangle]
 fn main() {
     println!("Hello, world!");
 }

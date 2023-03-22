@@ -1,13 +1,40 @@
-use core::arch::global_asm;
+use core::arch::{asm, global_asm};
+
+use riscv::register::utvec::TrapMode;
+
+use crate::config::{TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_START_ADDRESS};
+use crate::mm::address::VirPageNum;
+use crate::task::manager::{fetch_curr_task, TASK_MANAGER};
 
 global_asm!(include_str!("trampoline.s"));
 
-// global_asm!(
-// ".altmacro",
-// ".macro STORE_REG n",
-// "    sd x\n, \n*8(sp)",
-// ".endm",
-// ".macro LOAD_REG n",
-// "    ld x\n, \n*8(sp)",
-// ".endm"
-// );
+#[no_mangle]
+pub fn restore() {
+    TASK_MANAGER.borrow_mut();
+    fetch_curr_task()
+        .borrow_mut()
+        .user_mem()
+        .page_table()
+        .translate(VirPageNum::from(0x10000));
+    let user_satp = fetch_curr_task()
+        .borrow_mut()
+        .user_mem()
+        .page_table()
+        .to_satp();
+
+    extern "C" {
+        fn _restore();
+        fn _alltraps();
+    }
+
+    unsafe {
+        riscv::register::stvec::write(TRAMPOLINE_START_ADDRESS, TrapMode::Direct);
+        asm! {
+            "fence.i",
+            "jr {restore_va}",
+            restore_va = in(reg) TRAMPOLINE_START_ADDRESS + (_restore as usize - _alltraps as usize),
+            in("a0") TRAP_CONTEXT_START_ADDRESS,
+            in("a1") user_satp,
+        }
+    }
+}

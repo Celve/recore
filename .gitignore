@@ -1,2 +1,4 @@
 **/target
 **/Cargo.lock
+**/.gdbinit
+kernel/src/app.s

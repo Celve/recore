@@ -22,7 +22,7 @@ extern "C" fn _start() {
     unsafe {
         let start = USER_HEAP_SPACE.as_ptr() as usize;
         let end = start + USER_HEAP_SPACE.len();
-        HEAP.allocator.inner.borrow_mut().add_segment(start, end);
+        HEAP.add_segment(start, end);
     }
     exit(main());
 }

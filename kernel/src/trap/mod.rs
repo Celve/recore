@@ -2,9 +2,12 @@ use riscv::register::scause;
 
 use crate::{syscall::syscall, task::manager::fetch_curr_task};
 
+use self::trampoline::restore;
+
 pub mod context;
 pub mod trampoline;
 
+#[no_mangle]
 pub fn trap_handler() {
     let trap = scause::read().cause();
     match trap {
@@ -55,4 +58,5 @@ pub fn trap_handler() {
             scause::Exception::StoreGuestPageFault => todo!(),
         },
     }
+    restore();
 }

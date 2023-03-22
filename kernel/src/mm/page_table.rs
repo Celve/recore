@@ -178,17 +178,17 @@ pub fn activate_page_table() {
     }
 }
 
-pub fn translate_bytes(page_table: &PageTable, ptr: *const u8, len: usize) -> Vec<u8> {
+pub fn translate_bytes(page_table: &PageTable, ptr: *const u8, len: usize) -> Vec<&'static mut u8> {
     let ptr = ptr as usize;
     let mut vpn = VirPageNum::from(ptr);
-    let mut result: Vec<u8> = Vec::new();
+    let mut result: Vec<&'static mut u8> = Vec::new();
     while usize::from(vpn) <= ptr as usize + len {
         let ppn = page_table.find_pte(vpn).unwrap().get_ppn();
         let start = max(ptr - usize::from(vpn), 0);
         let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
         ppn.as_raw_bytes()[start..end]
-            .iter()
-            .for_each(|byte| result.push(*byte));
+            .iter_mut()
+            .for_each(|byte| result.push(byte));
         vpn += 1;
     }
     result

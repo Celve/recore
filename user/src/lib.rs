@@ -7,6 +7,7 @@ pub mod console;
 pub mod syscall;
 
 use allocator::heap::LockedHeap;
+use syscall::{syscall_exit, syscall_yield};
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
@@ -34,5 +35,9 @@ fn main() -> i32 {
 }
 
 fn exit(exit_code: i32) -> ! {
-    todo!()
+    syscall_exit(exit_code);
+}
+
+pub fn yield_now() {
+    syscall_yield();
 }

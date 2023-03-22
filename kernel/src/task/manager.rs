@@ -1,8 +1,11 @@
-use super::task::Task;
+use super::{
+    loader::get_num_apps,
+    task::{Task, TaskStatus},
+};
 
 use crate::task::{loader::get_app_data, task::TaskContext};
 
-use alloc::{collections::VecDeque, sync::Arc, sync::Weak};
+use alloc::{collections::VecDeque, sync::Arc};
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
@@ -12,6 +15,9 @@ pub struct Manager {
 
     /// A special task context that is used for thread switching.
     idle_task_ctx: TaskContext,
+
+    /// The current task that the processor is executing.
+    curr_task: Option<Arc<Mutex<Task>>>,
 }
 
 impl Manager {
@@ -21,15 +27,16 @@ impl Manager {
         Self {
             tasks,
             idle_task_ctx: TaskContext::empty(),
+            curr_task: None,
         }
     }
 
-    pub fn current_task(&self) -> Weak<Mutex<Task>> {
-        Arc::downgrade(
-            self.tasks
-                .front()
-                .expect("[task_manager] Cannot fetch task from manager."),
-        )
+    pub fn push_task(&mut self, task: Task) {
+        self.tasks.push_back(Arc::new(Mutex::new(task)));
+    }
+
+    pub fn curr_task(&self) -> Option<Arc<Mutex<Task>>> {
+        self.curr_task.clone()
     }
 
     pub fn idle_task_ctx_ptr(&mut self) -> *mut TaskContext {
@@ -43,7 +50,10 @@ lazy_static! {
 }
 
 pub fn fetch_curr_task() -> Arc<Mutex<Task>> {
-    TASK_MANAGER.lock().current_task().upgrade().unwrap()
+    TASK_MANAGER
+        .lock()
+        .curr_task()
+        .expect("[kernel] There is no running task currently.")
 }
 
 pub fn fetch_idle_task_ctx() -> *mut TaskContext {
@@ -56,7 +66,7 @@ pub fn switch() {
     if let Some(task) = task {
         let task_ctx = task.lock().task_ctx_ptr();
         let idle_task_ctx = task_manager.idle_task_ctx_ptr();
-        task_manager.tasks.push_back(task);
+        task_manager.curr_task = Some(task);
         drop(task_manager);
 
         extern "C" {
@@ -65,8 +75,24 @@ pub fn switch() {
         unsafe {
             _switch(idle_task_ctx, task_ctx);
         }
+
+        // clear current task
+        let mut task_manager = TASK_MANAGER.lock();
+        let curr_task = task_manager.curr_task().unwrap();
+        if *curr_task.lock().task_status() != TaskStatus::Zombie {
+            task_manager.tasks.push_back(curr_task);
+            task_manager.curr_task = None;
+        }
     } else {
-        panic!("[kernel] There is no running task.");
+        panic!("[kernel] Shutdown.");
+    }
+}
+
+pub fn init_tasks() {
+    let num_apps = get_num_apps();
+    for i in 1..num_apps {
+        let task = Task::from_elf(get_app_data(i), None);
+        TASK_MANAGER.lock().push_task(task);
     }
 }
 

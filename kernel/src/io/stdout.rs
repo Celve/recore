@@ -4,8 +4,8 @@ use core::fmt::{Arguments, Write};
 pub struct Stdout;
 
 impl Stdout {
-    pub fn putchar(&self, c: char) {
-        send_to_uart(c as u8);
+    pub fn putchar(&self, c: u8) {
+        send_to_uart(c);
     }
 
     pub fn print(&mut self, args: Arguments) {
@@ -15,7 +15,7 @@ impl Stdout {
 
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        s.chars().for_each(|c| self.putchar(c));
+        s.chars().for_each(|c| self.putchar(c as u8));
         Ok(())
     }
 }

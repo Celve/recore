@@ -26,17 +26,6 @@ pub fn exit_and_yield(exit_code: isize) {
 
 pub fn schedule() {
     let task_ctx = fetch_curr_task().lock().task_ctx_ptr();
-    println!(
-        "checking: {:#x}\n",
-        usize::from(
-            KERNEL_SPACE
-                .lock()
-                .page_table()
-                .translate(VirPageNum::from(0x10000))
-                .unwrap()
-                .get_ppn()
-        )
-    );
     extern "C" {
         fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
     }

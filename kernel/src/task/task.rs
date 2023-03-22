@@ -35,6 +35,7 @@ pub struct TaskContext {
     pub sr: [usize; 12],
 }
 
+#[derive(PartialEq, Eq)]
 pub enum TaskStatus {
     Ready,
     Running,
@@ -117,6 +118,10 @@ impl Task {
 
     pub fn task_status_mut(&mut self) -> &mut TaskStatus {
         &mut self.task_status
+    }
+
+    pub fn task_status(&self) -> &TaskStatus {
+        &self.task_status
     }
 
     pub fn exit_code_mut(&mut self) -> &mut isize {

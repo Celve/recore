@@ -3,6 +3,7 @@ use alloc::{
     vec::Vec,
 };
 use riscv::register::sstatus::{self, SPP};
+use spin::mutex::Mutex;
 
 use crate::{
     config::TRAP_CONTEXT_START_ADDRESS,
@@ -23,8 +24,8 @@ pub struct Task {
     task_ctx: TaskContext,
     trap_ctx: PhyAddr, // raw pointer can't be shared between threads
     kernel_stack: KernelStack,
-    parent: Option<Weak<Task>>,
-    children: Vec<Arc<Task>>,
+    parent: Option<Weak<Mutex<Task>>>,
+    children: Vec<Arc<Mutex<Task>>>,
     exit_code: isize,
 }
 
@@ -43,7 +44,7 @@ pub enum TaskStatus {
 }
 
 impl Task {
-    pub fn from_elf(elf_data: &[u8], parent: Option<Weak<Task>>) -> Self {
+    pub fn from_elf(elf_data: &[u8], parent: Option<Weak<Mutex<Task>>>) -> Self {
         let pid = alloc_pid();
         let (user_mem, user_sp, user_sepc) = Memory::from_elf(elf_data);
         let page_table = user_mem.page_table();
@@ -166,6 +167,14 @@ impl Task {
 
     pub fn pid(&self) -> usize {
         self.pid.0
+    }
+
+    pub fn children_mut(&mut self) -> &mut Vec<Arc<Mutex<Task>>> {
+        &mut self.children
+    }
+
+    pub fn parent_mut(&mut self) -> &mut Option<Weak<Mutex<Task>>> {
+        &mut self.parent
     }
 }
 

@@ -71,5 +71,9 @@ pub fn syscall_fork() {
     // modify the original task's a0
     task.lock().trap_ctx_mut().saved_regs[10] = 0;
 
+    // make new process the original's children
+    task.lock().children_mut().push(new_task.clone());
+    *new_task.lock().parent_mut() = Some(Arc::downgrade(&task));
+
     MANAGER.lock().push(new_task);
 }

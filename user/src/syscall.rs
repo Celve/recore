@@ -4,6 +4,7 @@ const SYSCALL_EXIT: usize = 93;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_YIELD: usize = 124;
+const SYSCALL_FORK: usize = 220;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     // let ret: isize;
@@ -41,4 +42,8 @@ pub fn syscall_write(fd: usize, buffer: &[u8]) -> isize {
 
 pub fn syscall_yield() {
     syscall(SYSCALL_YIELD, [0; 3]);
+}
+
+pub fn syscall_fork() -> isize {
+    syscall(SYSCALL_FORK, [0; 3])
 }

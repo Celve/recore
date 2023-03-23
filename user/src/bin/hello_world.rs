@@ -8,9 +8,5 @@ extern crate user;
 
 #[no_mangle]
 fn main() {
-    yield_now();
-    yield_now();
-    yield_now();
-    yield_now();
     println!("Hello, world!");
 }

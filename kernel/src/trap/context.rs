@@ -1,4 +1,7 @@
+use riscv::register::mcause::Trap;
+
 #[repr(C)]
+#[derive(Clone)]
 pub struct TrapContext {
     pub saved_regs: [usize; 32],
     pub user_sepc: usize,

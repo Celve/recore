@@ -8,6 +8,7 @@ use super::{
     address::{PhyPageNum, VirPageNum},
     frame::Frame,
     memory::{MappingPermission, MappingType},
+    page_table::PageTable,
     range::Range,
 };
 
@@ -61,7 +62,7 @@ impl Area {
         }
     }
 
-    pub fn copy_from(&self, data: &[u8]) {
+    pub fn copy_from_raw_bytes(&self, data: &[u8]) {
         let mut start = 0;
         let len = data.len();
         for frame in self.frames.iter() {
@@ -73,6 +74,18 @@ impl Area {
                 break;
             }
         }
+    }
+
+    pub fn copy_from_existed(&self, other: &Area) {
+        assert_eq!(self.len(), other.len());
+        self.frames
+            .iter()
+            .zip(other.frames.iter())
+            .for_each(|(dst, src)| {
+                let dst_addr = dst.ppn().as_raw_bytes();
+                let src_addr = src.ppn().as_raw_bytes();
+                dst_addr.copy_from_slice(src_addr);
+            });
     }
 
     pub fn init(&self) {
@@ -92,11 +105,34 @@ impl Area {
         self.map_perm
     }
 
+    pub fn map_type(&self) -> MappingType {
+        self.map_type
+    }
+
     pub fn range(&self) -> Range<VirPageNum> {
         self.range
     }
 
     pub fn len(&self) -> usize {
         self.frames.len()
+    }
+}
+
+impl Clone for Area {
+    fn clone(&self) -> Self {
+        match self.map_type {
+            MappingType::Identical => {
+                Self::new_identical(self.range.start, self.range.end, self.map_perm)
+            }
+            MappingType::Framed => {
+                Self::new_framed(self.range.start, self.range.end, self.map_perm)
+            }
+            MappingType::Linear => Self::new_linear(
+                self.range.start,
+                self.frames[0].ppn(),
+                self.len(),
+                self.map_perm,
+            ),
+        }
     }
 }

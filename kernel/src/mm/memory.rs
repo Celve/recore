@@ -32,7 +32,7 @@ bitflags! {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum MappingType {
     Identical,
     Framed,
@@ -181,7 +181,7 @@ impl Memory {
                     map_perm,
                 );
                 end_vpn = end_va.ceil_to_vir_page_num();
-                area.copy_from(
+                area.copy_from_raw_bytes(
                     &elf_file.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
                 );
                 result.map(area);
@@ -206,7 +206,24 @@ impl Memory {
             elf_file.header.pt2.entry_point() as usize,
         )
     }
+}
 
+impl Clone for Memory {
+    fn clone(&self) -> Self {
+        let mut result = Self::empty();
+        self.areas.iter().for_each(|area| {
+            let new_area = area.clone();
+            if area.map_type() == MappingType::Framed {
+                new_area.copy_from_existed(area);
+            }
+            result.map(new_area);
+        });
+
+        result
+    }
+}
+
+impl Memory {
     pub fn map(&mut self, area: Area) {
         println!(
             "[mem] Map area [{:#x}, {:#x})",

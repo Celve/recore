@@ -45,7 +45,6 @@ pub enum TaskStatus {
 impl Task {
     pub fn from_elf(elf_data: &[u8], parent: Option<Weak<Task>>) -> Self {
         let pid = alloc_pid();
-        let pid_int = pid.0;
         let (user_mem, user_sp, user_sepc) = Memory::from_elf(elf_data);
         let page_table = user_mem.page_table();
 
@@ -60,7 +59,7 @@ impl Task {
         );
         println!("[trap] User's sepc is {:#x}", user_sepc);
 
-        let kernel_stack = KernelStack::new(pid_int);
+        let kernel_stack = KernelStack::new(pid.0);
 
         let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
         let mut sstatus = sstatus::read();
@@ -87,7 +86,40 @@ impl Task {
             exit_code: 0,
         }
     }
+}
 
+impl Clone for Task {
+    fn clone(&self) -> Self {
+        let pid = alloc_pid();
+        let user_mem = self.user_mem().clone();
+        let page_table = user_mem.page_table();
+        let trap_ctx = page_table
+            .translate(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
+            .expect("[task] Unable to access trap context.")
+            .get_ppn();
+        let kernel_stack = KernelStack::new(pid.0);
+        let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
+        unsafe {
+            *raw_trap_ctx = self.trap_ctx().clone();
+        }
+        println!("new pid {} with sepc {}", pid.0, unsafe {
+            (*raw_trap_ctx).user_sepc
+        });
+        Self {
+            pid,
+            user_mem,
+            task_status: TaskStatus::Ready,
+            task_ctx: TaskContext::new(restore as usize, kernel_stack.top().into()),
+            trap_ctx: trap_ctx.into(),
+            kernel_stack,
+            parent: self.parent.clone(),
+            children: Vec::new(),
+            exit_code: 0,
+        }
+    }
+}
+
+impl Task {
     pub fn task_ctx_ptr(&mut self) -> *mut TaskContext {
         &mut self.task_ctx
     }
@@ -130,6 +162,10 @@ impl Task {
 
     pub fn user_mem(&self) -> &Memory {
         &self.user_mem
+    }
+
+    pub fn pid(&self) -> usize {
+        self.pid.0
     }
 }
 

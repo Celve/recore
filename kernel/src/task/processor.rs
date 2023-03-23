@@ -80,6 +80,8 @@ pub fn switch() {
         let curr_task = PROCESSOR.lock().take_curr_task().unwrap();
         if *curr_task.lock().task_status() != TaskStatus::Zombie {
             MANAGER.lock().push(curr_task);
+        } else {
+            println!("[kernel] One process has ended.");
         }
     } else {
         panic!("[kernel] Shutdown.");
@@ -88,7 +90,7 @@ pub fn switch() {
 
 pub fn init_tasks() {
     let num_apps = get_num_apps();
-    for i in 0..num_apps {
+    for i in 1..num_apps {
         let task = Task::from_elf(get_app_data(i), None);
         MANAGER.lock().push(Arc::new(Mutex::new(task)));
     }

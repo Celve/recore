@@ -15,10 +15,14 @@ pub fn suspend_and_yield() {
 }
 
 pub fn exit_and_yield(exit_code: isize) {
-    let curr_task = fetch_curr_task();
-    *curr_task.lock().task_status_mut() = TaskStatus::Zombie;
-    *curr_task.lock().exit_code_mut() = exit_code;
-    drop(curr_task);
+    // modify task status and exit code
+    {
+        let curr_task = fetch_curr_task();
+        let mut curr_task_guard = curr_task.lock();
+        *curr_task_guard.task_status_mut() = TaskStatus::Zombie;
+        *curr_task_guard.exit_code_mut() = exit_code;
+    }
+
     schedule();
 }
 

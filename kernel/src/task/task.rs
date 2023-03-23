@@ -103,15 +103,13 @@ impl Task {
     pub fn fork(self: &Arc<Self>) -> Arc<Self> {
         let new_task = Arc::new(self.as_ref().clone());
 
-        // do the copy with a0 modified
+        // modify a0
         {
             let new_task_guard = new_task.lock();
-            let new_task_pid = new_task_guard.pid();
-            new_task_guard.trap_ctx_mut().saved_regs[10] = new_task_pid;
+            let pid = new_task_guard.pid();
+            self.lock().trap_ctx_mut().saved_regs[10] = pid;
+            new_task_guard.trap_ctx_mut().saved_regs[10] = 0;
         }
-
-        // modify the original task's a0
-        self.lock().trap_ctx_mut().saved_regs[10] = 0;
 
         // make new process the original's children
         self.lock().children_mut().push(new_task.clone());

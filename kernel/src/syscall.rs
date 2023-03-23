@@ -12,6 +12,7 @@ const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_FORK: usize = 220;
+const SYSCALL_EXEC: usize = 221;
 
 pub fn syscall(id: usize, args: [usize; 3]) {
     match id {
@@ -20,6 +21,7 @@ pub fn syscall(id: usize, args: [usize; 3]) {
         SYSCALL_EXIT => syscall_exit(args[0] as isize),
         SYSCALL_YIELD => syscall_yield(),
         SYSCALL_FORK => syscall_fork(),
+        SYSCALL_EXEC => syscall_exec(args[0]),
         _ => todo!(),
     }
 }
@@ -76,4 +78,8 @@ pub fn syscall_fork() {
     *new_task.lock().parent_mut() = Some(Arc::downgrade(&task));
 
     MANAGER.lock().push(new_task);
+}
+
+pub fn syscall_exec(id: usize) {
+    fetch_curr_task().lock().exec(id);
 }

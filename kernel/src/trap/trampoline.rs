@@ -9,7 +9,7 @@ use crate::task::processor::fetch_curr_task;
 global_asm!(include_str!("trampoline.s"));
 
 #[no_mangle]
-pub fn restore() {
+pub fn restore() -> ! {
     fetch_curr_task()
         .lock()
         .user_mem()
@@ -30,6 +30,7 @@ pub fn restore() {
             restore_va = in(reg) TRAMPOLINE_START_ADDRESS + (_restore as usize - _alltraps as usize),
             in("a0") TRAP_CONTEXT_START_ADDRESS,
             in("a1") user_satp,
+            options(noreturn),
         }
     }
 }

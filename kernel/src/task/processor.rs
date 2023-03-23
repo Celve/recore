@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;

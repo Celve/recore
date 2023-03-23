@@ -45,3 +45,7 @@ pub fn yield_now() {
 pub fn fork() -> isize {
     syscall_fork()
 }
+
+pub fn exec(id: usize) -> isize {
+    syscall_exec(id)
+}

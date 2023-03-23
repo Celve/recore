@@ -8,7 +8,7 @@ pub mod context;
 pub mod trampoline;
 
 #[no_mangle]
-pub fn trap_handler() {
+pub fn trap_handler() -> ! {
     let trap = scause::read().cause();
     match trap {
         scause::Trap::Interrupt(intp) => match intp {

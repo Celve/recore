@@ -1,13 +1,11 @@
-use crate::{
-    mm::{address::VirPageNum, memory::KERNEL_SPACE},
-    task::{manager::fetch_idle_task_ctx, task::TaskContext},
-};
+use crate::task::{processor::fetch_idle_task_ctx, task::TaskContext};
 
-use self::{manager::fetch_curr_task, task::TaskStatus};
+use self::{processor::fetch_curr_task, task::TaskStatus};
 
 mod loader;
 pub mod manager;
 pub mod pid;
+pub mod processor;
 pub mod stack;
 mod switch;
 pub mod task;

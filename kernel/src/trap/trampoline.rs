@@ -4,7 +4,7 @@ use riscv::register::utvec::TrapMode;
 
 use crate::config::{TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_START_ADDRESS};
 use crate::mm::address::VirPageNum;
-use crate::task::manager::fetch_curr_task;
+use crate::task::processor::fetch_curr_task;
 
 global_asm!(include_str!("trampoline.s"));
 

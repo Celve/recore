@@ -1,6 +1,6 @@
 use riscv::register::scause;
 
-use crate::{syscall::syscall, task::manager::fetch_curr_task};
+use crate::{syscall::syscall, task::processor::fetch_curr_task};
 
 use self::trampoline::restore;
 

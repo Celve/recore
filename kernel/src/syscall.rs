@@ -1,7 +1,7 @@
 use crate::{
     io::{stdin::Stdin, stdout::Stdout},
     mm::page_table::translate_bytes,
-    task::{exit_and_yield, manager::fetch_curr_task, suspend_and_yield},
+    task::{exit_and_yield, processor::fetch_curr_task, suspend_and_yield},
 };
 
 const SYSCALL_READ: usize = 63;

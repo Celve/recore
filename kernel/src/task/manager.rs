@@ -11,27 +11,28 @@ use spin::mutex::Mutex;
 
 pub struct Manager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    tasks: VecDeque<Arc<Mutex<Task>>>,
+    tasks: VecDeque<Arc<Task>>,
 }
 
 impl Manager {
-    pub fn new(task: Arc<Mutex<Task>>) -> Self {
-        let mut tasks: VecDeque<Arc<Mutex<Task>>> = VecDeque::new();
+    pub fn new(task: Arc<Task>) -> Self {
+        let mut tasks: VecDeque<Arc<Task>> = VecDeque::new();
         tasks.push_back(task);
         Self { tasks }
     }
 
-    pub fn push(&mut self, task: Arc<Mutex<Task>>) {
+    pub fn push(&mut self, task: Arc<Task>) {
         self.tasks.push_back(task);
     }
 
-    pub fn pop(&mut self) -> Option<Arc<Mutex<Task>>> {
+    pub fn pop(&mut self) -> Option<Arc<Task>> {
         self.tasks.pop_front()
     }
 }
 
 lazy_static! {
-    pub static ref MANAGER: Mutex<Manager> = Mutex::new(Manager::new(Arc::new(Mutex::new(
-        Task::from_elf(get_app_data(0), None)
+    pub static ref MANAGER: Mutex<Manager> = Mutex::new(Manager::new(Arc::new(Task::from_elf(
+        get_app_data(0),
+        None
     ))));
 }

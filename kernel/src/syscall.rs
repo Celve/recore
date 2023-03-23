@@ -60,26 +60,9 @@ pub fn syscall_yield() {
 }
 
 pub fn syscall_fork() {
-    let task = fetch_curr_task();
-    let new_task = Arc::new(Mutex::new(task.lock().clone()));
-
-    // do the copy with a0 modified
-    {
-        let new_task_guard = new_task.lock();
-        let new_task_pid = new_task_guard.pid();
-        new_task_guard.trap_ctx_mut().saved_regs[10] = new_task_pid;
-    }
-
-    // modify the original task's a0
-    task.lock().trap_ctx_mut().saved_regs[10] = 0;
-
-    // make new process the original's children
-    task.lock().children_mut().push(new_task.clone());
-    *new_task.lock().parent_mut() = Some(Arc::downgrade(&task));
-
-    MANAGER.lock().push(new_task);
+    MANAGER.lock().push(fetch_curr_task().fork());
 }
 
 pub fn syscall_exec(id: usize) {
-    fetch_curr_task().lock().exec(id);
+    fetch_curr_task().exec(id);
 }

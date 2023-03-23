@@ -14,7 +14,7 @@ use super::{
 
 pub struct Processor {
     /// The current task that the processor is exeucting.
-    curr_task: Option<Arc<Mutex<Task>>>,
+    curr_task: Option<Arc<Task>>,
 
     /// A special task context that is used for thread switching.
     idle_task_ctx: TaskContext,
@@ -36,15 +36,15 @@ impl Processor {
         &mut self.idle_task_ctx
     }
 
-    pub fn clone_curr_task(&self) -> Option<Arc<Mutex<Task>>> {
+    pub fn clone_curr_task(&self) -> Option<Arc<Task>> {
         self.curr_task.clone()
     }
 
-    pub fn take_curr_task(&mut self) -> Option<Arc<Mutex<Task>>> {
+    pub fn take_curr_task(&mut self) -> Option<Arc<Task>> {
         self.curr_task.take()
     }
 
-    pub fn insert_curr_task(&mut self, task: Arc<Mutex<Task>>) {
+    pub fn insert_curr_task(&mut self, task: Arc<Task>) {
         self.curr_task = Some(task);
     }
 }
@@ -53,7 +53,7 @@ lazy_static! {
     static ref PROCESSOR: Mutex<Processor> = Mutex::new(Processor::new());
 }
 
-pub fn fetch_curr_task() -> Arc<Mutex<Task>> {
+pub fn fetch_curr_task() -> Arc<Task> {
     PROCESSOR
         .lock()
         .clone_curr_task()
@@ -94,7 +94,7 @@ pub fn init_tasks() {
     let num_apps = get_num_apps();
     for i in 1..num_apps {
         let task = Task::from_elf(get_app_data(i), None);
-        MANAGER.lock().push(Arc::new(Mutex::new(task)));
+        MANAGER.lock().push(Arc::new(task));
     }
 }
 

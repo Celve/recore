@@ -16,13 +16,14 @@ fn main() {
 }
 
 fn link() -> Result<()> {
-    let names: Vec<String> = fs::read_dir(USER_APPS_SRC_DIR_PATH)
+    let mut names: Vec<String> = fs::read_dir(USER_APPS_SRC_DIR_PATH)
         .unwrap()
         .map(|dir_entry| {
             let name = dir_entry.unwrap().file_name().into_string().unwrap();
             name.get(0..name.find('.').unwrap()).unwrap().to_owned()
         })
         .collect();
+    names.sort();
     let n = names.len();
 
     let mut output = String::from("\t.align 3\n")

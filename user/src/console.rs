@@ -1,5 +1,7 @@
 use core::fmt::Write;
 
+use alloc::string::String;
+
 use crate::syscall::{syscall_read, syscall_write};
 
 const STDIN: usize = 0;
@@ -25,7 +27,7 @@ impl Stdout {
 #[macro_export]
 macro_rules! print {
     ($fmt: literal $($t: tt)*) => {
-        Stdout.print(format_args!($fmt $($t)*));
+        $crate::console::Stdout.print(format_args!($fmt $($t)*));
     };
 }
 
@@ -42,4 +44,24 @@ impl Stdin {
         syscall_read(STDIN, &mut buffer);
         buffer[0] as char
     }
+
+    pub fn getline(&self) -> String {
+        let mut buffer = String::new();
+        loop {
+            let c = self.getchar();
+            if c == '\r' || c == '\n' {
+                break;
+            }
+            buffer.push(c);
+        }
+        buffer
+    }
+}
+
+pub fn stdin() -> Stdin {
+    Stdin
+}
+
+pub fn stdout() -> Stdout {
+    Stdout
 }

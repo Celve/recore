@@ -2,8 +2,10 @@ use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
+/// Data structure for pid to control allocation and deallocation.
 pub struct Pid(pub usize);
 
+/// A pid allocator that allocates pid from 1.
 pub struct PidAllocator {
     curr: usize,
     recycled: Vec<usize>,
@@ -24,7 +26,7 @@ impl Drop for Pid {
 impl PidAllocator {
     pub fn new() -> Self {
         Self {
-            curr: 0, // TODO: decide use 0 or 1 as init pid
+            curr: 1,
             recycled: Vec::new(),
         }
     }

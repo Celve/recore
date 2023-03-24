@@ -25,20 +25,26 @@ pub fn trap_handler() -> ! {
         },
         scause::Trap::Exception(excp) => match excp {
             scause::Exception::UserEnvCall => {
-                let task = fetch_curr_task();
-                let task_guard = task.lock();
-                let trap_ctx = task_guard.trap_ctx_mut();
-                let id = trap_ctx.saved_regs[17];
-                let arg1 = trap_ctx.saved_regs[10];
-                let arg2 = trap_ctx.saved_regs[11];
-                let arg3 = trap_ctx.saved_regs[12];
-
-                // move it on
-                trap_ctx.user_sepc += 4;
-
-                drop(task_guard);
-
-                syscall(id, [arg1, arg2, arg3]);
+                let (id, args) = {
+                    let task = fetch_curr_task();
+                    let task_guard = task.lock();
+                    let trap_ctx = task_guard.trap_ctx_mut();
+                    task_guard.trap_ctx_mut().user_sepc += 4; // it must be added here
+                    (
+                        trap_ctx.saved_regs[17],
+                        [
+                            trap_ctx.saved_regs[10],
+                            trap_ctx.saved_regs[11],
+                            trap_ctx.saved_regs[12],
+                        ],
+                    )
+                };
+                let result = syscall(id, args);
+                {
+                    let task = fetch_curr_task();
+                    let task_guard = task.lock();
+                    *task_guard.trap_ctx_mut().a0_mut() = result as usize;
+                }
             }
             scause::Exception::InstructionMisaligned => todo!(),
             scause::Exception::InstructionFault => todo!(),

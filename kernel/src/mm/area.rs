@@ -8,7 +8,6 @@ use super::{
     address::{PhyPageNum, VirPageNum},
     frame::Frame,
     memory::{MappingPermission, MappingType},
-    page_table::PageTable,
     range::Range,
 };
 

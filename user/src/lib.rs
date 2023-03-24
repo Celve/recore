@@ -2,6 +2,8 @@
 #![no_main]
 #![feature(linkage, panic_info_message)]
 
+extern crate alloc;
+
 pub mod complement;
 pub mod console;
 pub mod syscall;
@@ -46,6 +48,24 @@ pub fn fork() -> isize {
     syscall_fork()
 }
 
-pub fn exec(id: usize) -> isize {
-    syscall_exec(id)
+pub fn exec(path: &str) -> isize {
+    syscall_exec(path)
+}
+
+pub fn wait(exit_code: &mut i32) -> isize {
+    loop {
+        match syscall_waitpid(-1, exit_code) {
+            -2 => yield_now(),
+            pid => return pid,
+        }
+    }
+}
+
+pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
+    loop {
+        match syscall_waitpid(pid, exit_code) {
+            -2 => yield_now(),
+            pid => return pid,
+        }
+    }
 }

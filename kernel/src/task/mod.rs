@@ -1,8 +1,8 @@
-use crate::task::{processor::fetch_idle_task_ctx, task::TaskContext};
+use crate::task::{processor::fetch_idle_task_ctx_ptr, task::TaskContext};
 
 use self::{processor::fetch_curr_task, task::TaskStatus};
 
-mod loader;
+pub mod loader;
 pub mod manager;
 pub mod pid;
 pub mod processor;
@@ -31,5 +31,5 @@ pub fn schedule() {
     extern "C" {
         fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
     }
-    unsafe { _switch(task_ctx, fetch_idle_task_ctx()) }
+    unsafe { _switch(task_ctx, fetch_idle_task_ctx_ptr()) }
 }

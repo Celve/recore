@@ -11,13 +11,10 @@ use crate::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
     },
-    trap::{self, context::TrapContext, trampoline::restore, trap_handler},
+    trap::{context::TrapContext, trampoline::restore, trap_handler},
 };
 
-use super::{
-    loader::get_app_data,
-    pid::{alloc_pid, Pid},
-};
+use super::pid::{alloc_pid, Pid};
 use crate::task::stack::KernelStack;
 
 pub struct Task {
@@ -28,7 +25,7 @@ pub struct TaskInner {
     user_mem: Memory,
     task_status: TaskStatus,
     task_ctx: TaskContext,
-    trap_ctx: PhyAddr, // raw pointer can't be shared between threads
+    trap_ctx: PhyAddr, // raw pointer can't be shared between threads, therefore use phyaddr instead
     kernel_stack: KernelStack,
     parent: Option<Weak<Task>>,
     children: Vec<Arc<Task>>,
@@ -50,13 +47,14 @@ pub enum TaskStatus {
 }
 
 impl Task {
+    /// Create a new task from elf data.
     pub fn from_elf(elf_data: &[u8], parent: Option<Weak<Task>>) -> Self {
         let pid = alloc_pid();
         let (user_mem, user_sp, user_sepc) = Memory::from_elf(elf_data);
         let page_table = user_mem.page_table();
 
         let trap_ctx = page_table
-            .translate(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
+            .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
             .expect("[task] Unable to access trap context.")
             .get_ppn();
         println!(
@@ -100,16 +98,11 @@ impl Task {
         self.inner.lock()
     }
 
+    /// Fork a new task from an existing task with both of the return values unchanged.  
+    ///
+    /// The difference between this function and clone is that it maintains the parent-child relationship.
     pub fn fork(self: &Arc<Self>) -> Arc<Self> {
         let new_task = Arc::new(self.as_ref().clone());
-
-        // modify a0
-        {
-            let new_task_guard = new_task.lock();
-            let pid = new_task_guard.pid();
-            self.lock().trap_ctx_mut().saved_regs[10] = pid;
-            new_task_guard.trap_ctx_mut().saved_regs[10] = 0;
-        }
 
         // make new process the original's children
         self.lock().children_mut().push(new_task.clone());
@@ -118,13 +111,13 @@ impl Task {
         new_task
     }
 
-    pub fn exec(&self, id: usize) {
+    /// Replace the current task with new elf data. Therefore, all user configurations would be reset.
+    pub fn exec(&self, elf_data: &[u8]) {
         let mut task = self.lock();
-        let elf_data = get_app_data(id);
         let (user_mem, user_sp, user_sepc) = Memory::from_elf(elf_data);
         let page_table = user_mem.page_table();
         let trap_ctx = page_table
-            .translate(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
+            .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
             .expect("[task] Unable to access trap context.")
             .get_ppn();
         let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
@@ -155,17 +148,17 @@ impl Clone for Task {
         let user_mem = task.user_mem().clone();
         let page_table = user_mem.page_table();
         let trap_ctx = page_table
-            .translate(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
+            .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
             .expect("[task] Unable to access trap context.")
             .get_ppn();
         let kernel_stack = KernelStack::new(pid.0);
+
+        // we have to modify the kernel sp both in trap ctx and task ctx
         let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
         unsafe {
-            *raw_trap_ctx = task.trap_ctx().clone();
+            (*raw_trap_ctx).kernel_sp = kernel_stack.top().into();
         }
-        println!("new pid {} with sepc {}", pid.0, unsafe {
-            (*raw_trap_ctx).user_sepc
-        });
+
         Self {
             inner: Mutex::new(TaskInner {
                 pid,
@@ -235,8 +228,16 @@ impl TaskInner {
         &mut self.children
     }
 
+    pub fn children(&self) -> &Vec<Arc<Task>> {
+        &self.children
+    }
+
     pub fn parent_mut(&mut self) -> &mut Option<Weak<Task>> {
         &mut self.parent
+    }
+
+    pub fn exit_code(&self) -> isize {
+        self.exit_code
     }
 }
 

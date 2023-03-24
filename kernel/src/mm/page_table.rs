@@ -1,9 +1,12 @@
+use alloc::string::String;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 
 use core::arch::asm;
 use core::cmp::{max, min};
+use core::mem::{size_of, transmute};
 
+use super::address::VirAddr;
 use super::memory::KERNEL_SPACE;
 use super::{
     address::{PhyPageNum, VirPageNum},
@@ -110,11 +113,6 @@ impl PageTable {
         pte.set_flags(PTEFlags::empty());
     }
 
-    pub fn translate(&self, vpn: VirPageNum) -> Option<PageTableEntry> {
-        let indices = vpn.indices();
-        self.find_pte(vpn).map(|pte| *pte)
-    }
-
     /// Convert the root physical page number of page table to a form that can be used by `satp` register.
     pub fn to_satp(&self) -> usize {
         8usize << 60 | self.root.0
@@ -158,6 +156,78 @@ impl PageTable {
     }
 }
 
+impl PageTable {
+    pub fn translate_vpn(&self, vpn: VirPageNum) -> Option<PageTableEntry> {
+        let indices = vpn.indices();
+        self.find_pte(vpn).map(|pte| *pte)
+    }
+
+    pub fn translate_bytes(&self, ptr: VirAddr, len: usize) -> Vec<&'static mut u8> {
+        let ptr = usize::from(ptr);
+        let mut vpn = VirPageNum::from(ptr);
+        let mut result: Vec<&'static mut u8> = Vec::new();
+        while usize::from(vpn) <= ptr as usize + len {
+            let ppn = self.find_pte(vpn).unwrap().get_ppn();
+            let start = max(ptr - usize::from(vpn), 0);
+            let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
+            ppn.as_raw_bytes()[start..end]
+                .iter_mut()
+                .for_each(|byte| result.push(byte));
+            vpn += 1;
+        }
+        result
+    }
+
+    pub fn translate_str(&self, ptr: VirAddr) -> String {
+        let mut ptr = usize::from(ptr);
+        let mut vpn = VirPageNum::from(ptr);
+        ptr -= usize::from(vpn);
+        let mut result = String::new();
+        loop {
+            let ppn = self.find_pte(vpn).unwrap().get_ppn();
+            let bytes = ppn.as_raw_bytes();
+            let mut c = bytes[ptr];
+            let mut temp = &mut bytes[ptr..];
+            loop {
+                if c == '\0' as u8 {
+                    return result;
+                }
+                if ptr == PAGE_SIZE {
+                    break;
+                }
+                result.push(c as char);
+                ptr += 1;
+                c = bytes[ptr];
+            }
+            vpn += 1;
+            ptr = 0;
+        }
+    }
+
+    pub fn translate_ptr(&self, ptr: VirAddr) -> &'static mut u8 {
+        let vpn = VirPageNum::from(ptr);
+        let ppn = self.find_pte(vpn).unwrap().get_ppn();
+        let offset = usize::from(ptr) - usize::from(vpn);
+        &mut ppn.as_raw_bytes()[offset]
+    }
+
+    /// This function translate a piece of virtual memory into the type specified within just one page.
+    ///
+    /// It doesn't support translation across pages.  
+    pub fn translate_any<T>(&self, ptr: VirAddr) -> &'static mut T {
+        let size = size_of::<T>();
+        let vpn = VirPageNum::from(ptr);
+        let ppn = self.find_pte(vpn).unwrap().get_ppn();
+        let offset = usize::from(ptr) - usize::from(vpn);
+        assert!(offset + size <= PAGE_SIZE);
+        unsafe {
+            (&mut ppn.as_raw_bytes()[offset] as *mut u8 as *mut T)
+                .as_mut()
+                .unwrap()
+        }
+    }
+}
+
 impl Drop for PageTable {
     fn drop(&mut self) {
         self.frames.iter().for_each(|frame| drop(frame));
@@ -176,20 +246,4 @@ pub fn activate_page_table() {
     unsafe {
         asm!("sfence.vma");
     }
-}
-
-pub fn translate_bytes(page_table: &PageTable, ptr: *const u8, len: usize) -> Vec<&'static mut u8> {
-    let ptr = ptr as usize;
-    let mut vpn = VirPageNum::from(ptr);
-    let mut result: Vec<&'static mut u8> = Vec::new();
-    while usize::from(vpn) <= ptr as usize + len {
-        let ppn = page_table.find_pte(vpn).unwrap().get_ppn();
-        let start = max(ptr - usize::from(vpn), 0);
-        let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
-        ppn.as_raw_bytes()[start..end]
-            .iter_mut()
-            .for_each(|byte| result.push(byte));
-        vpn += 1;
-    }
-    result
 }

@@ -9,8 +9,8 @@ extern crate user;
 #[no_mangle]
 fn main() {
     if fork() == 0 {
-        println!("This is parent!");
-    } else {
         println!("This is children!");
+    } else {
+        println!("This is parent!");
     }
 }

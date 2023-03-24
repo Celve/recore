@@ -14,7 +14,7 @@ pub fn restore() -> ! {
         .lock()
         .user_mem()
         .page_table()
-        .translate(VirPageNum::from(0x10000));
+        .translate_vpn(VirPageNum::from(0x10000));
     let user_satp = fetch_curr_task().lock().user_mem().page_table().to_satp();
 
     extern "C" {

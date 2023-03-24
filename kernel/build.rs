@@ -22,6 +22,7 @@ fn link() -> Result<()> {
             let name = dir_entry.unwrap().file_name().into_string().unwrap();
             name.get(0..name.find('.').unwrap()).unwrap().to_owned()
         })
+        .filter(|name| !name.starts_with("disabled_"))
         .collect();
     names.sort();
     let n = names.len();

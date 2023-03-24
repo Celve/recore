@@ -1,9 +1,6 @@
-use super::{
-    loader::get_num_apps,
-    task::{Task, TaskStatus},
-};
+use super::task::Task;
 
-use crate::task::{loader::get_app_data, task::TaskContext};
+use crate::task::loader::get_app_data;
 
 use alloc::{collections::VecDeque, sync::Arc};
 use lazy_static::lazy_static;
@@ -31,8 +28,9 @@ impl Manager {
 }
 
 lazy_static! {
+    /// Manager only load the initproc at the beginning.
     pub static ref MANAGER: Mutex<Manager> = Mutex::new(Manager::new(Arc::new(Task::from_elf(
-        get_app_data(0),
+        get_app_data("initproc").expect("[task] Unable to load initproc."),
         None
     ))));
 }

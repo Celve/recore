@@ -19,8 +19,7 @@ use config::*;
 use core::arch::{asm, global_asm};
 use io::uart::init_uart;
 use mm::{frame::init_frame_allocator, heap::init_heap, page_table::activate_page_table};
-
-use crate::task::processor::{init_tasks, run_tasks};
+use task::processor::run_tasks;
 
 global_asm!(include_str!("app.s"));
 
@@ -89,7 +88,6 @@ extern "C" fn rust_main() {
     println!("[kernel] Page table activated.");
 
     println!("[kernel] Begin to run kernel tasks.");
-    init_tasks();
     run_tasks();
 }
 

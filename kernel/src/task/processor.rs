@@ -1,5 +1,3 @@
-use core::arch::asm;
-
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
@@ -7,7 +5,6 @@ use spin::mutex::Mutex;
 use crate::task::task::TaskStatus;
 
 use super::{
-    loader::{get_app_data, get_num_apps},
     manager::MANAGER,
     task::{Task, TaskContext},
 };
@@ -26,10 +23,6 @@ impl Processor {
             curr_task: None,
             idle_task_ctx: TaskContext::empty(),
         }
-    }
-
-    pub fn idle_task_ctx(&self) -> &TaskContext {
-        &self.idle_task_ctx
     }
 
     pub fn idle_task_ctx_ptr(&mut self) -> *mut TaskContext {
@@ -53,6 +46,7 @@ lazy_static! {
     static ref PROCESSOR: Mutex<Processor> = Mutex::new(Processor::new());
 }
 
+/// Fetch the current task with processor locked.
 pub fn fetch_curr_task() -> Arc<Task> {
     PROCESSOR
         .lock()
@@ -60,13 +54,18 @@ pub fn fetch_curr_task() -> Arc<Task> {
         .expect("[kernel] There is no running task currently.")
 }
 
-pub fn fetch_idle_task_ctx() -> *mut TaskContext {
+/// Fetch the idle task context pointer with processor locked.
+pub fn fetch_idle_task_ctx_ptr() -> *mut TaskContext {
     PROCESSOR.lock().idle_task_ctx_ptr()
 }
 
+/// Switch from idle task to the next task.
+///
+/// When the next task yields, it will get into this function again.
 pub fn switch() {
     let task = MANAGER.lock().pop();
     if let Some(task) = task {
+        *task.lock().task_status_mut() = TaskStatus::Running;
         let task_ctx = task.lock().task_ctx_ptr();
         let idle_task_ctx = PROCESSOR.lock().idle_task_ctx_ptr();
         PROCESSOR.lock().insert_curr_task(task);
@@ -90,17 +89,8 @@ pub fn switch() {
     }
 }
 
-pub fn init_tasks() {
-    let num_apps = get_num_apps();
-    for i in 1..num_apps {
-        let task = Task::from_elf(get_app_data(i), None);
-        MANAGER.lock().push(Arc::new(task));
-    }
-}
-
 pub fn run_tasks() {
     loop {
-        println!("[kernel] Begin to do the switching.");
         switch();
     }
 }

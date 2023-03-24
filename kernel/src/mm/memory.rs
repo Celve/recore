@@ -9,7 +9,7 @@ use crate::{
         MEMORY_END, PAGE_SIZE, TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_END_ADDRESS,
         TRAP_CONTEXT_START_ADDRESS, UART_BASE_ADDRESS, UART_MAP_SIZE, USER_STACK_SIZE,
     },
-    mm::address::PhyAddr,
+    mm::{address::PhyAddr, page_table::PTEFlags},
     println,
 };
 
@@ -20,7 +20,7 @@ use spin::mutex::Mutex;
 
 pub struct Memory {
     page_table: PageTable,
-    areas: Vec<Area>,
+    pub areas: Vec<Area>,
 }
 
 bitflags! {
@@ -218,7 +218,7 @@ impl Clone for Memory {
             }
             result.map(new_area);
         });
-
+        result.map_trampoline();
         result
     }
 }
@@ -232,7 +232,7 @@ impl Memory {
         );
         area.range().iter().enumerate().for_each(|(i, vpn)| {
             self.page_table
-                .map(vpn, area.frame(i).ppn(), area.map_perm().into())
+                .map(vpn, area.frame(i).ppn(), area.map_perm().into());
         });
         self.areas.push(area);
     }
@@ -259,12 +259,11 @@ impl Memory {
             TRAMPOLINE_START_ADDRESS,
             TRAMPOLINE_START_ADDRESS + PAGE_SIZE,
         );
-        self.map(Area::new_linear(
+        self.page_table.map(
             VirAddr::from(TRAMPOLINE_START_ADDRESS).floor_to_vir_page_num(),
             PhyAddr::from(strampoline as usize).floor_to_phy_page_num(),
-            1,
-            MappingPermission::R | MappingPermission::X,
-        ));
+            PTEFlags::R | PTEFlags::X,
+        );
     }
 
     fn map_trap_context(&mut self) {

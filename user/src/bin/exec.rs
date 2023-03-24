@@ -11,6 +11,6 @@ fn main() {
     if fork() == 0 {
         println!("This is parent!");
     } else {
-        exec(0);
+        exec("hello_world");
     }
 }

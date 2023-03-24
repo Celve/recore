@@ -32,4 +32,8 @@ impl TrapContext {
             kernel_satp,
         }
     }
+
+    pub fn a0_mut(&mut self) -> &mut usize {
+        &mut self.saved_regs[10]
+    }
 }

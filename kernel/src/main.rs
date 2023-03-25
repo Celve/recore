@@ -13,13 +13,16 @@ mod config;
 mod mm;
 mod syscall;
 mod task;
+mod time;
 mod trap;
 
 use config::*;
 use core::arch::{asm, global_asm};
 use io::uart::init_uart;
 use mm::{frame::init_frame_allocator, heap::init_heap, page_table::activate_page_table};
+use riscv::register::*;
 use task::processor::run_tasks;
+use time::init_timer;
 
 global_asm!(include_str!("app.s"));
 
@@ -46,33 +49,42 @@ unsafe extern "C" fn _start() {
 ///
 /// We spare a little bit of kernel stack to use as its stack, which would never be recovered.
 unsafe fn rust_start() -> ! {
-    use riscv::register::*;
     mstatus::set_mpp(riscv::register::mstatus::MPP::Supervisor);
     mepc::write(rust_main as usize);
 
     satp::write(0);
-    sie::set_sext();
-    sie::set_stimer();
-    sie::set_ssoft();
 
     // the following two lines are necessary, but I don't know why
     pmpaddr0::write(0x3fffffffffffffusize);
     pmpcfg0::write(0xf);
 
+    // keep CPU's hartid in tp register
+    asm!("csrr tp, mhartid");
+
+    init_timer();
+
+    mideleg::set_stimer();
+    mideleg::set_sext();
+    mideleg::set_ssoft();
+
     asm!(
-        "li t0, {medeleg}",
-        "li t1, {mideleg}",
-        "csrw medeleg, t0",
-        "csrw mideleg, t1",
+        "csrw mideleg, {mideleg}",
+        "csrw medeleg, {medeleg}",
         "mret",
-        medeleg = const 0xffff,
-        mideleg = const 0xffff,
+        medeleg = in(reg) !0,
+        mideleg = in(reg) !0,
         options(noreturn),
     );
 }
 
 #[no_mangle]
 extern "C" fn rust_main() {
+    unsafe {
+        sie::set_sext();
+        sie::set_stimer();
+        sie::set_ssoft();
+    }
+
     init_bss();
     init_uart();
     println!("[kernel] Section bss cleared.");

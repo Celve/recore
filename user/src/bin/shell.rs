@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use user::{exec, fork, yield_now};
+use user::{exec, fork, waitpid, yield_now};
 
 #[macro_use]
 extern crate user;
@@ -11,13 +11,16 @@ fn main() {
     loop {
         print!("> ");
         let str = user::console::stdin().getline();
-        if fork() == 0 {
+        let pid = fork();
+        if pid == 0 {
             if exec(str.as_str()) == -1 {
                 println!("[user] Exec {} failed", str);
                 return;
             }
         } else {
-            yield_now();
+            let mut exit_code: i32 = 0;
+            waitpid(pid, &mut exit_code);
+            println!("[user] Process {} exit with code {}", pid, exit_code);
         }
     }
 }

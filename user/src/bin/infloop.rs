@@ -6,5 +6,5 @@ extern crate user;
 
 #[no_mangle]
 fn main() {
-    println!("Hello, world!");
+    loop {}
 }

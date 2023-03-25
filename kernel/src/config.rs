@@ -25,3 +25,8 @@ pub const TRAP_CONTEXT_END_ADDRESS: usize = TRAMPOLINE_START_ADDRESS;
 
 pub const USER_STACK_SIZE: usize = 0x2000;
 pub const KERNEL_STACK_SIZE: usize = 0x2000;
+
+pub const TIMER_INTERVAL: usize = 1000_000;
+pub const CLINT: usize = 0x2000000;
+
+pub const NCPU: usize = 8;

@@ -1,6 +1,12 @@
-use riscv::register::scause;
+use core::arch::asm;
 
-use crate::{syscall::syscall, task::processor::fetch_curr_task};
+use riscv::register::{scause, sip};
+
+use crate::{
+    syscall::syscall,
+    task::{processor::fetch_curr_task, suspend_and_yield},
+    time::{get_time, set_timer},
+};
 
 use self::trampoline::restore;
 
@@ -12,7 +18,14 @@ pub fn trap_handler() -> ! {
     let trap = scause::read().cause();
     match trap {
         scause::Trap::Interrupt(intp) => match intp {
-            scause::Interrupt::SupervisorSoft => todo!(),
+            scause::Interrupt::SupervisorSoft => {
+                // acknowledge the software interrupt
+                let sip = sip::read().bits();
+                unsafe {
+                    asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
+                }
+                suspend_and_yield();
+            }
             scause::Interrupt::SupervisorTimer => todo!(),
             scause::Interrupt::SupervisorExternal => todo!(),
             scause::Interrupt::UserSoft => todo!(),

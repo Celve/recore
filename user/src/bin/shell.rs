@@ -1,16 +1,42 @@
 #![no_std]
 #![no_main]
 
-use user::{exec, fork, waitpid, yield_now};
-
 #[macro_use]
 extern crate user;
+
+#[macro_use]
+extern crate alloc;
+
+use alloc::string::String;
+use user::{console, exec, fork, waitpid};
+
+const BS: char = 8 as char;
+const DL: char = 127 as char;
+
+fn getline() -> String {
+    let mut c = console::stdin().getchar();
+    let mut result = String::new();
+    while c != '\n' && c != '\r' {
+        if c == BS || c == DL {
+            if !result.is_empty() {
+                print!("{c}");
+                result.pop();
+            }
+        } else {
+            result.push(c);
+            print!("{c}");
+        }
+        c = console::stdin().getchar();
+    }
+    result
+}
 
 #[no_mangle]
 fn main() {
     loop {
         print!("> ");
-        let str = user::console::stdin().getline();
+        let str = getline();
+        println!("get out");
         let pid = fork();
         if pid == 0 {
             if exec(str.as_str()) == -1 {

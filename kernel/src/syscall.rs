@@ -1,6 +1,3 @@
-use alloc::sync::Arc;
-use spin::mutex::Mutex;
-
 use crate::{
     io::{stdin::Stdin, stdout::Stdout},
     task::{
@@ -87,7 +84,7 @@ pub fn syscall_exec(path: usize) -> isize {
         fetch_curr_task().exec(elf_data);
         0
     } else {
-        println!("[kernel] Fail to exec a new program.");
+        println!("[kernel] Fail to exec {}.", s);
         -1
     }
 }

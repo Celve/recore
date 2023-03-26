@@ -31,10 +31,12 @@ pub fn syscall_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
     if fd != 0 {
         panic!("[syscall] Doesn't support file read.");
     }
-    let task = fetch_curr_task();
-    let task_guard = task.lock();
-    let page_table = task_guard.user_mem().page_table();
-    let mut buffer = page_table.translate_bytes(buffer_ptr.into(), buffer_len);
+    let mut buffer = {
+        let task = fetch_curr_task();
+        let task_guard = task.lock();
+        let page_table = task_guard.user_mem().page_table();
+        page_table.translate_bytes(buffer_ptr.into(), buffer_len)
+    };
     let stdin = Stdin;
     buffer.iter_mut().for_each(|b| **b = stdin.getchar() as u8);
     buffer_len as isize

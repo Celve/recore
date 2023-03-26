@@ -35,6 +35,20 @@ impl<T> Mutex<T> {
         {}
         MutexGuard::new(&self.lock, unsafe { &mut *self.data.get() }) // bypass mutability check
     }
+
+    pub fn try_lock(&self) -> Option<MutexGuard<T>> {
+        if self
+            .lock
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
+            .is_ok()
+        {
+            Some(MutexGuard::new(&self.lock, unsafe {
+                &mut *self.data.get()
+            }))
+        } else {
+            None
+        }
+    }
 }
 
 impl<'a, T: 'a> MutexGuard<'a, T> {

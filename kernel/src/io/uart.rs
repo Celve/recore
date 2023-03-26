@@ -1,11 +1,14 @@
 use bitflags::bitflags;
 use core::sync::atomic::{AtomicPtr, Ordering};
 use lazy_static::lazy_static;
+use spin::mutex::Mutex;
 
-use crate::config::UART_BASE_ADDRESS;
+use crate::{config::UART_BASE_ADDRESS, task::suspend_and_yield};
 
 const BS: u8 = 0x8;
 const DEL: u8 = 0x7F;
+const IER_RX_ENABLE: u8 = 1 << 0;
+const IER_TX_ENABLE: u8 = 1 << 1;
 
 macro_rules! wait_for {
     ($cond:expr) => {
@@ -89,7 +92,7 @@ impl SerialPort {
             self_modem_ctrl.write(0x0B);
 
             // enable interrupts
-            self_int_en.write(0x01);
+            self_int_en.write(IER_RX_ENABLE | IER_TX_ENABLE);
         }
     }
 
@@ -121,25 +124,69 @@ impl SerialPort {
     }
 
     /// Receive a byte on the serial port.
-    pub fn receive(&self) -> u8 {
+    pub fn recv(&self) -> u8 {
         let self_data_reg = self.data_reg.load(Ordering::Relaxed);
         unsafe {
             wait_for!(self.line_sts().contains(LineStsFlags::INPUT_FULL));
             self_data_reg.read()
         }
     }
+
+    pub fn try_recv(&self) -> Option<u8> {
+        let self_data_reg = self.data_reg.load(Ordering::Relaxed);
+        if self.line_sts().contains(LineStsFlags::INPUT_FULL) {
+            Some(unsafe { self_data_reg.read() })
+        } else {
+            None
+        }
+    }
+}
+
+struct UartTx;
+
+struct UartRx;
+
+impl UartTx {
+    pub fn send(&self, data: u8) {
+        UART.send(data);
+    }
+}
+
+impl UartRx {
+    pub fn recv(&self) -> u8 {
+        UART.recv()
+    }
+
+    pub fn try_recv(&self) -> Option<u8> {
+        UART.try_recv()
+    }
 }
 
 lazy_static! {
     static ref UART: SerialPort = unsafe { SerialPort::new(UART_BASE_ADDRESS) };
+    static ref UART_TX: UartTx = UartTx;
+    static ref UART_RX: Mutex<UartRx> = Mutex::new(UartRx);
 }
 
 pub fn send_to_uart(data: u8) {
-    UART.send(data);
+    UART_TX.send(data);
 }
 
-pub fn receive_from_uart() -> u8 {
-    UART.receive()
+#[no_mangle]
+pub fn recv_from_uart() -> u8 {
+    loop {
+        if let Some(uart_rx) = UART_RX.try_lock() {
+            loop {
+                if let Some(c) = uart_rx.try_recv() {
+                    return c;
+                } else {
+                    suspend_and_yield();
+                }
+            }
+        } else {
+            suspend_and_yield();
+        }
+    }
 }
 
 pub fn init_uart() {

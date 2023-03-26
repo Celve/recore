@@ -26,7 +26,9 @@ pub fn trap_handler() -> ! {
                 suspend_and_yield();
             }
             scause::Interrupt::SupervisorTimer => todo!(),
-            scause::Interrupt::SupervisorExternal => todo!(),
+            scause::Interrupt::SupervisorExternal => {
+                println!("receive supervisor external interrupt");
+            }
             scause::Interrupt::UserSoft => todo!(),
             scause::Interrupt::UserTimer => todo!(),
             scause::Interrupt::UserExternal => todo!(),

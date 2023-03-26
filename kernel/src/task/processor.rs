@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
-use crate::task::task::TaskStatus;
+use crate::task::{manager::INITPROC, task::TaskStatus};
 
 use super::{
     manager::MANAGER,
@@ -82,6 +82,10 @@ pub fn switch() {
         if *curr_task.lock().task_status() != TaskStatus::Zombie {
             MANAGER.lock().push(curr_task);
         } else {
+            for task in curr_task.lock().children().iter() {
+                *task.lock().parent_mut() = Some(Arc::downgrade(&INITPROC));
+                INITPROC.lock().children_mut().push(task.clone());
+            }
             println!("[kernel] One process has ended.");
         }
     } else {

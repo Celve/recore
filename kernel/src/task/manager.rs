@@ -28,9 +28,11 @@ impl Manager {
 }
 
 lazy_static! {
-    /// Manager only load the initproc at the beginning.
-    pub static ref MANAGER: Mutex<Manager> = Mutex::new(Manager::new(Arc::new(Task::from_elf(
+    pub static ref INITPROC: Arc<Task> = Arc::new(Task::from_elf(
         get_app_data("initproc").expect("[task] Unable to load initproc."),
         None
-    ))));
+    ));
+
+    /// Manager only loads the initproc at the beginning.
+    pub static ref MANAGER: Mutex<Manager> = Mutex::new(Manager::new(INITPROC.clone()));
 }

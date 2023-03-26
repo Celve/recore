@@ -5,7 +5,6 @@ use riscv::register::{scause, sip};
 use crate::{
     syscall::syscall,
     task::{processor::fetch_curr_task, suspend_and_yield},
-    time::{get_time, set_timer},
 };
 
 use self::trampoline::restore;

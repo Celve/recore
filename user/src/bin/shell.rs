@@ -36,7 +36,6 @@ fn main() {
     loop {
         print!("> ");
         let str = getline();
-        println!("get out");
         let pid = fork();
         if pid == 0 {
             if exec(str.as_str()) == -1 {

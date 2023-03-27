@@ -1,6 +1,5 @@
-use core::{alloc::GlobalAlloc, cell::RefCell};
+use core::alloc::GlobalAlloc;
 
-use alloc::sync::Arc;
 use spin::mutex::Mutex;
 
 use crate::buddy_allocator::BuddyAllocator;

@@ -67,12 +67,12 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-pub struct LinkedListNode {
+pub struct LinkedListInner {
     prev: *mut usize,
     curr: *mut usize,
 }
 
-impl LinkedListNode {
+impl LinkedListInner {
     pub fn as_ptr(&self) -> *mut usize {
         self.curr
     }
@@ -92,11 +92,11 @@ pub struct IterMut<'a> {
 }
 
 impl<'a> Iterator for IterMut<'a> {
-    type Item = LinkedListNode;
+    type Item = LinkedListInner;
 
     fn next(&mut self) -> Option<Self::Item> {
         if !self.curr.is_null() {
-            let result = LinkedListNode {
+            let result = LinkedListInner {
                 prev: self.prev,
                 curr: self.curr,
             };

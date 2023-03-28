@@ -10,6 +10,7 @@ mod io;
 
 mod complement;
 mod config;
+mod heap;
 mod mm;
 mod syscall;
 mod task;
@@ -18,11 +19,14 @@ mod trap;
 
 use config::*;
 use core::arch::{asm, global_asm};
+use heap::init_heap;
 use io::uart::init_uart;
-use mm::{frame::init_frame_allocator, heap::init_heap, page_table::activate_page_table};
+use mm::{frame::init_frame_allocator, page_table::activate_page_table};
 use riscv::register::*;
 use task::processor::run_tasks;
 use time::init_timer;
+
+use crate::heap::slab_allocator::test_slab_allocator;
 
 global_asm!(include_str!("app.s"));
 

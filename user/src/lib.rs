@@ -8,7 +8,7 @@ pub mod complement;
 pub mod console;
 pub mod syscall;
 
-use allocator::heap::LockedHeap;
+use allocator::heap::LockedBuddyHeap;
 use syscall::*;
 
 const USER_HEAP_SIZE: usize = 0x4000;
@@ -17,7 +17,7 @@ const USER_HEAP_GRANULARITY: usize = 8;
 static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
 #[global_allocator]
-static HEAP: LockedHeap = LockedHeap::empty(USER_HEAP_GRANULARITY);
+static HEAP: LockedBuddyHeap = LockedBuddyHeap::empty(USER_HEAP_GRANULARITY);
 
 #[no_mangle]
 #[link_section = ".text.entry"]

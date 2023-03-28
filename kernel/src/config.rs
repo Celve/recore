@@ -4,8 +4,8 @@ pub const BOOTLOADER_STACK_SIZE: usize = 0x1000;
 pub const UART_BASE_ADDRESS: usize = 0x10_000_000;
 pub const UART_MAP_SIZE: usize = 0x6;
 
-pub const KERNEL_HEAP_GRANULARITY: usize = size_of::<usize>();
-// pub const KERNEL_HEAP_GRANULARITY: usize = PAGE_SIZE;
+// pub const KERNEL_HEAP_GRANULARITY: usize = size_of::<usize>();
+pub const KERNEL_HEAP_GRANULARITY: usize = PAGE_SIZE;
 pub const KERNEL_HEAP_SIZE: usize = 0x200_000;
 
 pub const PAGE_SIZE: usize = 0x1000;

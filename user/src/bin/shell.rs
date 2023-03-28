@@ -36,6 +36,10 @@ fn main() {
     loop {
         print!("> ");
         let str = getline();
+        if str.is_empty() {
+            println!("");
+            continue;
+        }
         let pid = fork();
         if pid == 0 {
             if exec(str.as_str()) == -1 {

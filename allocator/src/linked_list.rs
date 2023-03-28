@@ -2,7 +2,7 @@ use core::ptr::null_mut;
 
 #[derive(Clone, Copy)]
 pub struct LinkedList {
-    head: *mut usize,
+    pub head: *mut usize,
 }
 
 unsafe impl Send for LinkedList {}

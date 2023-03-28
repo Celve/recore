@@ -98,6 +98,7 @@ SECTIONS
 
     sdata = .;
     .data : {
+        *(.data.heap)
         *(.data .data.*)
         *(.sdata .sdata.*)
     }

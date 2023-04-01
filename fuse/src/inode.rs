@@ -108,7 +108,7 @@ impl Inode {
         cnt
     }
 
-    pub fn write(&mut self, buf: &[u8]) -> usize {
+    pub fn write_at_end(&mut self, buf: &[u8]) -> usize {
         self.write_at(buf, self.size as usize)
     }
 

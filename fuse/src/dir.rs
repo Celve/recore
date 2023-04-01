@@ -117,7 +117,7 @@ impl Dir {
                 let cache = CACHE_MANAGER.lock().get(self.inode_ptr.bid());
                 let mut cache_guard = cache.lock();
                 let inode = &mut cache_guard.as_array_mut::<Inode>()[self.inode_ptr.offset()];
-                inode.write(DirEntry::new(name, iid).as_bytes());
+                inode.write_at_end(DirEntry::new(name, iid).as_bytes());
             }
             Ok(())
         }

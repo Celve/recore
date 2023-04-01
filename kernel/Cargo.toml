@@ -13,6 +13,8 @@ xmas-elf = "0.9.0"
 allocator = { path = "../allocator" }
 buddy_system_allocator = "0.6"
 spin = { path = "../spin" }
+virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
+lru = "0.10.0"
 
 [profile.release]
 # opt-level = 0

@@ -1,4 +1,8 @@
-use core::alloc::{GlobalAlloc, Layout};
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    cmp::max,
+    mem::size_of,
+};
 
 use alloc::vec::Vec;
 use spin::mutex::Mutex;
@@ -29,17 +33,16 @@ impl SlabAllocator {
     }
 
     pub fn alloc(&mut self, layout: Layout) -> *mut u8 {
-        let size = layout.size().next_power_of_two();
+        let size = max(size_of::<usize>(), layout.size().next_power_of_two());
         let order = size.trailing_zeros() as usize;
         assert!(order <= PAGE_SIZE_BITS);
         self.caches[order].alloc() as *mut u8
     }
 
     pub fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
-        let size = layout.size().next_power_of_two();
+        let size = max(size_of::<usize>(), layout.size().next_power_of_two());
         let order = size.trailing_zeros() as usize;
         assert!(order <= PAGE_SIZE_BITS);
-
         self.caches[order].dealloc(ptr as usize);
     }
 }

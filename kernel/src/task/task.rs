@@ -7,6 +7,7 @@ use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
     config::TRAP_CONTEXT_START_ADDRESS,
+    fs::file::Fileable,
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -29,6 +30,7 @@ pub struct TaskInner {
     kernel_stack: KernelStack,
     parent: Option<Weak<Task>>,
     children: Vec<Arc<Task>>,
+    fd_table: Vec<Option<Arc<dyn Fileable>>>,
     exit_code: isize,
 }
 
@@ -90,6 +92,7 @@ impl Task {
                 parent,
                 children: Vec::new(),
                 exit_code: 0,
+                fd_table: Vec::new(),
             }),
         }
     }
@@ -170,6 +173,7 @@ impl Clone for Task {
                 parent: task.parent.clone(),
                 children: Vec::new(),
                 exit_code: 0,
+                fd_table: Vec::new(),
             }),
         }
     }

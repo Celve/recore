@@ -23,11 +23,11 @@ impl Cache {
                 page.next_insert(None);
                 Some(page)
             } else {
-                println!("[buddy] Allocate 4096.");
                 let ptr = HEAP
                     .buddy_allocator
                     .lock()
                     .alloc(Layout::array::<u8>(1 << self.order).unwrap());
+                println!("[buddy] Allocate {:#x}.", ptr as usize);
                 let mut page = fetch_page(ptr as usize).unwrap();
                 *page.order_mut() = self.order;
                 page.make_slab();

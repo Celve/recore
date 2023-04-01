@@ -1,8 +1,9 @@
 use core::arch::asm;
 
-use riscv::register::{scause, sip};
+use riscv::register::{scause, sip, utvec::TrapMode};
 
 use crate::{
+    config::TRAMPOLINE_START_ADDRESS,
     syscall::syscall,
     task::{processor::fetch_curr_task, suspend_and_yield},
 };
@@ -14,6 +15,7 @@ pub mod trampoline;
 
 #[no_mangle]
 pub fn trap_handler() -> ! {
+    set_kernel_stvec();
     let trap = scause::read().cause();
     match trap {
         scause::Trap::Interrupt(intp) => match intp {
@@ -79,4 +81,16 @@ pub fn trap_handler() -> ! {
         },
     }
     restore();
+}
+
+pub fn fail() {
+    panic!("[kernel] Get into trap when in supervisor mode.");
+}
+
+pub fn set_kernel_stvec() {
+    unsafe { riscv::register::stvec::write(fail as usize, TrapMode::Direct) };
+}
+
+pub fn set_user_stvec() {
+    unsafe { riscv::register::stvec::write(TRAMPOLINE_START_ADDRESS, TrapMode::Direct) };
 }

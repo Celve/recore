@@ -27,6 +27,12 @@ impl Frame {
         result
     }
 
+    pub fn fresh() -> Self {
+        let result = Self { ppn: fresh_frame() };
+        result.init();
+        result
+    }
+
     pub fn from_existed(ppn: PhyPageNum) -> Self {
         Self { ppn }
     }
@@ -88,6 +94,13 @@ impl FrameAllocator {
         }
     }
 
+    /// Allocate page from unexploited region, which guarantees that the allocated pages must be continuous.
+    pub fn fresh(&mut self) -> Option<PhyPageNum> {
+        let ppn = self.start;
+        self.start += 1;
+        Some(ppn)
+    }
+
     pub fn dealloc(&mut self, ppn: PhyPageNum) {
         self.recycled.push(ppn);
     }
@@ -108,6 +121,13 @@ fn alloc_frame() -> PhyPageNum {
     FRAME_ALLOCATOR
         .lock()
         .alloc()
+        .expect("[frame_allocator] Cannot fetch any more frame.")
+}
+
+fn fresh_frame() -> PhyPageNum {
+    FRAME_ALLOCATOR
+        .lock()
+        .fresh()
         .expect("[frame_allocator] Cannot fetch any more frame.")
 }
 

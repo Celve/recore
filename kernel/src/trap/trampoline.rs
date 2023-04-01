@@ -5,6 +5,7 @@ use riscv::register::utvec::TrapMode;
 use crate::config::{TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_START_ADDRESS};
 use crate::mm::address::VirPageNum;
 use crate::task::processor::fetch_curr_task;
+use crate::trap::set_user_stvec;
 
 global_asm!(include_str!("trampoline.s"));
 
@@ -22,8 +23,9 @@ pub fn restore() -> ! {
         fn _alltraps();
     }
 
+    set_user_stvec();
+
     unsafe {
-        riscv::register::stvec::write(TRAMPOLINE_START_ADDRESS, TrapMode::Direct);
         asm! {
             "fence.i",
             "jr {restore_va}",

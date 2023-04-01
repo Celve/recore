@@ -8,6 +8,7 @@ use crate::{
     config::{
         MEMORY_END, PAGE_SIZE, TRAMPOLINE_START_ADDRESS, TRAP_CONTEXT_END_ADDRESS,
         TRAP_CONTEXT_START_ADDRESS, UART_BASE_ADDRESS, UART_MAP_SIZE, USER_STACK_SIZE,
+        VIRTIO_BASE_ADDRESS, VIRTIO_MAP_SIZE,
     },
     mm::{address::PhyAddr, page_table::PTEFlags},
     println,
@@ -125,6 +126,16 @@ impl Memory {
         result.map(Area::new_identical(
             VirAddr::from(UART_BASE_ADDRESS).floor_to_vir_page_num(),
             VirAddr::from(UART_BASE_ADDRESS + UART_MAP_SIZE).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
+        println!(
+            "[kernel] Mapping Virio [{:#x}, {:#x})",
+            VIRTIO_BASE_ADDRESS, VIRTIO_MAP_SIZE
+        );
+        result.map(Area::new_identical(
+            VirAddr::from(VIRTIO_BASE_ADDRESS).floor_to_vir_page_num(),
+            VirAddr::from(VIRTIO_BASE_ADDRESS + VIRTIO_MAP_SIZE).ceil_to_vir_page_num(),
             MappingPermission::R | MappingPermission::W,
         ));
 

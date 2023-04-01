@@ -6,7 +6,7 @@ use core::arch::asm;
 use core::cmp::{max, min};
 use core::mem::{size_of, transmute};
 
-use super::address::VirAddr;
+use super::address::{GenOffset, PhyAddr, VirAddr};
 use super::memory::KERNEL_SPACE;
 use super::{
     address::{PhyPageNum, VirPageNum},
@@ -14,6 +14,7 @@ use super::{
     memory::MappingPermission,
 };
 use crate::config::{PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH};
+use crate::fs::segment::Segment;
 use crate::println;
 
 bitflags! {
@@ -157,8 +158,14 @@ impl PageTable {
 }
 
 impl PageTable {
+    pub fn translate_va(&self, va: VirAddr) -> Option<PhyAddr> {
+        let vpn = VirPageNum::from(va);
+        let offset = GenOffset::from(va);
+        let ppn = self.find_pte(vpn)?.get_ppn();
+        Some(ppn + offset)
+    }
+
     pub fn translate_vpn(&self, vpn: VirPageNum) -> Option<PageTableEntry> {
-        let indices = vpn.indices();
         self.find_pte(vpn).map(|pte| *pte)
     }
 
@@ -176,6 +183,20 @@ impl PageTable {
             vpn += 1;
         }
         result
+    }
+
+    pub fn translate_segment(&self, ptr: VirAddr, len: usize) -> Segment {
+        let ptr = usize::from(ptr);
+        let mut vpn = VirPageNum::from(ptr);
+        let mut result: Vec<&'static mut [u8]> = Vec::new();
+        while usize::from(vpn) <= ptr as usize + len {
+            let ppn = self.find_pte(vpn).unwrap().get_ppn();
+            let start = max(ptr - usize::from(vpn), 0);
+            let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
+            result.push(&mut ppn.as_raw_bytes()[start..end]);
+            vpn += 1;
+        }
+        Segment::new(result)
     }
 
     pub fn translate_str(&self, ptr: VirAddr) -> String {

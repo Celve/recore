@@ -10,6 +10,7 @@ mod io;
 
 mod complement;
 mod config;
+mod fs;
 mod heap;
 mod mm;
 mod syscall;
@@ -26,7 +27,7 @@ use riscv::register::*;
 use task::processor::run_tasks;
 use time::init_timer;
 
-use crate::heap::slab_allocator::test_slab_allocator;
+use crate::{fs::fuse::FUSE, heap::slab_allocator::test_slab_allocator, trap::set_kernel_stvec};
 
 global_asm!(include_str!("app.s"));
 
@@ -88,6 +89,8 @@ extern "C" fn rust_main() {
         sie::set_stimer();
         sie::set_ssoft();
     }
+
+    set_kernel_stvec();
 
     init_bss();
     init_uart();

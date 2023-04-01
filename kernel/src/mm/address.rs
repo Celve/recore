@@ -446,6 +446,22 @@ impl ops::SubAssign<usize> for GenOffset {
     }
 }
 
+impl ops::Add<GenOffset> for PhyPageNum {
+    type Output = PhyAddr;
+
+    fn add(self, rhs: GenOffset) -> Self::Output {
+        PhyAddr(self.0 * PAGE_SIZE + rhs.0)
+    }
+}
+
+impl ops::Add<GenOffset> for VirPageNum {
+    type Output = VirAddr;
+
+    fn add(self, rhs: GenOffset) -> Self::Output {
+        VirAddr(self.0 * PAGE_SIZE + rhs.0)
+    }
+}
+
 impl Step for PhyAddr {
     fn step(&mut self) {
         self.add_assign(1);

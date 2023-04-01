@@ -2,7 +2,7 @@ use core::fmt::Write;
 
 use alloc::string::String;
 
-use crate::syscall::{syscall_read, syscall_write};
+use crate::syscall::{sys_read, sys_write};
 
 const STDIN: usize = 0;
 const STDOUT: usize = 1;
@@ -13,7 +13,7 @@ pub struct Stdout;
 
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        syscall_write(STDOUT, s.as_bytes());
+        sys_write(STDOUT, s.as_bytes());
         Ok(())
     }
 }
@@ -41,7 +41,7 @@ macro_rules! println {
 impl Stdin {
     pub fn getchar(&self) -> char {
         let mut buffer: [u8; 1] = [0];
-        syscall_read(STDIN, &mut buffer);
+        sys_read(STDIN, &mut buffer);
         buffer[0] as char
     }
 

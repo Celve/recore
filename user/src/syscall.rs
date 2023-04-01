@@ -26,35 +26,35 @@ fn syscall(id: usize, args: [usize; 3]) -> isize {
     return ret;
 }
 
-pub fn syscall_exit(exit_code: i32) -> ! {
+pub fn sys_exit(exit_code: i32) -> ! {
     syscall(SYSCALL_EXIT, [exit_code as usize, 0, 0]);
     panic!("[user] Return from syscall_exit()");
 }
 
-pub fn syscall_read(fd: usize, buffer: &mut [u8]) -> isize {
+pub fn sys_read(fd: usize, buffer: &mut [u8]) -> isize {
     syscall(
         SYSCALL_READ,
         [fd, buffer.as_mut_ptr() as usize, buffer.len()],
     )
 }
 
-pub fn syscall_write(fd: usize, buffer: &[u8]) -> isize {
+pub fn sys_write(fd: usize, buffer: &[u8]) -> isize {
     syscall(SYSCALL_WRITE, [fd, buffer.as_ptr() as usize, buffer.len()])
 }
 
-pub fn syscall_yield() {
+pub fn sys_yield() {
     syscall(SYSCALL_YIELD, [0; 3]);
 }
 
-pub fn syscall_fork() -> isize {
+pub fn sys_fork() -> isize {
     syscall(SYSCALL_FORK, [0; 3])
 }
 
-pub fn syscall_exec(path: &str) -> isize {
+pub fn sys_exec(path: &str) -> isize {
     syscall(SYSCALL_EXEC, [path.as_ptr() as usize, 0, 0])
 }
 
-pub fn syscall_waitpid(pid: isize, exit_code: &mut i32) -> isize {
+pub fn sys_waitpid(pid: isize, exit_code: &mut i32) -> isize {
     syscall(
         SYSCALL_WAITPID,
         [pid as usize, exit_code as *mut i32 as usize, 0],

@@ -37,24 +37,24 @@ fn main() -> i32 {
 }
 
 fn exit(exit_code: i32) -> ! {
-    syscall_exit(exit_code);
+    sys_exit(exit_code);
 }
 
 pub fn yield_now() {
-    syscall_yield();
+    sys_yield();
 }
 
 pub fn fork() -> isize {
-    syscall_fork()
+    sys_fork()
 }
 
 pub fn exec(path: &str) -> isize {
-    syscall_exec(path)
+    sys_exec(path)
 }
 
 pub fn wait(exit_code: &mut i32) -> isize {
     loop {
-        match syscall_waitpid(-1, exit_code) {
+        match sys_waitpid(-1, exit_code) {
             -2 => yield_now(),
             pid => return pid,
         }
@@ -63,7 +63,7 @@ pub fn wait(exit_code: &mut i32) -> isize {
 
 pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
     loop {
-        match syscall_waitpid(pid, exit_code) {
+        match sys_waitpid(pid, exit_code) {
             -2 => yield_now(),
             pid => return pid,
         }

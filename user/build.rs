@@ -30,14 +30,13 @@ SECTIONS
         *(.data .data.*)
         *(.sdata .sdata.*)
     }
-    . = ALIGN(4K);
     .bss : {
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }
-    . = ALIGN(4K);
     /DISCARD/ : {
         *(.eh_frame)
+        *(.debug*)
     }
 }
 ";

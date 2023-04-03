@@ -106,6 +106,9 @@ extern "C" fn rust_main() {
     activate_page_table(); // the kernel space is automatically init before activating page table because of the lazy_static!
     println!("[kernel] Page table activated.");
 
+    let root = FUSE.root();
+    root.ls().iter().for_each(|name| println!("{}", name));
+
     println!("[kernel] Begin to run kernel tasks.");
     run_tasks();
 }

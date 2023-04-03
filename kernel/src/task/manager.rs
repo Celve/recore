@@ -1,8 +1,9 @@
 use super::task::Task;
 
-use crate::task::loader::get_app_data;
+use crate::{fs::fuse::FUSE, task::loader::get_app_data};
 
 use alloc::{collections::VecDeque, sync::Arc};
+use fosix::fs::OpenFlags;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
@@ -29,7 +30,7 @@ impl Manager {
 
 lazy_static! {
     pub static ref INITPROC: Arc<Task> = Arc::new(Task::from_elf(
-        get_app_data("initproc").expect("[task] Unable to load initproc."),
+        FUSE.root().open("initproc", OpenFlags::RDONLY).unwrap(),
         None
     ));
 

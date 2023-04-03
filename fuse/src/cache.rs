@@ -5,9 +5,9 @@ use lru::LruCache;
 use spin::mutex::Mutex;
 use std::sync::Arc;
 
-use super::disk::DISK_MANAGER;
-
 use crate::config::{BLK_SIZE, CACHE_SIZE};
+
+use super::disk::DISK_MANAGER;
 
 pub struct CacheManager {
     pub caches: LruCache<usize, Arc<Mutex<Cache>>>,

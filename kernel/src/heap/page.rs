@@ -69,8 +69,11 @@ impl Page {
 
     /// Take a free object inside slab with `inused` increased.
     pub fn take_free(&mut self) -> Option<*mut usize> {
-        self.inuse += 1;
-        self.free.pop_front()
+        let res = self.free.pop_front();
+        if res.is_some() {
+            self.inuse += 1;
+        }
+        res
     }
 
     /// Insert a free object inside slab with `inused` decreased.

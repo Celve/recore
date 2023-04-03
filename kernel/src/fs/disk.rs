@@ -57,6 +57,11 @@ impl Hal for VirIoHal {
     }
 
     fn virt_to_phys(vaddr: virtio_drivers::VirtAddr) -> virtio_drivers::PhysAddr {
-        vaddr
+        KERNEL_SPACE
+            .lock()
+            .page_table()
+            .translate_va(vaddr.into())
+            .unwrap()
+            .into()
     }
 }

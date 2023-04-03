@@ -2,6 +2,7 @@ mod bitmap;
 mod cache;
 pub mod dir;
 mod disk;
+pub mod fd;
 pub mod file;
 pub mod fuse;
 pub mod inode;

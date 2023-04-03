@@ -1,10 +1,9 @@
 use core::cmp::{max, min};
-use core::mem::size_of;
 
 use alloc::vec::Vec;
-use spin::mutex::Mutex;
+use fosix::fs::DirEntry;
 
-use super::fuse::{Fuse, FUSE};
+use super::fuse::FUSE;
 use crate::config::{DNODE_SIZE, INODE_PER_BLK, INODE_SIZE};
 
 use super::cache::CACHE_MANAGER;
@@ -44,7 +43,9 @@ pub struct Inode {
     directs: [u32; DIRECT_INDEXING_LEN],
 }
 
+#[derive(Clone, Copy)]
 pub struct InodePtr {
+    iid: usize,
     bid: usize,
     offset: usize,
 }
@@ -275,7 +276,7 @@ impl Inode {
 }
 
 impl Inode {
-    pub fn empty(ty: InodeType) -> Self {
+    fn empty(ty: InodeType) -> Self {
         Self {
             size: 0,
             indirect1: 0,
@@ -285,14 +286,15 @@ impl Inode {
         }
     }
 
-    pub fn from_existed(other: &Self) -> Self {
-        Self {
-            size: other.size,
-            indirect1: other.indirect1,
-            indirect2: other.indirect2,
-            ty: other.ty,
-            directs: other.directs,
-        }
+    pub fn empty_file() -> Self {
+        Self::empty(InodeType::File)
+    }
+
+    pub fn empty_dir(myself: usize, parent: usize) -> Self {
+        let mut inode = Self::empty(InodeType::Directory);
+        inode.write_at_end(DirEntry::new(".", myself).as_bytes());
+        inode.write_at_end(DirEntry::new("..", parent).as_bytes());
+        inode
     }
 
     pub fn size(&self) -> usize {
@@ -311,9 +313,14 @@ impl Inode {
 impl InodePtr {
     pub fn new(iid: usize) -> Self {
         Self {
+            iid,
             bid: iid / INODE_PER_BLK + FUSE.area_inode_start_bid(),
             offset: iid % INODE_PER_BLK,
         }
+    }
+
+    pub fn iid(&self) -> usize {
+        self.iid
     }
 
     pub fn bid(&self) -> usize {

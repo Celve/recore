@@ -247,6 +247,15 @@ impl PageTable {
                 .unwrap()
         }
     }
+
+    pub fn translate_array<T>(&self, ptr: VirAddr, len: usize) -> Vec<&'static mut T> {
+        let mut res = Vec::new();
+        for i in 0..len {
+            let ptr = ptr + i * size_of::<T>();
+            res.push(self.translate_any(ptr));
+        }
+        res
+    }
 }
 
 impl Drop for PageTable {

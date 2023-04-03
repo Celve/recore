@@ -4,6 +4,7 @@ use std::{
 };
 
 use clap::{App, Arg};
+use fosix::fs::OpenFlags;
 use fuse::FUSE;
 
 use crate::cache::CACHE_MANAGER;
@@ -36,6 +37,7 @@ fn main() {
         )
         .get_matches();
 
+    FUSE.alloc_root();
     let root = FUSE.root();
 
     let src_path = matches.value_of("source").unwrap();
@@ -58,11 +60,10 @@ fn main() {
 
         // create a file in easy-fs
         root.touch(app.as_str()).unwrap();
-        let mut inode = root.open(app.as_str()).unwrap();
+        let mut inode = root.open(app.as_str(), OpenFlags::RDWR).unwrap();
 
         // write data to easy-fs
         let size = inode.write(&mut all_data);
-        root.ls();
         assert_eq!(size, all_data.len());
     }
 

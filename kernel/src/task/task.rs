@@ -7,7 +7,11 @@ use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
     config::TRAP_CONTEXT_START_ADDRESS,
-    fs::file::Fileable,
+    fs::{
+        dir::Dir,
+        fd::FileDescriptor,
+        file::{File, Fileable},
+    },
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -21,6 +25,7 @@ use crate::task::stack::KernelStack;
 pub struct Task {
     inner: Mutex<TaskInner>,
 }
+
 pub struct TaskInner {
     pid: Pid,
     user_mem: Memory,
@@ -30,8 +35,9 @@ pub struct TaskInner {
     kernel_stack: KernelStack,
     parent: Option<Weak<Task>>,
     children: Vec<Arc<Task>>,
-    fd_table: Vec<Option<Arc<dyn Fileable>>>,
+    fd_table: Vec<Option<FileDescriptor>>,
     exit_code: isize,
+    cwd: Dir,
 }
 
 #[repr(C)]
@@ -50,9 +56,13 @@ pub enum TaskStatus {
 
 impl Task {
     /// Create a new task from elf data.
-    pub fn from_elf(elf_data: &[u8], parent: Option<Weak<Task>>) -> Self {
+    pub fn from_elf(file: File, parent: Option<Weak<Task>>) -> Self {
+        let file_size = file.size();
+        let mut elf_data = vec![0u8; file_size];
+        assert_eq!(file.read_at(&mut elf_data, 0), file_size);
+
         let pid = alloc_pid();
-        let (user_mem, user_sp, user_sepc) = Memory::from_elf(elf_data);
+        let (user_mem, user_sp, user_sepc) = Memory::from_elf(&elf_data);
         let page_table = user_mem.page_table();
 
         let trap_ctx = page_table
@@ -93,6 +103,7 @@ impl Task {
                 children: Vec::new(),
                 exit_code: 0,
                 fd_table: Vec::new(),
+                cwd: file.parent(),
             }),
         }
     }
@@ -115,9 +126,13 @@ impl Task {
     }
 
     /// Replace the current task with new elf data. Therefore, all user configurations would be reset.
-    pub fn exec(&self, elf_data: &[u8]) {
+    pub fn exec(&self, file: File) {
+        let file_size = file.size();
+        let mut elf_data = vec![0u8; file_size];
+        assert_eq!(file.read_at(&mut elf_data, 0), file_size);
+
         let mut task = self.lock();
-        let (user_mem, user_sp, user_sepc) = Memory::from_elf(elf_data);
+        let (user_mem, user_sp, user_sepc) = Memory::from_elf(&elf_data);
         let page_table = user_mem.page_table();
         let trap_ctx = page_table
             .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
@@ -155,6 +170,7 @@ impl Clone for Task {
             .expect("[task] Unable to access trap context.")
             .get_ppn();
         let kernel_stack = KernelStack::new(pid.0);
+        let cwd = task.cwd;
 
         // we have to modify the kernel sp both in trap ctx and task ctx
         let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
@@ -174,8 +190,23 @@ impl Clone for Task {
                 children: Vec::new(),
                 exit_code: 0,
                 fd_table: Vec::new(),
+                cwd,
             }),
         }
+    }
+}
+
+impl TaskInner {
+    pub fn alloc_fd(&mut self, f: FileDescriptor) -> isize {
+        for (i, fd) in self.fd_table.iter_mut().enumerate() {
+            if fd.is_none() {
+                let file = fd.insert(f);
+                return i as isize;
+            }
+        }
+
+        self.fd_table.push(Some(f));
+        (self.fd_table.len() - 1) as isize
     }
 }
 
@@ -242,6 +273,22 @@ impl TaskInner {
 
     pub fn exit_code(&self) -> isize {
         self.exit_code
+    }
+
+    pub fn cwd(&self) -> Dir {
+        self.cwd
+    }
+
+    pub fn cwd_mut(&mut self) -> &mut Dir {
+        &mut self.cwd
+    }
+
+    pub fn fd_table(&self) -> &Vec<Option<FileDescriptor>> {
+        &self.fd_table
+    }
+
+    pub fn fd_table_mut(&mut self) -> &mut Vec<Option<FileDescriptor>> {
+        &mut self.fd_table
     }
 }
 

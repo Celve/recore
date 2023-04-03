@@ -1,5 +1,7 @@
 use core::alloc::Layout;
 
+use allocator::linked_list::LinkedList;
+
 use super::{fetch_page, page::PagePtr, HEAP};
 
 #[derive(Clone, Copy)]
@@ -30,6 +32,7 @@ impl Cache {
                 println!("[buddy] Allocate {:#x}.", ptr as usize);
                 let mut page = fetch_page(ptr as usize).unwrap();
                 *page.order_mut() = self.order;
+                page.free = LinkedList::new();
                 page.make_slab();
                 Some(page)
             }

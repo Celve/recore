@@ -9,10 +9,16 @@ pub mod console;
 pub mod syscall;
 
 use allocator::heap::LockedBuddyHeap;
-use syscall::*;
+use bitflags::bitflags;
+use fosix::fs::{DirEntry, FileStat, OpenFlags};
+use syscall::{
+    file::{sys_chdir, sys_fstat, sys_getdents, sys_mkdir, sys_open, sys_read, sys_write},
+    *,
+};
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
+const DIR_ENTRY_NAME_LEN: usize = 28;
 
 static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
@@ -68,4 +74,32 @@ pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
             pid => return pid,
         }
     }
+}
+
+pub fn open(path: &str, flags: OpenFlags) -> isize {
+    sys_open(path, flags)
+}
+
+pub fn read(fd: usize, buffer: &mut [u8]) -> isize {
+    sys_read(fd, buffer)
+}
+
+pub fn write(fd: usize, buffer: &[u8]) -> isize {
+    sys_write(fd, buffer)
+}
+
+pub fn mkdir(dfd: usize, path: &str) -> isize {
+    sys_mkdir(dfd, path)
+}
+
+pub fn chdir(path: &str) -> isize {
+    sys_chdir(path)
+}
+
+pub fn getdents(dfd: usize, des: &[DirEntry]) -> isize {
+    sys_getdents(dfd, des)
+}
+
+pub fn fstat(fd: usize, stat: &mut FileStat) {
+    sys_fstat(fd, stat);
 }

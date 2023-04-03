@@ -1,7 +1,11 @@
+use fosix::fs::OpenFlags;
+
 use crate::task::{
     exit_and_yield, loader::get_app_data, manager::MANAGER, processor::fetch_curr_task,
     suspend_and_yield, task::TaskStatus,
 };
+
+use super::{open_file, parse_str};
 
 pub fn sys_exit(exit_code: isize) -> isize {
     exit_and_yield(exit_code);
@@ -23,17 +27,15 @@ pub fn sys_fork() -> isize {
 }
 
 pub fn sys_exec(path: usize) -> isize {
-    let s = fetch_curr_task()
-        .lock()
-        .user_mem()
-        .page_table()
-        .translate_str(path.into());
-    if let Some(elf_data) = get_app_data(s.as_str()) {
+    let name = parse_str(path);
+    let cwd = fetch_curr_task().lock().cwd();
+    let file = open_file(cwd, &name, OpenFlags::RDONLY);
+    if let Some(file) = file {
         println!("[kernel] Exec a new program.");
-        fetch_curr_task().exec(elf_data);
+        fetch_curr_task().exec(file);
         0
     } else {
-        println!("[kernel] Fail to exec {}.", s);
+        println!("[kernel] Fail to exec {}.", name);
         -1
     }
 }

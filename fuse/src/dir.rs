@@ -1,7 +1,9 @@
 use core::mem::size_of;
 
+use fosix::fs::OpenFlags;
 use spin::mutex::Mutex;
 use std::sync::Arc;
+use std::{string::String, vec::Vec};
 
 use super::{
     cache::CACHE_MANAGER,
@@ -14,8 +16,9 @@ use crate::config::INODE_PER_BLK;
 
 const NAME_LENGTH: usize = 28;
 
+#[derive(Clone, Copy)]
 pub struct Dir {
-    inode_ptr: InodePtr,
+    myself: InodePtr,
 }
 
 pub struct DirEntry {
@@ -25,9 +28,9 @@ pub struct DirEntry {
 
 impl Dir {
     pub fn ls(&self) -> Vec<String> {
-        let cache = CACHE_MANAGER.lock().get(self.inode_ptr.bid());
+        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.inode_ptr.offset()];
+        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
 
         let num_de = inode.size() / size_of::<DirEntry>();
         let mut names = Vec::new();
@@ -55,18 +58,16 @@ impl Dir {
         None
     }
 
-    pub fn open(&self, name: &str) -> Option<File> {
+    pub fn open(&self, name: &str, flags: OpenFlags) -> Option<File> {
         let de = self.get_de(name)?;
         if de.name() == name {
-            let iid = de.inode_id as usize;
-            let bid = iid / INODE_PER_BLK + FUSE.area_inode_start_bid();
-            let offset = iid % INODE_PER_BLK;
+            let inode_ptr = InodePtr::new(de.inode_id as usize);
 
-            let blk = CACHE_MANAGER.lock().get(bid);
+            let blk = CACHE_MANAGER.lock().get(inode_ptr.bid());
             let blk_guard = blk.lock();
-            let inode = &blk_guard.as_array::<Inode>()[offset];
+            let inode = &blk_guard.as_array::<Inode>()[inode_ptr.offset()];
             if inode.is_file() {
-                return Some(File::new(Arc::new(Mutex::new(Inode::from_existed(inode)))));
+                return Some(File::new(inode_ptr, self.myself, flags.into()));
             }
         }
         None
@@ -81,9 +82,9 @@ impl Dir {
     }
 
     fn get_de(&self, name: &str) -> Option<DirEntry> {
-        let cache = CACHE_MANAGER.lock().get(self.inode_ptr.bid());
+        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.inode_ptr.offset()];
+        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
 
         let num_de = inode.size() / size_of::<DirEntry>();
         assert_eq!(num_de * size_of::<DirEntry>(), inode.size());
@@ -109,14 +110,17 @@ impl Dir {
                 let cache = CACHE_MANAGER.lock().get(inode_ptr.bid());
                 let mut cache_guard = cache.lock();
                 let inode = &mut cache_guard.as_array_mut::<Inode>()[inode_ptr.offset()];
-                *inode = Inode::empty(ty);
+                *inode = match ty {
+                    InodeType::File => Inode::empty_file(),
+                    InodeType::Directory => Inode::empty_dir(iid, self.myself.iid()),
+                }
             }
 
             // modify outer inode
             {
-                let cache = CACHE_MANAGER.lock().get(self.inode_ptr.bid());
+                let cache = CACHE_MANAGER.lock().get(self.myself.bid());
                 let mut cache_guard = cache.lock();
-                let inode = &mut cache_guard.as_array_mut::<Inode>()[self.inode_ptr.offset()];
+                let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
                 inode.write_at_end(DirEntry::new(name, iid).as_bytes());
             }
             Ok(())
@@ -125,8 +129,8 @@ impl Dir {
 }
 
 impl Dir {
-    pub fn new(inode_ptr: InodePtr) -> Self {
-        Self { inode_ptr }
+    pub fn new(myself: InodePtr) -> Self {
+        Self { myself }
     }
 }
 

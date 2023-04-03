@@ -27,4 +27,8 @@ impl Fileable for Stdin {
     fn seek(&mut self, offset: usize) {
         unimplemented!()
     }
+
+    fn stat(&self) -> fosix::fs::FileStat {
+        unimplemented!()
+    }
 }

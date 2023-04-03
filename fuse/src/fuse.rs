@@ -22,13 +22,7 @@ pub struct Fuse {
 }
 
 lazy_static! {
-    pub static ref FUSE: Fuse = Fuse::new(
-        SuperBlock::new(4096, 32768),
-        DISK_MANAGER.clone(),
-    );
-    // pub static ref FUSE: Arc<Mutex<Fuse>> = Arc::new(Mutex::new(Fuse::from_existed(
-    //     DISK_MANAGER.clone(),
-    // )));
+    pub static ref FUSE: Fuse = Fuse::new(SuperBlock::new(4096, 32768), DISK_MANAGER.clone(),);
 }
 
 impl Fuse {
@@ -65,16 +59,6 @@ impl Fuse {
             + super_block.num_inode_area_blks
             + super_block.num_dnode_bitmap_blks;
 
-        // alloc root
-        let iid = bitmap_inode.alloc().unwrap();
-        assert_eq!(iid, 0);
-        let bid = area_inode_start_bid + iid / INODE_PER_BLK;
-        let offset = iid % INODE_PER_BLK * INODE_SIZE;
-        let blk = CACHE_MANAGER.lock().get(bid);
-        let mut blk_guard = blk.lock();
-        let inode = &mut blk_guard.as_array_mut::<Inode>()[offset];
-        *inode = Inode::empty(InodeType::Directory);
-
         Self {
             disk_manager,
             bitmap_inode: Mutex::new(bitmap_inode),
@@ -82,6 +66,16 @@ impl Fuse {
             bitmap_dnode: Mutex::new(bitmap_dnode),
             area_dnode_start_bid,
         }
+    }
+
+    pub fn alloc_root(&self) {
+        let iid = self.alloc_iid().unwrap();
+        assert_eq!(iid, 0);
+        let iptr = InodePtr::new(iid);
+        let blk = CACHE_MANAGER.lock().get(iptr.bid());
+        let mut blk_guard = blk.lock();
+        let inode = &mut blk_guard.as_array_mut::<Inode>()[iptr.offset()];
+        *inode = Inode::empty_dir(iid, iid);
     }
 
     pub fn from_existed(disk_manager: Arc<Mutex<DiskManager>>) -> Self {

@@ -2,7 +2,7 @@ use core::fmt::Write;
 
 use alloc::string::String;
 
-use crate::syscall::{sys_read, sys_write};
+use crate::syscall::file::{sys_read, sys_write};
 
 const STDIN: usize = 0;
 const STDOUT: usize = 1;

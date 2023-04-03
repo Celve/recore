@@ -36,6 +36,7 @@ pub const BLK_SIZE: usize = 512;
 pub const INODE_SIZE: usize = 32 * 4;
 pub const DNODE_SIZE: usize = 32 * 16;
 pub const INODE_PER_BLK: usize = BLK_SIZE / INODE_SIZE;
+pub const DIR_ENTRY_NAME_LEN: usize = 28;
 pub const FUSE_INODE_NUM: usize = 1024;
 pub const FUSE_DNODE_NUM: usize = 4096;
 

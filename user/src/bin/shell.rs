@@ -7,8 +7,9 @@ extern crate user;
 #[macro_use]
 extern crate alloc;
 
-use alloc::string::String;
-use user::{console, exec, fork, waitpid};
+use alloc::{string::String, vec::Vec};
+use fosix::fs::OpenFlags;
+use user::{console, exec, fork, open, waitpid};
 
 const BS: char = 8 as char;
 const DL: char = 127 as char;
@@ -33,13 +34,18 @@ fn getline() -> String {
 
 #[no_mangle]
 fn main() {
+    let cwd = "/";
     loop {
-        print!("> ");
-        let str = getline();
+        print!("{} > ", cwd);
+        let mut str = getline();
         if str.is_empty() {
             println!("");
             continue;
         }
+        str.push('\0');
+
+        // let args = str.split_whitespace().collect::<Vec<&str>>();
+
         let pid = fork();
         if pid == 0 {
             if exec(str.as_str()) == -1 {

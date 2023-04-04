@@ -4,20 +4,20 @@ use crate::io::{stdin::Stdin, stdout::Stdout};
 
 use super::{dir::Dir, file::File, segment::Segment};
 
-pub enum FileableX {
+pub enum Fileable {
     Stdin(Stdin),
     Stdout(Stdout),
     File(File),
     Dir(Dir),
 }
 
-impl FileableX {
+impl Fileable {
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
         match self {
-            FileableX::Stdin(stdin) => stdin.read(buf),
-            FileableX::Stdout(_) => 0,
-            FileableX::File(file) => file.read(buf),
-            FileableX::Dir(_) => 0,
+            Fileable::Stdin(stdin) => stdin.read(buf),
+            Fileable::Stdout(_) => 0,
+            Fileable::File(file) => file.read(buf),
+            Fileable::Dir(_) => 0,
         }
     }
 
@@ -31,8 +31,8 @@ impl FileableX {
 
     pub fn write(&mut self, buf: &[u8]) -> usize {
         match self {
-            FileableX::Stdout(stdout) => stdout.write(buf),
-            FileableX::File(file) => file.write(buf),
+            Fileable::Stdout(stdout) => stdout.write(buf),
+            Fileable::File(file) => file.write(buf),
             _ => 0,
         }
     }
@@ -47,45 +47,45 @@ impl FileableX {
 
     pub fn seek(&mut self, new_offset: usize) {
         match self {
-            FileableX::File(file) => file.seek(new_offset),
+            Fileable::File(file) => file.seek(new_offset),
             _ => {}
         }
     }
 
     pub fn stat(&self) -> FileStat {
         match self {
-            FileableX::File(file) => file.stat(),
-            FileableX::Dir(dir) => dir.stat(),
+            Fileable::File(file) => file.stat(),
+            Fileable::Dir(dir) => dir.stat(),
             _ => FileStat::empty(),
         }
     }
 }
 
-impl FileableX {
+impl Fileable {
     pub fn as_file(&self) -> Option<&File> {
         match self {
-            FileableX::File(file) => Some(file),
+            Fileable::File(file) => Some(file),
             _ => None,
         }
     }
 
     pub fn as_file_mut(&mut self) -> Option<&mut File> {
         match self {
-            FileableX::File(file) => Some(file),
+            Fileable::File(file) => Some(file),
             _ => None,
         }
     }
 
     pub fn as_dir(&self) -> Option<&Dir> {
         match self {
-            FileableX::Dir(dir) => Some(dir),
+            Fileable::Dir(dir) => Some(dir),
             _ => None,
         }
     }
 
     pub fn as_dir_mut(&mut self) -> Option<&mut Dir> {
         match self {
-            FileableX::Dir(dir) => Some(dir),
+            Fileable::Dir(dir) => Some(dir),
             _ => None,
         }
     }

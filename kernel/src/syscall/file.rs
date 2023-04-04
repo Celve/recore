@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use fosix::fs::{DirEntry, FileStat, OpenFlags};
 
 use crate::{
-    fs::fileable::FileableX,
+    fs::fileable::Fileable,
     io::{stdin::Stdin, stdout::Stdout},
     task::processor::fetch_curr_task,
 };
@@ -49,13 +49,13 @@ pub fn sys_open(path: usize, flags: u32) -> isize {
         if dir.is_none() {
             return -1;
         }
-        FileableX::Dir(dir.unwrap())
+        Fileable::Dir(dir.unwrap())
     } else {
         let file = open_file(cwd, &parse_str(path), flags);
         if file.is_none() {
             return -1;
         }
-        FileableX::File(file.unwrap())
+        Fileable::File(file.unwrap())
     };
     let task = fetch_curr_task();
     let mut task_guard = task.lock();

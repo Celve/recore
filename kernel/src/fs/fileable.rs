@@ -89,4 +89,32 @@ impl Fileable {
             _ => None,
         }
     }
+
+    pub fn as_stdin(&self) -> Option<&Stdin> {
+        match self {
+            Fileable::Stdin(stdin) => Some(stdin),
+            _ => None,
+        }
+    }
+
+    pub fn as_stdin_mut(&mut self) -> Option<&mut Stdin> {
+        match self {
+            Fileable::Stdin(stdin) => Some(stdin),
+            _ => None,
+        }
+    }
+
+    pub fn as_stdout(&self) -> Option<&Stdout> {
+        match self {
+            Fileable::Stdout(stdout) => Some(stdout),
+            _ => None,
+        }
+    }
+
+    pub fn as_stdout_mut(&mut self) -> Option<&mut Stdout> {
+        match self {
+            Fileable::Stdout(stdout) => Some(stdout),
+            _ => None,
+        }
+    }
 }

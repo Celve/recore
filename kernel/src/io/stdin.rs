@@ -1,7 +1,4 @@
-use crate::fs::{
-    file::{File, Fileable},
-    segment::Segment,
-};
+use crate::fs::{file::File, segment::Segment};
 
 use super::uart::recv_from_uart;
 
@@ -14,21 +11,9 @@ impl Stdin {
     }
 }
 
-impl Fileable for Stdin {
-    fn read(&mut self, buf: &mut [u8]) -> usize {
+impl Stdin {
+    pub fn read(&mut self, buf: &mut [u8]) -> usize {
         buf.iter_mut().for_each(|b| *b = self.getchar());
         buf.len()
-    }
-
-    fn write(&mut self, buf: &[u8]) -> usize {
-        unimplemented!()
-    }
-
-    fn seek(&mut self, offset: usize) {
-        unimplemented!()
-    }
-
-    fn stat(&self) -> fosix::fs::FileStat {
-        unimplemented!()
     }
 }

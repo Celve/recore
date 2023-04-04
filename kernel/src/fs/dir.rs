@@ -3,7 +3,6 @@ use core::mem::size_of;
 use alloc::{string::String, vec::Vec};
 use fosix::fs::{DirEntry, FileStat, OpenFlags};
 
-use super::file::Fileable;
 use super::{
     cache::CACHE_MANAGER,
     file::File,
@@ -151,21 +150,8 @@ impl Dir {
     pub fn new(myself: InodePtr) -> Self {
         Self { myself }
     }
-}
 
-impl Fileable for Dir {
-    fn seek(&mut self, new_offset: usize) {
-        unimplemented!()
-    }
-
-    fn read(&mut self, buf: &mut [u8]) -> usize {
-        unimplemented!()
-    }
-    fn write(&mut self, buf: &[u8]) -> usize {
-        unimplemented!()
-    }
-
-    fn stat(&self) -> FileStat {
+    pub fn stat(&self) -> FileStat {
         let cache = CACHE_MANAGER.lock().get(self.myself.bid());
         let cache_guard = cache.lock();
         let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];

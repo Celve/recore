@@ -8,32 +8,6 @@ use super::{
     segment::Segment,
 };
 
-pub trait Fileable: Send + Sync {
-    fn seek(&mut self, new_offset: usize);
-
-    fn read(&mut self, buf: &mut [u8]) -> usize;
-
-    fn write(&mut self, buf: &[u8]) -> usize;
-
-    fn stat(&self) -> FileStat;
-
-    fn read_seg(&mut self, seg: &mut Segment) -> usize {
-        let mut bytes = 0;
-        for buf in seg.iter_mut() {
-            bytes += self.read(buf);
-        }
-        bytes
-    }
-
-    fn write_seg(&mut self, seg: &Segment) -> usize {
-        let mut bytes = 0;
-        for buf in seg.iter() {
-            bytes += self.write(buf);
-        }
-        bytes
-    }
-}
-
 pub struct File {
     myself: InodePtr,
     parent: InodePtr,
@@ -79,24 +53,24 @@ impl File {
     }
 }
 
-impl Fileable for File {
-    fn seek(&mut self, new_offset: usize) {
+impl File {
+    pub fn seek(&mut self, new_offset: usize) {
         self.offset = new_offset;
     }
 
-    fn read(&mut self, buf: &mut [u8]) -> usize {
+    pub fn read(&mut self, buf: &mut [u8]) -> usize {
         let bytes = self.read_at(buf, self.offset);
         self.offset += bytes;
         bytes
     }
 
-    fn write(&mut self, buf: &[u8]) -> usize {
+    pub fn write(&mut self, buf: &[u8]) -> usize {
         let bytes = self.write_at(buf, self.offset);
         self.offset += bytes;
         bytes
     }
 
-    fn stat(&self) -> FileStat {
+    pub fn stat(&self) -> FileStat {
         FileStat::new(self.size())
     }
 }

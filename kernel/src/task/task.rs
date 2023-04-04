@@ -7,11 +7,7 @@ use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
     config::TRAP_CONTEXT_START_ADDRESS,
-    fs::{
-        dir::Dir,
-        fd::FileDescriptor,
-        file::{File, Fileable},
-    },
+    fs::{dir::Dir, file::File, fileable::FileableX},
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -35,7 +31,7 @@ pub struct TaskInner {
     kernel_stack: KernelStack,
     parent: Option<Weak<Task>>,
     children: Vec<Arc<Task>>,
-    fd_table: Vec<Option<FileDescriptor>>,
+    fd_table: Vec<Option<FileableX>>,
     exit_code: isize,
     cwd: Dir,
 }
@@ -197,7 +193,7 @@ impl Clone for Task {
 }
 
 impl TaskInner {
-    pub fn alloc_fd(&mut self, f: FileDescriptor) -> isize {
+    pub fn alloc_fd(&mut self, f: FileableX) -> isize {
         for (i, fd) in self.fd_table.iter_mut().enumerate() {
             if fd.is_none() {
                 let file = fd.insert(f);
@@ -283,11 +279,11 @@ impl TaskInner {
         &mut self.cwd
     }
 
-    pub fn fd_table(&self) -> &Vec<Option<FileDescriptor>> {
+    pub fn fd_table(&self) -> &Vec<Option<FileableX>> {
         &self.fd_table
     }
 
-    pub fn fd_table_mut(&mut self) -> &mut Vec<Option<FileDescriptor>> {
+    pub fn fd_table_mut(&mut self) -> &mut Vec<Option<FileableX>> {
         &mut self.fd_table
     }
 }

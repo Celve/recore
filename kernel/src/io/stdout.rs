@@ -1,7 +1,4 @@
-use crate::fs::{
-    file::{File, Fileable},
-    segment::Segment,
-};
+use crate::fs::{file::File, segment::Segment};
 
 use super::uart::send_to_uart;
 use core::fmt::{Arguments, Write};
@@ -25,22 +22,14 @@ impl Write for Stdout {
     }
 }
 
-impl Fileable for Stdout {
-    fn read(&mut self, buf: &mut [u8]) -> usize {
+impl Stdout {
+    pub fn read(&mut self, buf: &mut [u8]) -> usize {
         unimplemented!()
     }
 
-    fn write(&mut self, buf: &[u8]) -> usize {
+    pub fn write(&mut self, buf: &[u8]) -> usize {
         buf.iter().for_each(|b| self.putchar(*b));
         buf.len()
-    }
-
-    fn seek(&mut self, offset: usize) {
-        unimplemented!()
-    }
-
-    fn stat(&self) -> fosix::fs::FileStat {
-        unimplemented!()
     }
 }
 

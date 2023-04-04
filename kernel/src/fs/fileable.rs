@@ -1,4 +1,4 @@
-use fosix::fs::FileStat;
+use fosix::fs::{FileStat, SeekFlag};
 
 use crate::io::{stdin::Stdin, stdout::Stdout};
 
@@ -46,9 +46,9 @@ impl Fileable {
         bytes
     }
 
-    pub fn seek(&mut self, new_offset: usize) {
+    pub fn seek(&mut self, new_offset: usize, flag: SeekFlag) {
         match self {
-            Fileable::File(file) => file.seek(new_offset),
+            Fileable::File(file) => file.seek(new_offset, flag),
             _ => {}
         }
     }

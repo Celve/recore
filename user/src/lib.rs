@@ -10,9 +10,11 @@ pub mod syscall;
 
 use allocator::heap::LockedBuddyHeap;
 use bitflags::bitflags;
-use fosix::fs::{DirEntry, FileStat, OpenFlags};
+use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
 use syscall::{
-    file::{sys_chdir, sys_fstat, sys_getdents, sys_mkdir, sys_open, sys_read, sys_write},
+    file::{
+        sys_chdir, sys_fstat, sys_getdents, sys_lseek, sys_mkdir, sys_open, sys_read, sys_write,
+    },
     *,
 };
 
@@ -102,4 +104,8 @@ pub fn getdents(dfd: usize, des: &[DirEntry]) -> isize {
 
 pub fn fstat(fd: usize, stat: &mut FileStat) {
     sys_fstat(fd, stat);
+}
+
+pub fn lseek(fd: usize, offset: usize, flag: SeekFlag) {
+    sys_lseek(fd, offset, flag);
 }

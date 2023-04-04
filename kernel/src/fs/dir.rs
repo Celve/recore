@@ -36,22 +36,21 @@ impl Dir {
 
     pub fn cd(&self, name: &str) -> Option<Dir> {
         let de = self.get_de(name)?;
-        if de.name() == name {
-            let inode_ptr = InodePtr::new(de.iid() as usize);
+        let inode_ptr = InodePtr::new(de.iid() as usize);
 
-            let blk = CACHE_MANAGER.lock().get(inode_ptr.bid());
-            let blk_guard = blk.lock();
-            let inode = &blk_guard.as_array::<Inode>()[inode_ptr.offset()];
-            if inode.is_dir() {
-                return Some(Dir::new(inode_ptr));
-            }
+        let blk = CACHE_MANAGER.lock().get(inode_ptr.bid());
+        let blk_guard = blk.lock();
+        let inode = &blk_guard.as_array::<Inode>()[inode_ptr.offset()];
+        if inode.is_dir() {
+            Some(Dir::new(inode_ptr))
+        } else {
+            None
         }
-        None
     }
 
     pub fn open(&self, name: &str, flags: OpenFlags) -> Option<File> {
-        let de = self.get_de(name)?;
-        if de.name() == name {
+        let de = self.get_de(name);
+        if let Some(de) = de {
             let inode_ptr = InodePtr::new(de.iid());
 
             let blk = CACHE_MANAGER.lock().get(inode_ptr.bid());
@@ -66,7 +65,7 @@ impl Dir {
         } else if flags.contains(OpenFlags::CREATE) {
             self.touch(name).unwrap();
             let de = self.get_de(name).unwrap();
-            Some(File::new(
+            return Some(File::new(
                 InodePtr::new(de.iid()),
                 self.myself,
                 flags.into(),

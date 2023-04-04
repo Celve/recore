@@ -10,7 +10,7 @@ use crate::{
 };
 
 use self::{
-    file::{sys_close, sys_fstat, sys_getdents, sys_open, sys_read, sys_write},
+    file::{sys_close, sys_fstat, sys_getdents, sys_lseek, sys_open, sys_read, sys_write},
     process::{sys_exec, sys_exit, sys_fork, sys_waitpid, sys_yield},
 };
 
@@ -18,6 +18,7 @@ const SYSCALL_FSTAT: usize = 43;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_GETDENTS: usize = 61;
+const SYSCALL_LSEEK: usize = 62;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
@@ -32,6 +33,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_OPEN => sys_open(args[0], args[1] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
         SYSCALL_GETDENTS => sys_getdents(args[0], args[1], args[2]),
+        SYSCALL_LSEEK => sys_lseek(args[0], args[1] as isize, args[2]),
         SYSCALL_READ => sys_read(args[0], args[1], args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1], args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as isize),

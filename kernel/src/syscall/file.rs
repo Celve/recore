@@ -1,6 +1,6 @@
 use core::mem::size_of;
 
-use fosix::fs::{DirEntry, FileStat, OpenFlags};
+use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
 
 use crate::{fs::fileable::Fileable, task::processor::fetch_curr_task};
 
@@ -155,5 +155,13 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
         **byte = src_bytes[i];
     }
 
+    0
+}
+
+pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
+    let task = fetch_curr_task();
+    let mut task_guard = task.lock();
+    let fileable = task_guard.fd_table_mut()[fd].as_mut().unwrap();
+    fileable.seek(offset as usize, SeekFlag::from_bits(flags as u8).unwrap());
     0
 }

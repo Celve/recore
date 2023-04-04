@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use fosix::fs::{FilePerm, FileStat, OpenFlags};
+use fosix::fs::{FilePerm, FileStat, OpenFlags, SeekFlag};
 
 use super::{
     cache::CACHE_MANAGER,
@@ -55,8 +55,13 @@ impl File {
 }
 
 impl File {
-    pub fn seek(&mut self, new_offset: usize) {
-        self.offset = new_offset;
+    pub fn seek(&mut self, new_offset: usize, flag: SeekFlag) {
+        match flag {
+            SeekFlag::SET => self.offset = new_offset,
+            SeekFlag::CUR => self.offset += new_offset,
+            SeekFlag::END => self.offset = self.size() + new_offset,
+            _ => {}
+        }
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> usize {

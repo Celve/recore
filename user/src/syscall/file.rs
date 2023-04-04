@@ -2,6 +2,7 @@ use fosix::fs::DirEntry;
 
 use fosix::fs::FileStat;
 use fosix::fs::OpenFlags;
+use fosix::fs::SeekFlag;
 
 use super::syscall;
 
@@ -11,6 +12,7 @@ const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_GETDENTS: usize = 61;
+const SYSCALL_LSEEK: usize = 62;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 
@@ -50,4 +52,8 @@ pub fn sys_getdents(dfd: usize, des: &[DirEntry]) -> isize {
 
 pub fn sys_fstat(fd: usize, stat: &mut FileStat) -> isize {
     syscall(SYSCALL_FSTAT, [fd, stat as *mut FileStat as usize, 0])
+}
+
+pub fn sys_lseek(fd: usize, offset: usize, flag: SeekFlag) {
+    syscall(SYSCALL_LSEEK, [fd, offset, flag.bits() as usize]);
 }

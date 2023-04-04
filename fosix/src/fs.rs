@@ -23,6 +23,12 @@ bitflags! {
         const TRUNC = 1 << 10;
     }
 
+    pub struct SeekFlag: u8 {
+        const SET = 0;
+        const CUR = 1 << 0;
+        const END = 1 << 1;
+    }
+
     pub struct FilePerm: u8 {
         const READABLE = 1 << 0;
         const WRITEABLE = 1 << 1;

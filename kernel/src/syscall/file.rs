@@ -4,7 +4,7 @@ use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
 
 use crate::{fs::fileable::Fileable, task::processor::fetch_curr_task};
 
-use super::{open_dir, open_file, parse_str};
+use super::{create_dir, open_dir, open_file, parse_str};
 
 pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
     let (mut fileable, mut seg) = {
@@ -76,7 +76,7 @@ pub fn sys_close(fd: usize) -> isize {
 
 pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
     let path = parse_str(path);
-    let dir = open_dir(
+    let dir = create_dir(
         *fetch_curr_task().lock().fd_table()[dfd]
             .as_ref()
             .unwrap()
@@ -84,8 +84,7 @@ pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
             .unwrap(),
         &path,
     );
-    if let Some(dir) = dir {
-        dir.mkdir(&path).unwrap();
+    if let Some(_) = dir {
         0
     } else {
         -1

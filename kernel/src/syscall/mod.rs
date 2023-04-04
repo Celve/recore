@@ -10,11 +10,16 @@ use crate::{
 };
 
 use self::{
-    file::{sys_close, sys_fstat, sys_getdents, sys_lseek, sys_open, sys_read, sys_write},
+    file::{
+        sys_chdir, sys_close, sys_fstat, sys_getdents, sys_lseek, sys_mkdir, sys_open, sys_read,
+        sys_write,
+    },
     process::{sys_exec, sys_exit, sys_fork, sys_waitpid, sys_yield},
 };
 
+const SYSCALL_MKDIR: usize = 34;
 const SYSCALL_FSTAT: usize = 43;
+const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_GETDENTS: usize = 61;
@@ -29,7 +34,9 @@ const SYSCALL_WAITPID: usize = 260;
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
+        SYSCALL_MKDIR => sys_mkdir(args[0], args[1]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1]),
+        SYSCALL_CHDIR => sys_chdir(args[0]),
         SYSCALL_OPEN => sys_open(args[0], args[1] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
         SYSCALL_GETDENTS => sys_getdents(args[0], args[1], args[2]),
@@ -81,6 +88,18 @@ fn open_dir(cwd: Dir, path: &str) -> Option<Dir> {
         cwd = cwd.cd(step)?;
     }
     Some(cwd)
+}
+
+fn create_dir(cwd: Dir, path: &str) -> Option<Dir> {
+    let (mut cwd, steps) = split_path(cwd, path);
+    for step in steps[..steps.len() - 1].iter() {
+        cwd = cwd.cd(step)?;
+    }
+    if cwd.mkdir(steps[steps.len() - 1]).is_err() {
+        None
+    } else {
+        cwd.cd(steps[steps.len() - 1])
+    }
 }
 
 fn parse_str(path: usize) -> String {

@@ -29,6 +29,7 @@ $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
 
 fsimg: $(APPS)
+	@cd ../user && make build && cd ../kernel
 	@cd ../fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/
 
 kernel:

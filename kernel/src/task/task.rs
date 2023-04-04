@@ -8,6 +8,7 @@ use spin::mutex::{Mutex, MutexGuard};
 use crate::{
     config::TRAP_CONTEXT_START_ADDRESS,
     fs::{dir::Dir, file::File, fileable::Fileable},
+    io::{stdin::Stdin, stdout::Stdout},
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -98,7 +99,11 @@ impl Task {
                 parent,
                 children: Vec::new(),
                 exit_code: 0,
-                fd_table: Vec::new(),
+                fd_table: vec![
+                    Some(Fileable::Stdin(Stdin)),
+                    Some(Fileable::Stdout(Stdout)),
+                    Some(Fileable::Stdout(Stdout)),
+                ],
                 cwd: file.parent(),
             }),
         }
@@ -167,6 +172,7 @@ impl Clone for Task {
             .get_ppn();
         let kernel_stack = KernelStack::new(pid.0);
         let cwd = task.cwd;
+        let fd_table = task.fd_table().clone();
 
         // we have to modify the kernel sp both in trap ctx and task ctx
         let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
@@ -185,7 +191,7 @@ impl Clone for Task {
                 parent: task.parent.clone(),
                 children: Vec::new(),
                 exit_code: 0,
-                fd_table: Vec::new(),
+                fd_table,
                 cwd,
             }),
         }

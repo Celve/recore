@@ -4,6 +4,7 @@ use crate::io::{stdin::Stdin, stdout::Stdout};
 
 use super::{dir::Dir, file::File, segment::Segment};
 
+#[derive(Clone, Copy)]
 pub enum Fileable {
     Stdin(Stdin),
     Stdout(Stdout),

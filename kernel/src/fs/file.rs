@@ -8,6 +8,7 @@ use super::{
     segment::Segment,
 };
 
+#[derive(Clone, Copy)]
 pub struct File {
     myself: InodePtr,
     parent: InodePtr,

@@ -3,6 +3,7 @@ use crate::fs::{file::File, segment::Segment};
 use super::uart::send_to_uart;
 use core::fmt::{Arguments, Write};
 
+#[derive(Clone, Copy)]
 pub struct Stdout;
 
 impl Stdout {

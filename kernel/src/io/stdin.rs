@@ -2,6 +2,7 @@ use crate::fs::{file::File, segment::Segment};
 
 use super::uart::recv_from_uart;
 
+#[derive(Clone, Copy)]
 pub struct Stdin;
 
 impl Stdin {
@@ -12,7 +13,7 @@ impl Stdin {
 }
 
 impl Stdin {
-    pub fn read(&mut self, buf: &mut [u8]) -> usize {
+    pub fn read(&self, buf: &mut [u8]) -> usize {
         buf.iter_mut().for_each(|b| *b = self.getchar());
         buf.len()
     }

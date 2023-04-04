@@ -1,43 +1,41 @@
-use core::{cmp::min, mem::size_of};
+use core::mem::size_of;
 
-use alloc::vec::Vec;
 use fosix::fs::{DirEntry, FileStat, OpenFlags};
 
-use crate::{
-    fs::fileable::Fileable,
-    io::{stdin::Stdin, stdout::Stdout},
-    task::processor::fetch_curr_task,
-};
+use crate::{fs::fileable::Fileable, task::processor::fetch_curr_task};
 
 use super::{open_dir, open_file, parse_str};
 
 pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
-    if fd != 0 {
-        panic!("[syscall] Doesn't support file read.");
-    }
-    let mut buffer = {
+    let (mut fileable, mut seg) = {
         let task = fetch_curr_task();
         let task_guard = task.lock();
         let page_table = task_guard.user_mem().page_table();
-        page_table.translate_bytes(buffer_ptr.into(), buffer_len)
+        let fd_table = task_guard.fd_table();
+        let fileable = fd_table.get(fd).unwrap().unwrap();
+        (
+            fileable,
+            page_table.translate_segment(buffer_ptr.into(), buffer_len),
+        )
     };
-    let stdin = Stdin;
-    buffer.iter_mut().for_each(|b| **b = stdin.getchar() as u8);
-    buffer_len as isize
+
+    fileable.read_seg(&mut seg) as isize
 }
 
 pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
-    if fd != 1 {
-        panic!("[syscall] Doesn't support file write.");
-    }
-    let buffer = fetch_curr_task()
-        .lock()
-        .user_mem()
-        .page_table()
-        .translate_bytes(buffer_ptr.into(), buffer_len);
-    let stdout = Stdout;
-    buffer.iter().for_each(|&&mut b| stdout.putchar(b));
-    buffer_len as isize
+    let (mut fileable, seg) = {
+        let task = fetch_curr_task();
+        let task_guard = task.lock();
+        let page_table = task_guard.user_mem().page_table();
+        let fd_table = task_guard.fd_table();
+        let fileable = fd_table.get(fd).unwrap().unwrap();
+        (
+            fileable,
+            page_table.translate_segment(buffer_ptr.into(), buffer_len),
+        )
+    };
+
+    fileable.write_seg(&seg) as isize
 }
 
 pub fn sys_open(path: usize, flags: u32) -> isize {

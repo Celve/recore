@@ -227,7 +227,7 @@ impl Inode {
                 0
             };
             let end_blk_id = if i == end_pri_offset - 1 {
-                end_blk_id % DNODE_LEN
+                (end_blk_id - 1) % DNODE_LEN + 1
             } else {
                 DNODE_LEN
             };
@@ -264,7 +264,7 @@ impl Inode {
                 0
             };
             let end_blk_id = if i == end_pri_offset - 1 {
-                end_blk_id % DNODE_LEN
+                (end_blk_id - 1) % DNODE_LEN + 1
             } else {
                 DNODE_LEN
             };

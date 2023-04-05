@@ -16,7 +16,10 @@ use crate::{
     trap::{context::TrapContext, trampoline::restore, trap_handler},
 };
 
-use super::pid::{alloc_pid, Pid};
+use super::{
+    fd_table::FdTable,
+    pid::{alloc_pid, Pid},
+};
 use crate::task::stack::KernelStack;
 
 pub struct Task {
@@ -32,7 +35,7 @@ pub struct TaskInner {
     kernel_stack: KernelStack,
     parent: Option<Weak<Task>>,
     children: Vec<Arc<Task>>,
-    fd_table: Vec<Option<Fileable>>,
+    fd_table: FdTable,
     exit_code: isize,
     cwd: Dir,
 }
@@ -99,11 +102,7 @@ impl Task {
                 parent,
                 children: Vec::new(),
                 exit_code: 0,
-                fd_table: vec![
-                    Some(Fileable::Stdin(Stdin)),
-                    Some(Fileable::Stdout(Stdout)),
-                    Some(Fileable::Stdout(Stdout)),
-                ],
+                fd_table: FdTable::new(),
                 cwd: file.parent(),
             }),
         }
@@ -199,20 +198,6 @@ impl Clone for Task {
 }
 
 impl TaskInner {
-    pub fn alloc_fd(&mut self, f: Fileable) -> isize {
-        for (i, fd) in self.fd_table.iter_mut().enumerate() {
-            if fd.is_none() {
-                let file = fd.insert(f);
-                return i as isize;
-            }
-        }
-
-        self.fd_table.push(Some(f));
-        (self.fd_table.len() - 1) as isize
-    }
-}
-
-impl TaskInner {
     pub fn task_ctx_ptr(&mut self) -> *mut TaskContext {
         &mut self.task_ctx
     }
@@ -285,11 +270,11 @@ impl TaskInner {
         &mut self.cwd
     }
 
-    pub fn fd_table(&self) -> &Vec<Option<Fileable>> {
+    pub fn fd_table(&self) -> &FdTable {
         &self.fd_table
     }
 
-    pub fn fd_table_mut(&mut self) -> &mut Vec<Option<Fileable>> {
+    pub fn fd_table_mut(&mut self) -> &mut FdTable {
         &mut self.fd_table
     }
 }

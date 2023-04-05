@@ -42,3 +42,5 @@ pub const FUSE_DNODE_NUM: usize = 4096;
 
 pub const VIRTIO_BASE_ADDRESS: usize = 0x1000_1000;
 pub const VIRTIO_MAP_SIZE: usize = 0x1000;
+
+pub const RING_BUFFER_SIZE: usize = 128;

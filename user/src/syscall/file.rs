@@ -11,6 +11,7 @@ const SYSCALL_FSTAT: usize = 43;
 const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
+const SYSCALL_PIPE: usize = 59;
 const SYSCALL_GETDENTS: usize = 61;
 const SYSCALL_LSEEK: usize = 62;
 const SYSCALL_READ: usize = 63;
@@ -54,6 +55,10 @@ pub fn sys_fstat(fd: usize, stat: &mut FileStat) -> isize {
     syscall(SYSCALL_FSTAT, [fd, stat as *mut FileStat as usize, 0])
 }
 
-pub fn sys_lseek(fd: usize, offset: usize, flag: SeekFlag) {
-    syscall(SYSCALL_LSEEK, [fd, offset, flag.bits() as usize]);
+pub fn sys_lseek(fd: usize, offset: usize, flag: SeekFlag) -> isize {
+    syscall(SYSCALL_LSEEK, [fd, offset, flag.bits() as usize])
+}
+
+pub fn sys_pipe(pipe: &mut [usize; 2]) -> isize {
+    syscall(SYSCALL_PIPE, [pipe.as_mut_ptr() as usize, 0, 0])
 }

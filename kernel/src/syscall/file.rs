@@ -12,7 +12,7 @@ pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
         let task_guard = task.lock();
         let page_table = task_guard.user_mem().page_table();
         let fd_table = task_guard.fd_table();
-        let fileable = fd_table.get(fd).unwrap().unwrap();
+        let fileable = fd_table.get(fd).unwrap();
         (
             fileable,
             page_table.translate_segment(buffer_ptr.into(), buffer_len),
@@ -28,7 +28,7 @@ pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
         let task_guard = task.lock();
         let page_table = task_guard.user_mem().page_table();
         let fd_table = task_guard.fd_table();
-        let fileable = fd_table.get(fd).unwrap().unwrap();
+        let fileable = fd_table.get(fd).unwrap();
         (
             fileable,
             page_table.translate_segment(buffer_ptr.into(), buffer_len),
@@ -41,7 +41,7 @@ pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
 pub fn sys_open(path: usize, flags: u32) -> isize {
     let flags = OpenFlags::from_bits(flags).unwrap();
     let cwd = fetch_curr_task().lock().cwd();
-    let fd = if flags.contains(OpenFlags::DIR) {
+    let fileable = if flags.contains(OpenFlags::DIR) {
         let path = &parse_str(path);
         let dir = open_dir(cwd, path);
         if dir.is_none() {
@@ -57,7 +57,7 @@ pub fn sys_open(path: usize, flags: u32) -> isize {
     };
     let task = fetch_curr_task();
     let mut task_guard = task.lock();
-    task_guard.alloc_fd(fd) as isize
+    task_guard.fd_table_mut().alloc(fileable) as isize
 }
 
 pub fn sys_close(fd: usize) -> isize {
@@ -66,10 +66,10 @@ pub fn sys_close(fd: usize) -> isize {
     let fd_table = task_guard.fd_table_mut();
     if fd > fd_table.len() {
         -1
-    } else if fd_table[fd].is_none() {
+    } else if fd_table.get(fd).is_none() {
         -1
     } else {
-        fd_table[fd] = None;
+        fd_table.get_mut(fd).take();
         0
     }
 }
@@ -77,8 +77,10 @@ pub fn sys_close(fd: usize) -> isize {
 pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
     let path = parse_str(path);
     let dir = create_dir(
-        *fetch_curr_task().lock().fd_table()[dfd]
-            .as_ref()
+        *fetch_curr_task()
+            .lock()
+            .fd_table()
+            .get(dfd)
             .unwrap()
             .as_dir()
             .unwrap(),
@@ -113,11 +115,7 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
         .translate_bytes(des_ptr.into(), des_len * size_of::<DirEntry>());
 
     let dir = open_dir(
-        *task_guard.fd_table()[dfd]
-            .as_ref()
-            .unwrap()
-            .as_dir()
-            .unwrap(),
+        *task_guard.fd_table().get(dfd).unwrap().as_dir().unwrap(),
         ".",
     )
     .unwrap();
@@ -145,7 +143,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
         .page_table()
         .translate_bytes(stat_ptr.into(), size_of::<FileStat>());
 
-    let dir = task_guard.fd_table()[fd].as_ref().unwrap();
+    let dir = task_guard.fd_table().get(fd).unwrap();
     let stat = dir.stat();
     let src_bytes = stat.as_bytes();
 
@@ -160,7 +158,8 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
 pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
     let task = fetch_curr_task();
     let mut task_guard = task.lock();
-    let fileable = task_guard.fd_table_mut()[fd].as_mut().unwrap();
+    let fd_table = task_guard.fd_table_mut();
+    let fileable = fd_table.get_mut(fd).unwrap();
     fileable.seek(offset as usize, SeekFlag::from_bits(flags as u8).unwrap());
     0
 }

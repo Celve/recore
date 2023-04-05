@@ -2,6 +2,7 @@ use crate::task::{processor::fetch_idle_task_ctx_ptr, task::TaskContext};
 
 use self::{processor::fetch_curr_task, task::TaskStatus};
 
+pub mod fd_table;
 pub mod loader;
 pub mod manager;
 pub mod pid;

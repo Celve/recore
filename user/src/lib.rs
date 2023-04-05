@@ -13,14 +13,14 @@ use bitflags::bitflags;
 use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
 use syscall::{
     file::{
-        sys_chdir, sys_fstat, sys_getdents, sys_lseek, sys_mkdir, sys_open, sys_read, sys_write,
+        sys_chdir, sys_close, sys_fstat, sys_getdents, sys_lseek, sys_mkdir, sys_open, sys_pipe,
+        sys_read, sys_write,
     },
     *,
 };
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
-const DIR_ENTRY_NAME_LEN: usize = 28;
 
 static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
@@ -82,6 +82,10 @@ pub fn open(path: &str, flags: OpenFlags) -> isize {
     sys_open(path, flags)
 }
 
+pub fn close(fd: usize) {
+    sys_close(fd);
+}
+
 pub fn read(fd: usize, buffer: &mut [u8]) -> isize {
     sys_read(fd, buffer)
 }
@@ -108,4 +112,8 @@ pub fn fstat(fd: usize, stat: &mut FileStat) {
 
 pub fn lseek(fd: usize, offset: usize, flag: SeekFlag) {
     sys_lseek(fd, offset, flag);
+}
+
+pub fn pipe(fds: &mut [usize; 2]) -> isize {
+    sys_pipe(fds)
 }

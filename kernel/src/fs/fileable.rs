@@ -1,24 +1,28 @@
 use fosix::fs::{FileStat, SeekFlag};
 
-use crate::io::{stdin::Stdin, stdout::Stdout};
+use crate::{
+    io::{stdin::Stdin, stdout::Stdout},
+    ipc::pipe::Pipe,
+};
 
 use super::{dir::Dir, file::File, segment::Segment};
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Fileable {
     Stdin(Stdin),
     Stdout(Stdout),
     File(File),
     Dir(Dir),
+    Pipe(Pipe),
 }
 
 impl Fileable {
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
         match self {
             Fileable::Stdin(stdin) => stdin.read(buf),
-            Fileable::Stdout(_) => 0,
             Fileable::File(file) => file.read(buf),
-            Fileable::Dir(_) => 0,
+            Fileable::Pipe(pipe) => pipe.read(buf),
+            _ => 0,
         }
     }
 
@@ -34,6 +38,7 @@ impl Fileable {
         match self {
             Fileable::Stdout(stdout) => stdout.write(buf),
             Fileable::File(file) => file.write(buf),
+            Fileable::Pipe(pipe) => pipe.write(buf),
             _ => 0,
         }
     }

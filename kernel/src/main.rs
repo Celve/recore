@@ -12,6 +12,7 @@ mod complement;
 mod config;
 mod fs;
 mod heap;
+mod ipc;
 mod mm;
 mod syscall;
 mod task;

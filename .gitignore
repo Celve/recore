@@ -2,3 +2,5 @@
 **/Cargo.lock
 **/.gdbinit
 kernel/src/app.s
+**/fs.img
+.vscode/

@@ -7,12 +7,51 @@ extern crate user;
 #[macro_use]
 extern crate alloc;
 
+use core::fmt::Display;
+
 use alloc::{string::String, vec::Vec};
 use fosix::fs::OpenFlags;
 use user::{chdir, console, exec, fork, mkdir, open, waitpid};
 
 const BS: char = 8 as char;
 const DL: char = 127 as char;
+
+struct Path {
+    inner: Vec<String>,
+}
+
+impl Path {
+    fn new() -> Self {
+        Self { inner: Vec::new() }
+    }
+
+    fn push(&mut self, str: String) {
+        self.inner.push(str);
+    }
+
+    fn pop(&mut self) {
+        self.inner.pop();
+    }
+
+    fn last(&self) -> Option<&String> {
+        self.inner.last()
+    }
+
+    fn len(&mut self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl Display for Path {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut result = String::from("/");
+        for s in &self.inner {
+            result.push_str(s);
+            result.push('/');
+        }
+        write!(f, "{}", result)
+    }
+}
 
 fn getline() -> String {
     let mut c = console::stdin().getchar();
@@ -34,7 +73,7 @@ fn getline() -> String {
 
 #[no_mangle]
 fn main() {
-    let mut cwd = String::from("/");
+    let mut cwd: Path = Path::new();
     loop {
         print!("{} > ", cwd);
         let str = getline();
@@ -57,16 +96,17 @@ fn main() {
                     path.push('\0');
                     if chdir(path.as_str()) == -1 {
                         println!("[user] cd {}: No such file or directory", args[1]);
-                    } else if args[1] == ".." && cwd != "/" {
-                        cwd.pop();
-                        let mut c = cwd.pop();
-                        while c != Some('/') {
-                            c = cwd.pop();
+                    } else {
+                        let splited: Vec<&str> = args[1].split('/').collect();
+                        for s in splited {
+                            if s == ".." {
+                                cwd.pop();
+                            } else if s == "." {
+                                continue;
+                            } else {
+                                cwd.push(String::from(s));
+                            }
                         }
-                        cwd.push('/');
-                    } else if args[1] != ".." {
-                        cwd.push_str(args[1]);
-                        cwd.push('/');
                     }
                     println!("");
                 }

@@ -1,21 +1,6 @@
-use fosix::fs::DirEntry;
-
-use fosix::fs::FileStat;
-use fosix::fs::OpenFlags;
-use fosix::fs::SeekFlag;
+use fosix::{fs::*, syscall::*};
 
 use super::syscall;
-
-const SYSCALL_MKDIR: usize = 34;
-const SYSCALL_FSTAT: usize = 43;
-const SYSCALL_CHDIR: usize = 49;
-const SYSCALL_OPEN: usize = 56;
-const SYSCALL_CLOSE: usize = 57;
-const SYSCALL_PIPE: usize = 59;
-const SYSCALL_GETDENTS: usize = 61;
-const SYSCALL_LSEEK: usize = 62;
-const SYSCALL_READ: usize = 63;
-const SYSCALL_WRITE: usize = 64;
 
 pub fn sys_open(path: &str, flags: OpenFlags) -> isize {
     syscall(

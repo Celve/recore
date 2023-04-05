@@ -2,11 +2,7 @@ pub mod file;
 
 use core::arch::asm;
 
-const SYSCALL_EXIT: usize = 93;
-const SYSCALL_YIELD: usize = 124;
-const SYSCALL_FORK: usize = 220;
-const SYSCALL_EXEC: usize = 221;
-const SYSCALL_WAITPID: usize = 260;
+use fosix::syscall::*;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     // let ret: isize;

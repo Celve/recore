@@ -3,7 +3,7 @@ mod file;
 mod process;
 
 use alloc::{string::String, vec::Vec};
-use fosix::fs::OpenFlags;
+use fosix::{fs::OpenFlags, syscall::*};
 
 use crate::{
     fs::{dir::Dir, file::File, fuse::FUSE},
@@ -18,22 +18,6 @@ use self::{
     },
     process::{sys_exec, sys_exit, sys_fork, sys_waitpid, sys_yield},
 };
-
-const SYSCALL_MKDIR: usize = 34;
-const SYSCALL_FSTAT: usize = 43;
-const SYSCALL_CHDIR: usize = 49;
-const SYSCALL_OPEN: usize = 56;
-const SYSCALL_CLOSE: usize = 57;
-const SYSCALL_PIPE: usize = 59;
-const SYSCALL_GETDENTS: usize = 61;
-const SYSCALL_LSEEK: usize = 62;
-const SYSCALL_READ: usize = 63;
-const SYSCALL_WRITE: usize = 64;
-const SYSCALL_EXIT: usize = 93;
-const SYSCALL_YIELD: usize = 124;
-const SYSCALL_FORK: usize = 220;
-const SYSCALL_EXEC: usize = 221;
-const SYSCALL_WAITPID: usize = 260;
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {

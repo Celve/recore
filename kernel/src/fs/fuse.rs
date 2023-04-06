@@ -9,8 +9,6 @@ use super::{
     superblock::SuperBlock,
 };
 
-use crate::config::{INODE_PER_BLK, INODE_SIZE};
-
 pub struct Fuse {
     bitmap_inode: Mutex<BitMap>,
     area_inode_start_bid: usize,
@@ -33,8 +31,18 @@ impl Fuse {
         Some(self.bitmap_dnode.lock().alloc()? + self.area_dnode_start_bid)
     }
 
+    pub fn dealloc_bid(&self, bid: usize) {
+        self.bitmap_dnode
+            .lock()
+            .dealloc(bid - self.area_dnode_start_bid)
+    }
+
     pub fn alloc_iid(&self) -> Option<usize> {
         self.bitmap_inode.lock().alloc()
+    }
+
+    pub fn dealloc_iid(&self, iid: usize) {
+        self.bitmap_inode.lock().dealloc(iid)
     }
 }
 
@@ -43,8 +51,7 @@ impl Fuse {
         let cache = CACHE_MANAGER.lock().get(0);
         let mut cache_guard = cache.lock();
         *cache_guard.as_any_mut::<SuperBlock>() = super_block;
-        let mut bitmap_inode =
-            BitMap::new(1, super_block.num_inode_bitmap_blks, super_block.num_inode);
+        let bitmap_inode = BitMap::new(1, super_block.num_inode_bitmap_blks, super_block.num_inode);
         let area_inode_start_bid = 1 + super_block.num_inode_bitmap_blks;
         let bitmap_dnode = BitMap::new(
             1 + super_block.num_inode_bitmap_blks + super_block.num_inode_area_blks,
@@ -56,22 +63,22 @@ impl Fuse {
             + super_block.num_inode_area_blks
             + super_block.num_dnode_bitmap_blks;
 
-        // alloc root
-        let iid = bitmap_inode.alloc().unwrap();
-        assert_eq!(iid, 0);
-        let bid = area_inode_start_bid + iid / INODE_PER_BLK;
-        let offset = iid % INODE_PER_BLK * INODE_SIZE;
-        let blk = CACHE_MANAGER.lock().get(bid);
-        let mut blk_guard = blk.lock();
-        let inode = &mut blk_guard.as_array_mut::<Inode>()[offset];
-        *inode = Inode::empty_dir(iid, iid);
-
         Self {
             bitmap_inode: Mutex::new(bitmap_inode),
             area_inode_start_bid,
             bitmap_dnode: Mutex::new(bitmap_dnode),
             area_dnode_start_bid,
         }
+    }
+
+    pub fn alloc_root(&self) {
+        let iid = self.alloc_iid().unwrap();
+        assert_eq!(iid, 0);
+        let iptr = InodePtr::new(iid);
+        let blk = CACHE_MANAGER.lock().get(iptr.bid());
+        let mut blk_guard = blk.lock();
+        let inode = &mut blk_guard.as_array_mut::<Inode>()[iptr.offset()];
+        *inode = Inode::empty_dir(iid, iid);
     }
 
     pub fn from_existed() -> Self {

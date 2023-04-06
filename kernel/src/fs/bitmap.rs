@@ -84,9 +84,9 @@ impl BitMap {
     }
 
     fn locate(iid: usize) -> (usize, usize, usize) {
-        let blk = iid / BLK_SIZE;
-        let bytes = iid % BLK_SIZE / 64;
-        let bit = iid % BLK_SIZE % 64;
+        let blk = iid / (BLK_SIZE * 8);
+        let bytes = iid % (BLK_SIZE * 8) / 64;
+        let bit = iid % (BLK_SIZE * 8) % 64;
         (blk, bytes, bit)
     }
 }

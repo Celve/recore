@@ -1,5 +1,8 @@
-use bitflags::bitflags;
-use fosix::fs::{FilePerm, FileStat, OpenFlags};
+use spin::mutex::MutexGuard;
+
+use fosix::fs::{FilePerm, FileStat, SeekFlag};
+use spin::mutex::Mutex;
+use std::sync::Arc;
 
 use super::{
     cache::CACHE_MANAGER,
@@ -7,7 +10,12 @@ use super::{
     inode::{Inode, InodePtr},
 };
 
+#[derive(Clone)]
 pub struct File {
+    inner: Arc<Mutex<FileInner>>,
+}
+
+pub struct FileInner {
     myself: InodePtr,
     parent: InodePtr,
     offset: usize,
@@ -15,6 +23,18 @@ pub struct File {
 }
 
 impl File {
+    pub fn new(myself: InodePtr, parent: InodePtr, perm: FilePerm) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(FileInner::new(myself, parent, perm))),
+        }
+    }
+
+    pub fn lock(&self) -> MutexGuard<FileInner> {
+        self.inner.lock()
+    }
+}
+
+impl FileInner {
     pub fn read_at(&self, buf: &mut [u8], offset: usize) -> usize {
         if !self.perm.contains(FilePerm::READABLE) {
             return 0;
@@ -39,6 +59,19 @@ impl File {
         inode.write_at(buf, offset)
     }
 
+    pub fn trunc(&mut self) -> usize {
+        if !self.perm.contains(FilePerm::WRITEABLE) {
+            return 0;
+        }
+
+        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
+        let mut cache_guard = cache.lock();
+        let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
+
+        self.offset = 0;
+        inode.trunc()
+    }
+
     pub fn size(&self) -> usize {
         let cache = CACHE_MANAGER.lock().get(self.myself.bid());
         let cache_guard = cache.lock();
@@ -50,33 +83,36 @@ impl File {
     pub fn parent(&self) -> Dir {
         Dir::new(self.parent)
     }
+}
 
-    pub fn seek(&mut self, new_offset: usize) {
-        self.offset = new_offset;
+impl FileInner {
+    pub fn seek(&mut self, new_offset: usize, flag: SeekFlag) {
+        match flag {
+            SeekFlag::SET => self.offset = new_offset,
+            SeekFlag::CUR => self.offset += new_offset,
+            SeekFlag::END => self.offset = self.size() + new_offset,
+            _ => {}
+        }
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
-        if !self.perm.contains(FilePerm::READABLE) {
-            return 0;
-        }
-
         let bytes = self.read_at(buf, self.offset);
         self.offset += bytes;
         bytes
     }
 
     pub fn write(&mut self, buf: &[u8]) -> usize {
-        if !self.perm.contains(FilePerm::WRITEABLE) {
-            return 0;
-        }
-
         let bytes = self.write_at(buf, self.offset);
         self.offset += bytes;
         bytes
     }
+
+    pub fn stat(&self) -> FileStat {
+        FileStat::new(self.size())
+    }
 }
 
-impl File {
+impl FileInner {
     pub fn new(myself: InodePtr, parent: InodePtr, perm: FilePerm) -> Self {
         Self {
             myself,

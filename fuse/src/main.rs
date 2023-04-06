@@ -17,6 +17,7 @@ mod disk;
 mod file;
 mod fuse;
 mod inode;
+mod segment;
 mod superblock;
 
 fn main() {
@@ -59,11 +60,11 @@ fn main() {
         host_file.read_to_end(&mut all_data).unwrap();
 
         // create a file in easy-fs
-        root.touch(app.as_str()).unwrap();
-        let mut inode = root.open(app.as_str(), OpenFlags::RDWR).unwrap();
+        root.lock().touch(app.as_str()).unwrap();
+        let inode = root.lock().open(app.as_str(), OpenFlags::RDWR).unwrap();
 
         // write data to easy-fs
-        let size = inode.write(&mut all_data);
+        let size = inode.lock().write(&mut all_data);
         assert_eq!(size, all_data.len());
     }
 
@@ -72,26 +73,36 @@ fn main() {
     assert_eq!(CACHE_MANAGER.lock().len(), 0);
 }
 
-#[cfg(test)]
 fn test() {
-    let root = FUSE.lock().root();
+    FUSE.alloc_root();
+    let root = FUSE.root();
     for i in 0..129 {
-        root.mkdir(format!("{i}").as_str());
+        root.lock().mkdir(format!("{i}").as_str());
     }
-    let res = root.ls();
-    res.iter()
-        .enumerate()
-        .for_each(|(i, name)| assert_eq!(name, format!("{i}").as_str()));
+    let res = root.lock().ls();
+    res.iter().enumerate().for_each(|(i, name)| {
+        if name != "." && name != ".." {
+            assert_eq!(name, format!("{}", i - 2).as_str())
+        }
+    });
 
-    let one = root.cd("1").unwrap();
+    let one = root.lock().cd("1").unwrap();
     let mut s = String::new();
-    for i in 0..(8 * 1024 * 1024) {
+    for _ in 0..(8 * 1024 * 1024) {
         s.push('a');
     }
-    one.touch("a").unwrap();
-    let mut f = one.open("a").unwrap();
-    println!("{}", f.write(s.as_bytes()));
+    one.lock().touch("a").unwrap();
+    let f = one.lock().open("a", OpenFlags::RDWR).unwrap();
+    let written = f.lock().write(s.as_bytes());
     let mut v = vec![0u8; 8 * 1024 * 1024];
-    f.read_at(v.as_mut(), 0);
+    assert_eq!(f.lock().read_at(v.as_mut(), 0), written);
+    assert!(v.iter().any(|x| *x == 'a' as u8));
+
+    assert_eq!(f.lock().trunc(), written);
+    assert_eq!(f.lock().stat().size(), 0);
+
+    let written = f.lock().write(s.as_bytes());
+    let mut v = vec![0u8; 8 * 1024 * 1024];
+    assert_eq!(f.lock().read_at(v.as_mut(), 0), written);
     assert!(v.iter().any(|x| *x == 'a' as u8));
 }

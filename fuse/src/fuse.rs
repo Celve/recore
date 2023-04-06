@@ -1,20 +1,17 @@
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
-use std::sync::Arc;
 
 use super::{
     bitmap::BitMap,
     cache::CACHE_MANAGER,
     dir::Dir,
-    disk::{DiskManager, DISK_MANAGER},
-    inode::{Inode, InodePtr, InodeType},
+    inode::{Inode, InodePtr},
     superblock::SuperBlock,
 };
 
 use crate::config::{INODE_PER_BLK, INODE_SIZE};
 
 pub struct Fuse {
-    disk_manager: Arc<Mutex<DiskManager>>,
     bitmap_inode: Mutex<BitMap>,
     area_inode_start_bid: usize,
     bitmap_dnode: Mutex<BitMap>,
@@ -22,7 +19,7 @@ pub struct Fuse {
 }
 
 lazy_static! {
-    pub static ref FUSE: Fuse = Fuse::new(SuperBlock::new(4096, 32768), DISK_MANAGER.clone(),);
+    pub static ref FUSE: Fuse = Fuse::new(SuperBlock::new(4096, 32768));
 }
 
 impl Fuse {
@@ -36,18 +33,27 @@ impl Fuse {
         Some(self.bitmap_dnode.lock().alloc()? + self.area_dnode_start_bid)
     }
 
+    pub fn dealloc_bid(&self, bid: usize) {
+        self.bitmap_dnode
+            .lock()
+            .dealloc(bid - self.area_dnode_start_bid)
+    }
+
     pub fn alloc_iid(&self) -> Option<usize> {
         self.bitmap_inode.lock().alloc()
+    }
+
+    pub fn dealloc_iid(&self, iid: usize) {
+        self.bitmap_inode.lock().dealloc(iid)
     }
 }
 
 impl Fuse {
-    pub fn new(super_block: SuperBlock, disk_manager: Arc<Mutex<DiskManager>>) -> Self {
+    pub fn new(super_block: SuperBlock) -> Self {
         let cache = CACHE_MANAGER.lock().get(0);
         let mut cache_guard = cache.lock();
         *cache_guard.as_any_mut::<SuperBlock>() = super_block;
-        let mut bitmap_inode =
-            BitMap::new(1, super_block.num_inode_bitmap_blks, super_block.num_inode);
+        let bitmap_inode = BitMap::new(1, super_block.num_inode_bitmap_blks, super_block.num_inode);
         let area_inode_start_bid = 1 + super_block.num_inode_bitmap_blks;
         let bitmap_dnode = BitMap::new(
             1 + super_block.num_inode_bitmap_blks + super_block.num_inode_area_blks,
@@ -60,7 +66,6 @@ impl Fuse {
             + super_block.num_dnode_bitmap_blks;
 
         Self {
-            disk_manager,
             bitmap_inode: Mutex::new(bitmap_inode),
             area_inode_start_bid,
             bitmap_dnode: Mutex::new(bitmap_dnode),
@@ -78,7 +83,7 @@ impl Fuse {
         *inode = Inode::empty_dir(iid, iid);
     }
 
-    pub fn from_existed(disk_manager: Arc<Mutex<DiskManager>>) -> Self {
+    pub fn from_existed() -> Self {
         let cache = CACHE_MANAGER.lock().get(0);
         let cache_guard = cache.lock();
         let super_block = cache_guard.as_any::<SuperBlock>();
@@ -89,7 +94,6 @@ impl Fuse {
             super_block.num_dnode,
         );
         Self {
-            disk_manager,
             bitmap_inode: Mutex::new(bitmap_inode),
             area_inode_start_bid: 1 + super_block.num_inode_bitmap_blks,
             bitmap_dnode: Mutex::new(bitmap_dnode),

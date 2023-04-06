@@ -1,15 +1,13 @@
 use spin::mutex::MutexGuard;
 
 use alloc::sync::Arc;
-use bitflags::bitflags;
-use fosix::fs::{FilePerm, FileStat, OpenFlags, SeekFlag};
+use fosix::fs::{FilePerm, FileStat, SeekFlag};
 use spin::mutex::Mutex;
 
 use super::{
     cache::CACHE_MANAGER,
-    dir::{Dir, DirInner},
+    dir::Dir,
     inode::{Inode, InodePtr},
-    segment::Segment,
 };
 
 #[derive(Clone)]
@@ -59,6 +57,19 @@ impl FileInner {
         let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
 
         inode.write_at(buf, offset)
+    }
+
+    pub fn trunc(&mut self) -> usize {
+        if !self.perm.contains(FilePerm::WRITEABLE) {
+            return 0;
+        }
+
+        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
+        let mut cache_guard = cache.lock();
+        let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
+
+        self.offset = 0;
+        inode.trunc()
     }
 
     pub fn size(&self) -> usize {

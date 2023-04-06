@@ -1,11 +1,9 @@
 use core::cmp::{max, min};
-use core::mem::size_of;
 
-use spin::mutex::Mutex;
+use fosix::fs::DirEntry;
 use std::vec::Vec;
 
-use super::dir::DirEntry;
-use super::fuse::{Fuse, FUSE};
+use super::fuse::FUSE;
 use crate::config::{DNODE_SIZE, INODE_PER_BLK, INODE_SIZE};
 
 use super::cache::CACHE_MANAGER;
@@ -69,7 +67,7 @@ impl Inode {
             let bytes = blk_guard.as_array::<u8>();
             let start = if i == 0 { offset % DNODE_SIZE } else { 0 };
             let end = if i == blk_ids.len() - 1 {
-                (offset + buf.len() - 1) % DNODE_SIZE + 1
+                (min(offset + buf.len(), self.size()) - 1) % DNODE_SIZE + 1
             } else {
                 DNODE_SIZE
             }; // exclusive
@@ -115,6 +113,12 @@ impl Inode {
         self.write_at(buf, self.size as usize)
     }
 
+    pub fn trunc(&mut self) -> usize {
+        let old_size = self.size as usize;
+        self.shrink(0);
+        old_size
+    }
+
     /// Adjust the file to the given size.
     ///
     /// If the new size is bigger than the current one, then it's an expansion; otherwise it's an shrinkage with extra bytes discarded.
@@ -128,46 +132,66 @@ impl Inode {
     }
 
     fn expand(&mut self, new_size: usize) {
-        let mut start_blk_id = if self.size == 0 {
+        let start_blk_id = if self.size == 0 {
             0
         } else {
             (self.size as usize - 1) / DNODE_SIZE + 1
         }; // inclusive
         let end_blk_id = (new_size - 1) / DNODE_SIZE + 1; // exclusive
         self.size = new_size as u32;
+        self.set(start_blk_id, end_blk_id, true);
+    }
 
-        if start_blk_id < end_blk_id && start_blk_id < DIRECT_INDEXING_LEN {
-            let end_blk_id = min(end_blk_id, DIRECT_INDEXING_LEN);
+    fn shrink(&mut self, new_size: usize) {
+        let start_blk_id = if new_size == 0 {
+            0
+        } else {
+            (new_size - 1) / DNODE_SIZE + 1
+        }; // inclusive
+        let end_blk_id = (self.size as usize - 1) / DNODE_SIZE + 1; // exclusive
+        self.size = new_size as u32;
+        self.set(start_blk_id, end_blk_id, false);
+    }
+
+    fn set(&mut self, mut start_blk_id: usize, end_blk_id: usize, flag: bool) {
+        if start_blk_id < end_blk_id && start_blk_id < DIRECT_INDEXING_MAX_LEN {
+            let end_blk_id = min(end_blk_id, DIRECT_INDEXING_MAX_LEN);
             for i in start_blk_id..end_blk_id {
-                self.directs[i] = FUSE.alloc_bid().unwrap() as u32;
+                if flag {
+                    self.directs[i] = FUSE.alloc_bid().unwrap() as u32;
+                } else {
+                    FUSE.dealloc_bid(self.directs[i] as usize);
+                }
             }
         }
-        start_blk_id = DIRECT_INDEXING_LEN;
+        start_blk_id = max(start_blk_id, DIRECT_INDEXING_MAX_LEN);
 
-        if start_blk_id < end_blk_id && start_blk_id < INDIRECT1_INDEXING_LEN {
+        if start_blk_id < end_blk_id && start_blk_id < INDIRECT1_INDEXING_MAX_LEN {
             let offset = DIRECT_INDEXING_MAX_LEN;
             let start_blk_id = start_blk_id - offset;
             let end_blk_id = min(end_blk_id, INDIRECT1_INDEXING_MAX_LEN) - offset;
-            if start_blk_id == 0 {
+            if start_blk_id == 0 && flag {
                 self.indirect1 = FUSE.alloc_bid().unwrap() as u32;
             }
-            self.set_primary(start_blk_id, end_blk_id);
+            self.set_primary(start_blk_id, end_blk_id, flag);
+            if start_blk_id == 0 && !flag {
+                FUSE.dealloc_bid(self.indirect1 as usize);
+            }
         }
-        start_blk_id = INDIRECT1_INDEXING_MAX_LEN;
+        start_blk_id = max(start_blk_id, INDIRECT1_INDEXING_MAX_LEN);
 
         if start_blk_id < end_blk_id {
             let offset = INDIRECT1_INDEXING_MAX_LEN;
             let start_blk_id = start_blk_id - offset;
             let end_blk_id = min(end_blk_id, INDIRECT2_INDEXING_MAX_LEN) - offset;
-            if start_blk_id == 0 {
+            if start_blk_id == 0 && flag {
                 self.indirect2 = FUSE.alloc_bid().unwrap() as u32;
             }
-            self.set_secondary(start_blk_id, end_blk_id);
+            self.set_secondary(start_blk_id, end_blk_id, flag);
+            if start_blk_id == 0 && !flag {
+                FUSE.dealloc_bid(self.indirect2 as usize);
+            }
         }
-    }
-
-    fn shrink(&mut self, new_size: usize) {
-        todo!();
     }
 
     pub fn find(&self, start: usize, len: usize) -> Vec<u32> {
@@ -176,11 +200,11 @@ impl Inode {
         let end_blk_id = (max(end, 1) - 1) / DNODE_SIZE + 1; // exclusive
         let mut res = Vec::new();
 
-        if start_blk_id < end_blk_id && start_blk_id < DIRECT_INDEXING_LEN {
-            let end_blk_id = min(end_blk_id, DIRECT_INDEXING_LEN);
+        if start_blk_id < end_blk_id && start_blk_id < DIRECT_INDEXING_MAX_LEN {
+            let end_blk_id = min(end_blk_id, DIRECT_INDEXING_MAX_LEN);
             res.extend(self.directs[start_blk_id..end_blk_id].iter());
         }
-        start_blk_id = DIRECT_INDEXING_MAX_LEN;
+        start_blk_id = max(start_blk_id, DIRECT_INDEXING_MAX_LEN);
 
         if start_blk_id < end_blk_id && start_blk_id < INDIRECT1_INDEXING_MAX_LEN {
             let offset = DIRECT_INDEXING_MAX_LEN;
@@ -188,7 +212,7 @@ impl Inode {
             let end_blk_id = min(end_blk_id, INDIRECT1_INDEXING_MAX_LEN) - offset;
             res.append(&mut self.get_primary(start_blk_id, end_blk_id));
         }
-        start_blk_id = INDIRECT1_INDEXING_MAX_LEN;
+        start_blk_id = max(start_blk_id, INDIRECT1_INDEXING_MAX_LEN);
 
         if start_blk_id < end_blk_id {
             let offset = INDIRECT1_INDEXING_MAX_LEN;
@@ -236,25 +260,37 @@ impl Inode {
         res
     }
 
-    pub fn set_primary(&self, start_blk_id: usize, end_blk_id: usize) {
+    pub fn set_primary(&self, start_blk_id: usize, end_blk_id: usize, flag: bool) {
         let pri = CACHE_MANAGER.lock().get(self.indirect1 as usize);
         let mut pri_guard = pri.lock();
         let blk_ids = pri_guard.as_array_mut::<u32>();
 
         blk_ids[start_blk_id..end_blk_id]
             .iter_mut()
-            .for_each(|blk_id| *blk_id = FUSE.alloc_bid().unwrap() as u32);
+            .for_each(|blk_id| {
+                if flag {
+                    *blk_id = FUSE.alloc_bid().unwrap() as u32;
+                } else {
+                    FUSE.dealloc_bid(*blk_id as usize);
+                }
+            });
     }
 
-    pub fn set_secondary(&self, start_blk_id: usize, end_blk_id: usize) {
+    pub fn set_secondary(&self, start_blk_id: usize, end_blk_id: usize, flag: bool) {
         let sec = CACHE_MANAGER.lock().get(self.indirect2 as usize);
         let mut sec_guard = sec.lock();
         let pri_ids = sec_guard.as_array_mut::<u32>();
         let start_pri_offset = start_blk_id / DNODE_LEN;
         let end_pri_offset = (end_blk_id - 1) / DNODE_LEN + 1;
         for i in start_pri_offset..end_pri_offset {
-            let pri_id = FUSE.alloc_bid().unwrap();
-            pri_ids[i] = pri_id as u32;
+            let pri_id = if flag {
+                let bid = FUSE.alloc_bid().unwrap();
+                pri_ids[i] = bid as u32;
+                bid
+            } else {
+                pri_ids[i] as usize
+            };
+
             let pri = CACHE_MANAGER.lock().get(pri_id);
             let mut pri_guard = pri.lock();
             let blk_ids = pri_guard.as_array_mut::<u32>();
@@ -268,11 +304,20 @@ impl Inode {
             } else {
                 DNODE_LEN
             };
+
             blk_ids[start_blk_id..end_blk_id]
                 .iter_mut()
                 .for_each(|blk_id| {
-                    *blk_id = FUSE.alloc_bid().unwrap() as u32;
+                    if flag {
+                        *blk_id = FUSE.alloc_bid().unwrap() as u32;
+                    } else {
+                        FUSE.dealloc_bid(*blk_id as usize);
+                    }
                 });
+
+            if !flag {
+                FUSE.dealloc_bid(pri_id);
+            }
         }
     }
 }

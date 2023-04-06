@@ -67,7 +67,7 @@ impl Inode {
             let bytes = blk_guard.as_array::<u8>();
             let start = if i == 0 { offset % DNODE_SIZE } else { 0 };
             let end = if i == blk_ids.len() - 1 {
-                (offset + buf.len() - 1) % DNODE_SIZE + 1
+                (min(offset + buf.len(), self.size()) - 1) % DNODE_SIZE + 1
             } else {
                 DNODE_SIZE
             }; // exclusive

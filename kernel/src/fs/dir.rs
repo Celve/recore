@@ -69,11 +69,11 @@ impl DirInner {
             let inode_ptr = InodePtr::new(de.iid());
 
             let blk = CACHE_MANAGER.lock().get(inode_ptr.bid());
-            let blk_guard = blk.lock();
-            let inode = &blk_guard.as_array::<Inode>()[inode_ptr.offset()];
+            let mut blk_guard = blk.lock();
+            let inode = &mut blk_guard.as_array_mut::<Inode>()[inode_ptr.offset()];
             if inode.is_file() {
                 if flags.contains(OpenFlags::TRUNC) {
-                    todo!()
+                    inode.trunc();
                 }
                 return Some(File::new(inode_ptr, self.myself, flags.into()));
             }

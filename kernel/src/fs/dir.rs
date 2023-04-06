@@ -1,7 +1,8 @@
 use core::mem::size_of;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use fosix::fs::{DirEntry, FileStat, OpenFlags};
+use spin::mutex::{Mutex, MutexGuard};
 
 use super::{
     cache::CACHE_MANAGER,
@@ -10,14 +11,28 @@ use super::{
     inode::{Inode, InodePtr, InodeType},
 };
 
-use crate::config::DIR_ENTRY_NAME_LEN;
-
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Dir {
+    inner: Arc<Mutex<DirInner>>,
+}
+
+pub struct DirInner {
     myself: InodePtr,
 }
 
 impl Dir {
+    pub fn new(myself: InodePtr) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(DirInner::new(myself))),
+        }
+    }
+
+    pub fn lock(&self) -> MutexGuard<DirInner> {
+        self.inner.lock()
+    }
+}
+
+impl DirInner {
     pub fn ls(&self) -> Vec<String> {
         let cache = CACHE_MANAGER.lock().get(self.myself.bid());
         let cache_guard = cache.lock();
@@ -145,7 +160,7 @@ impl Dir {
     }
 }
 
-impl Dir {
+impl DirInner {
     pub fn new(myself: InodePtr) -> Self {
         Self { myself }
     }

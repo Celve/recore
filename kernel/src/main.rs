@@ -28,7 +28,7 @@ use riscv::register::*;
 use task::processor::run_tasks;
 use time::init_timer;
 
-use crate::{fs::fuse::FUSE, heap::slab_allocator::test_slab_allocator, trap::set_kernel_stvec};
+use crate::{fs::fuse::FUSE, trap::set_kernel_stvec};
 
 global_asm!(include_str!("app.s"));
 
@@ -108,7 +108,10 @@ extern "C" fn rust_main() {
     println!("[kernel] Page table activated.");
 
     let root = FUSE.root();
-    root.ls().iter().for_each(|name| println!("{}", name));
+    root.lock()
+        .ls()
+        .iter()
+        .for_each(|name| println!("{}", name));
 
     println!("[kernel] Begin to run kernel tasks.");
     run_tasks();

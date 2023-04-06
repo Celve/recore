@@ -30,7 +30,7 @@ impl Manager {
 
 lazy_static! {
     pub static ref INITPROC: Arc<Task> = Arc::new(Task::from_elf(
-        FUSE.root().open("initproc", OpenFlags::RDONLY).unwrap(),
+        FUSE.root().lock().open("initproc", OpenFlags::RDONLY).unwrap(),
         None
     ));
 

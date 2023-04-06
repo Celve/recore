@@ -77,7 +77,7 @@ pub fn sys_close(fd: usize) -> isize {
 pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
     let path = parse_str(path);
     let dir = create_dir(
-        *fetch_curr_task()
+        fetch_curr_task()
             .lock()
             .fd_table()
             .get(dfd)
@@ -115,12 +115,12 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
         .translate_bytes(des_ptr.into(), des_len * size_of::<DirEntry>());
 
     let dir = open_dir(
-        *task_guard.fd_table().get(dfd).unwrap().as_dir().unwrap(),
+        task_guard.fd_table().get(dfd).unwrap().as_dir().unwrap(),
         ".",
     )
     .unwrap();
 
-    let dir_entries = dir.to_dir_entries();
+    let dir_entries = dir.lock().to_dir_entries();
     let mut i = 0;
     for de in dir_entries {
         let src_bytes = de.as_bytes();

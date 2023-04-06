@@ -1,15 +1,23 @@
+use spin::mutex::MutexGuard;
+
+use alloc::sync::Arc;
 use bitflags::bitflags;
 use fosix::fs::{FilePerm, FileStat, OpenFlags, SeekFlag};
+use spin::mutex::Mutex;
 
 use super::{
     cache::CACHE_MANAGER,
-    dir::Dir,
+    dir::{Dir, DirInner},
     inode::{Inode, InodePtr},
     segment::Segment,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct File {
+    inner: Arc<Mutex<FileInner>>,
+}
+
+pub struct FileInner {
     myself: InodePtr,
     parent: InodePtr,
     offset: usize,
@@ -17,6 +25,18 @@ pub struct File {
 }
 
 impl File {
+    pub fn new(myself: InodePtr, parent: InodePtr, perm: FilePerm) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(FileInner::new(myself, parent, perm))),
+        }
+    }
+
+    pub fn lock(&self) -> MutexGuard<FileInner> {
+        self.inner.lock()
+    }
+}
+
+impl FileInner {
     pub fn read_at(&self, buf: &mut [u8], offset: usize) -> usize {
         if !self.perm.contains(FilePerm::READABLE) {
             return 0;
@@ -54,7 +74,7 @@ impl File {
     }
 }
 
-impl File {
+impl FileInner {
     pub fn seek(&mut self, new_offset: usize, flag: SeekFlag) {
         match flag {
             SeekFlag::SET => self.offset = new_offset,
@@ -81,7 +101,7 @@ impl File {
     }
 }
 
-impl File {
+impl FileInner {
     pub fn new(myself: InodePtr, parent: InodePtr, perm: FilePerm) -> Self {
         Self {
             myself,

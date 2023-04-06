@@ -10,8 +10,10 @@ use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
     config::TRAP_CONTEXT_START_ADDRESS,
-    fs::{dir::Dir, file::File, fileable::Fileable},
-    io::{stdin::Stdin, stdout::Stdout},
+    fs::{
+        dir::{Dir, DirInner},
+        file::{File, FileInner},
+    },
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -60,9 +62,9 @@ pub enum TaskStatus {
 impl Task {
     /// Create a new task from elf data.
     pub fn from_elf(file: File, parent: Option<Weak<Task>>) -> Self {
-        let file_size = file.size();
+        let file_size = file.lock().size();
         let mut elf_data = vec![0u8; file_size];
-        assert_eq!(file.read_at(&mut elf_data, 0), file_size);
+        assert_eq!(file.lock().read_at(&mut elf_data, 0), file_size);
 
         let pid = alloc_pid();
         let (user_mem, user_sp, user_sepc) = Memory::from_elf(&elf_data);
@@ -106,7 +108,7 @@ impl Task {
                 children: Vec::new(),
                 exit_code: 0,
                 fd_table: FdTable::new(),
-                cwd: file.parent(),
+                cwd: file.lock().parent(),
             }),
         }
     }
@@ -130,9 +132,9 @@ impl Task {
 
     /// Replace the current task with new elf data. Therefore, all user configurations would be reset.
     pub fn exec(&self, file: File, args: &Vec<String>) {
-        let file_size = file.size();
+        let file_size = file.lock().size();
         let mut elf_data = vec![0u8; file_size];
-        assert_eq!(file.read_at(&mut elf_data, 0), file_size);
+        assert_eq!(file.lock().read_at(&mut elf_data, 0), file_size);
 
         let mut task = self.lock();
         let (user_mem, mut user_sp, user_sepc) = Memory::from_elf(&elf_data);
@@ -210,7 +212,7 @@ impl Clone for Task {
             .expect("[task] Unable to access trap context.")
             .get_ppn();
         let kernel_stack = KernelStack::new(pid.0);
-        let cwd = task.cwd;
+        let cwd = task.cwd.clone();
         let fd_table = task.fd_table().clone();
 
         // we have to modify the kernel sp both in trap ctx and task ctx
@@ -303,7 +305,7 @@ impl TaskInner {
     }
 
     pub fn cwd(&self) -> Dir {
-        self.cwd
+        self.cwd.clone()
     }
 
     pub fn cwd_mut(&mut self) -> &mut Dir {

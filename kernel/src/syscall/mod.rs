@@ -65,15 +65,18 @@ fn split_path(cwd: Dir, path: &str) -> (Dir, Vec<&str>) {
 fn open_file(cwd: Dir, path: &str, flags: OpenFlags) -> Option<File> {
     let (mut cwd, steps) = split_path(cwd, path);
     for step in steps[..steps.len() - 1].iter() {
-        cwd = cwd.cd(step)?;
+        let temp = cwd.lock().cd(step)?;
+        cwd = temp;
     }
-    cwd.open(steps[steps.len() - 1], flags)
+    let temp = cwd.lock().open(steps[steps.len() - 1], flags);
+    temp
 }
 
 fn open_dir(cwd: Dir, path: &str) -> Option<Dir> {
     let (mut cwd, steps) = split_path(cwd, path);
     for step in steps.iter() {
-        cwd = cwd.cd(step)?;
+        let temp = cwd.lock().cd(step)?;
+        cwd = temp;
     }
     Some(cwd)
 }
@@ -81,12 +84,13 @@ fn open_dir(cwd: Dir, path: &str) -> Option<Dir> {
 fn create_dir(cwd: Dir, path: &str) -> Option<Dir> {
     let (mut cwd, steps) = split_path(cwd, path);
     for step in steps[..steps.len() - 1].iter() {
-        cwd = cwd.cd(step)?;
+        let temp = cwd.lock().cd(step)?;
+        cwd = temp;
     }
-    if cwd.mkdir(steps[steps.len() - 1]).is_err() {
+    if cwd.lock().mkdir(steps[steps.len() - 1]).is_err() {
         None
     } else {
-        cwd.cd(steps[steps.len() - 1])
+        cwd.lock().cd(steps[steps.len() - 1])
     }
 }
 

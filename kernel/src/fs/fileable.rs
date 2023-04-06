@@ -5,7 +5,11 @@ use crate::{
     ipc::pipe::Pipe,
 };
 
-use super::{dir::Dir, file::File, segment::Segment};
+use super::{
+    dir::{Dir, DirInner},
+    file::{File, FileInner},
+    segment::Segment,
+};
 
 #[derive(Clone)]
 pub enum Fileable {
@@ -20,7 +24,7 @@ impl Fileable {
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
         match self {
             Fileable::Stdin(stdin) => stdin.read(buf),
-            Fileable::File(file) => file.read(buf),
+            Fileable::File(file) => file.lock().read(buf),
             Fileable::Pipe(pipe) => pipe.read(buf),
             _ => 0,
         }
@@ -37,7 +41,7 @@ impl Fileable {
     pub fn write(&mut self, buf: &[u8]) -> usize {
         match self {
             Fileable::Stdout(stdout) => stdout.write(buf),
-            Fileable::File(file) => file.write(buf),
+            Fileable::File(file) => file.lock().write(buf),
             Fileable::Pipe(pipe) => pipe.write(buf),
             _ => 0,
         }
@@ -53,73 +57,45 @@ impl Fileable {
 
     pub fn seek(&mut self, new_offset: usize, flag: SeekFlag) {
         match self {
-            Fileable::File(file) => file.seek(new_offset, flag),
+            Fileable::File(file) => file.lock().seek(new_offset, flag),
             _ => {}
         }
     }
 
     pub fn stat(&self) -> FileStat {
         match self {
-            Fileable::File(file) => file.stat(),
-            Fileable::Dir(dir) => dir.stat(),
+            Fileable::File(file) => file.lock().stat(),
+            Fileable::Dir(dir) => dir.lock().stat(),
             _ => FileStat::empty(),
         }
     }
 }
 
 impl Fileable {
-    pub fn as_file(&self) -> Option<&File> {
+    pub fn as_file(&self) -> Option<File> {
         match self {
-            Fileable::File(file) => Some(file),
+            Fileable::File(file) => Some(file.clone()),
             _ => None,
         }
     }
 
-    pub fn as_file_mut(&mut self) -> Option<&mut File> {
+    pub fn as_dir(&self) -> Option<Dir> {
         match self {
-            Fileable::File(file) => Some(file),
+            Fileable::Dir(dir) => Some(dir.clone()),
             _ => None,
         }
     }
 
-    pub fn as_dir(&self) -> Option<&Dir> {
+    pub fn as_stdin(&self) -> Option<Stdin> {
         match self {
-            Fileable::Dir(dir) => Some(dir),
+            Fileable::Stdin(stdin) => Some(*stdin),
             _ => None,
         }
     }
 
-    pub fn as_dir_mut(&mut self) -> Option<&mut Dir> {
+    pub fn as_stdout(&self) -> Option<Stdout> {
         match self {
-            Fileable::Dir(dir) => Some(dir),
-            _ => None,
-        }
-    }
-
-    pub fn as_stdin(&self) -> Option<&Stdin> {
-        match self {
-            Fileable::Stdin(stdin) => Some(stdin),
-            _ => None,
-        }
-    }
-
-    pub fn as_stdin_mut(&mut self) -> Option<&mut Stdin> {
-        match self {
-            Fileable::Stdin(stdin) => Some(stdin),
-            _ => None,
-        }
-    }
-
-    pub fn as_stdout(&self) -> Option<&Stdout> {
-        match self {
-            Fileable::Stdout(stdout) => Some(stdout),
-            _ => None,
-        }
-    }
-
-    pub fn as_stdout_mut(&mut self) -> Option<&mut Stdout> {
-        match self {
-            Fileable::Stdout(stdout) => Some(stdout),
+            Fileable::Stdout(stdout) => Some(*stdout),
             _ => None,
         }
     }

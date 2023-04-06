@@ -1,4 +1,4 @@
-use crate::fs::{file::File, segment::Segment};
+use crate::fs::{file::FileInner, segment::Segment};
 
 use super::uart::send_to_uart;
 use core::fmt::{Arguments, Write};

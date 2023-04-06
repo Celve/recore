@@ -5,7 +5,7 @@ use super::{
     bitmap::BitMap,
     cache::CACHE_MANAGER,
     dir::Dir,
-    inode::{Inode, InodePtr, InodeType},
+    inode::{Inode, InodePtr},
     superblock::SuperBlock,
 };
 

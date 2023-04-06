@@ -31,6 +31,9 @@ impl Pipe {
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> usize {
+        if !self.perm.contains(FilePerm::READABLE) {
+            return 0;
+        }
         let mut ring_buf = self.buf.lock();
         let mut bytes = 0;
         while bytes < buf.len() {
@@ -45,6 +48,9 @@ impl Pipe {
     }
 
     pub fn write(&self, buf: &[u8]) -> usize {
+        if !self.perm.contains(FilePerm::WRITEABLE) {
+            return 0;
+        }
         let mut ring_buf = self.buf.lock();
         let mut bytes = 0;
         while bytes < buf.len() {

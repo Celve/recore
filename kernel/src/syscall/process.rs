@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use fosix::fs::OpenFlags;
 
 use crate::task::{
@@ -26,14 +27,33 @@ pub fn sys_fork() -> isize {
     pid as isize
 }
 
-pub fn sys_exec(path: usize) -> isize {
+pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
     let name = parse_str(path);
     let cwd = fetch_curr_task().lock().cwd();
     let file = open_file(cwd, &name, OpenFlags::RDONLY);
     if let Some(file) = file {
         println!("[kernel] Exec a new program.");
-        fetch_curr_task().exec(file);
-        0
+
+        // parse args
+        let mut args = Vec::new();
+        loop {
+            let arg = {
+                let task = fetch_curr_task();
+                let task_guard = task.lock();
+                let page_table = task_guard.user_mem().page_table();
+                page_table.translate_any::<usize>((args_ptr as usize).into())
+            };
+            if *arg == 0 {
+                break;
+            }
+            let mut str = parse_str(*arg);
+            str.push('\0');
+            args.push(str);
+            args_ptr = unsafe { args_ptr.add(1) };
+        }
+
+        fetch_curr_task().exec(file, &args);
+        args.len() as isize // otherwise it would be overrided
     } else {
         println!("[kernel] Fail to exec {}.", name);
         -1

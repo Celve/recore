@@ -8,9 +8,10 @@ extern crate user;
 
 #[no_mangle]
 fn main() {
-    if fork() == 0 {
+    let pid = fork();
+    if pid == 0 {
         println!("This is children!");
     } else {
-        println!("This is parent!");
+        println!("This is parent! Children's pid is {}", pid);
     }
 }

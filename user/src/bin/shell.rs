@@ -83,6 +83,10 @@ fn main() {
         }
 
         let args: Vec<&str> = str.split_whitespace().collect();
+        let mut cargs: Vec<String> = args.iter().map(|s| String::from(*s)).collect();
+        cargs.iter_mut().for_each(|s| s.push('\0'));
+        let mut uargs: Vec<*const u8> = cargs.iter().map(|str| str.as_ptr()).collect();
+        uargs.push(core::ptr::null());
 
         match args[0] {
             "cd" => {
@@ -136,7 +140,7 @@ fn main() {
                 name.push('\0');
                 let pid = fork();
                 if pid == 0 {
-                    if exec(name.as_str()) == -1 {
+                    if exec(name.as_str(), &uargs) == -1 {
                         println!("[user] Exec {} failed", str);
                         return;
                     }

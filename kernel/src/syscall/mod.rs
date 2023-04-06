@@ -34,7 +34,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_EXIT => sys_exit(args[0] as isize),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_FORK => sys_fork(),
-        SYSCALL_EXEC => sys_exec(args[0]),
+        SYSCALL_EXEC => sys_exec(args[0], args[1] as *const usize),
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1]),
         _ => todo!(),
     }

@@ -8,6 +8,7 @@ pub mod complement;
 pub mod console;
 pub mod syscall;
 
+use alloc::vec::Vec;
 use allocator::heap::LockedBuddyHeap;
 use bitflags::bitflags;
 use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
@@ -29,18 +30,31 @@ static HEAP: LockedBuddyHeap = LockedBuddyHeap::empty(USER_HEAP_GRANULARITY);
 
 #[no_mangle]
 #[link_section = ".text.entry"]
-extern "C" fn _start() {
+extern "C" fn _start(argc: usize, argv: usize) {
     unsafe {
         let start = USER_HEAP_SPACE.as_ptr() as usize;
         let end = start + USER_HEAP_SPACE.len();
         HEAP.add_segment(start, end);
     }
-    exit(main());
+
+    let mut v = Vec::new();
+    for i in 0..argc {
+        let start =
+            unsafe { ((argv + i * core::mem::size_of::<usize>()) as *const usize).read_volatile() };
+        let len = (0usize..)
+            .find(|i| unsafe { ((start + *i) as *const u8).read_volatile() == 0 })
+            .unwrap();
+        v.push(
+            core::str::from_utf8(unsafe { core::slice::from_raw_parts(start as *const u8, len) })
+                .unwrap(),
+        );
+    }
+    exit(main(argc, v.as_slice()));
 }
 
 #[linkage = "weak"]
 #[no_mangle]
-fn main() -> i32 {
+fn main(argc: usize, argv: &[&str]) -> i32 {
     panic!("[user] main() is not implemented.")
 }
 
@@ -56,8 +70,8 @@ pub fn fork() -> isize {
     sys_fork()
 }
 
-pub fn exec(path: &str) -> isize {
-    sys_exec(path)
+pub fn exec(path: &str, args: &Vec<*const u8>) -> isize {
+    sys_exec(path, args)
 }
 
 pub fn wait(exit_code: &mut i32) -> isize {

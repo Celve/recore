@@ -1,4 +1,7 @@
+use core::mem::size_of;
+
 use alloc::{
+    string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -126,14 +129,49 @@ impl Task {
     }
 
     /// Replace the current task with new elf data. Therefore, all user configurations would be reset.
-    pub fn exec(&self, file: File) {
+    pub fn exec(&self, file: File, args: &Vec<String>) {
         let file_size = file.size();
         let mut elf_data = vec![0u8; file_size];
         assert_eq!(file.read_at(&mut elf_data, 0), file_size);
 
         let mut task = self.lock();
-        let (user_mem, user_sp, user_sepc) = Memory::from_elf(&elf_data);
+        let (user_mem, mut user_sp, user_sepc) = Memory::from_elf(&elf_data);
         let page_table = user_mem.page_table();
+
+        // push args
+        let mut acc = 0;
+        for i in (0..=args.len()).rev() {
+            let ptr = if i == args.len() {
+                0
+            } else {
+                user_sp - (args.len() + 1) * size_of::<usize>() - acc - args[i].len()
+            };
+            let offset = (args.len() + 1 - i) * size_of::<usize>();
+            let src_bytes = ptr.to_ne_bytes();
+            let mut dst_bytes =
+                page_table.translate_bytes((user_sp - offset).into(), src_bytes.len());
+            dst_bytes
+                .iter_mut()
+                .enumerate()
+                .for_each(|(i, byte)| **byte = src_bytes[i]);
+
+            if i != args.len() {
+                acc += args[i].len();
+            }
+        }
+        user_sp -= (args.len() + 1) * size_of::<usize>();
+        let argv = user_sp;
+
+        for arg in args.iter().rev() {
+            let src_bytes = arg.as_bytes();
+            user_sp -= src_bytes.len();
+            let mut dst_bytes = page_table.translate_bytes(user_sp.into(), src_bytes.len());
+            dst_bytes
+                .iter_mut()
+                .enumerate()
+                .for_each(|(i, byte)| **byte = src_bytes[i]);
+        }
+
         let trap_ctx = page_table
             .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
             .expect("[task] Unable to access trap context.")
@@ -155,6 +193,8 @@ impl Task {
         // replace some
         task.user_mem = user_mem;
         task.trap_ctx = trap_ctx.into();
+        *task.trap_ctx_mut().a0_mut() = args.len();
+        *task.trap_ctx_mut().a1_mut() = argv;
         task.task_ctx = TaskContext::new(restore as usize, task.kernel_stack.top().into());
     }
 }

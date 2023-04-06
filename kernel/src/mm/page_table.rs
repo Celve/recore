@@ -173,7 +173,7 @@ impl PageTable {
         let ptr = usize::from(ptr);
         let mut vpn = VirPageNum::from(ptr);
         let mut result: Vec<&'static mut u8> = Vec::new();
-        while usize::from(vpn) <= ptr as usize + len {
+        while usize::from(vpn) < ptr as usize + len {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
             let start = max(ptr - usize::from(vpn), 0);
             let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
@@ -189,7 +189,7 @@ impl PageTable {
         let ptr = usize::from(ptr);
         let mut vpn = VirPageNum::from(ptr);
         let mut result: Vec<&'static mut [u8]> = Vec::new();
-        while usize::from(vpn) <= ptr as usize + len {
+        while usize::from(vpn) < ptr as usize + len {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
             let start = max(ptr - usize::from(vpn), 0);
             let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
@@ -208,7 +208,6 @@ impl PageTable {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
             let bytes = ppn.as_raw_bytes();
             let mut c = bytes[ptr];
-            let mut temp = &mut bytes[ptr..];
             loop {
                 if c == '\0' as u8 {
                     return result;

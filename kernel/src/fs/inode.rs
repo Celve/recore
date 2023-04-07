@@ -115,7 +115,7 @@ impl Inode {
 
     pub fn trunc(&mut self) -> usize {
         let old_size = self.size as usize;
-        self.shrink(0);
+        self.adjust(0);
         old_size
     }
 
@@ -132,6 +132,7 @@ impl Inode {
     }
 
     fn expand(&mut self, new_size: usize) {
+        assert!(new_size > self.size());
         let start_blk_id = if self.size == 0 {
             0
         } else {
@@ -143,6 +144,7 @@ impl Inode {
     }
 
     fn shrink(&mut self, new_size: usize) {
+        assert!(new_size < self.size());
         let start_blk_id = if new_size == 0 {
             0
         } else {

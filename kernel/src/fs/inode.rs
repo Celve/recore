@@ -197,7 +197,11 @@ impl Inode {
     pub fn find(&self, start: usize, len: usize) -> Vec<u32> {
         let end = min(start + len, self.size as usize); // exclusive
         let mut start_blk_id = start / DNODE_SIZE;
-        let end_blk_id = (max(end, 1) - 1) / DNODE_SIZE + 1; // exclusive
+        let end_blk_id = if end == 0 {
+            0
+        } else {
+            (end - 1) / DNODE_SIZE + 1
+        }; // exclusive
         let mut res = Vec::new();
 
         if start_blk_id < end_blk_id && start_blk_id < DIRECT_INDEXING_MAX_LEN {

@@ -38,8 +38,8 @@ impl FdTable {
         self.entries[fd].clone()
     }
 
-    pub fn get_mut(&mut self, fd: usize) -> Option<&mut Fileable> {
-        self.entries[fd].as_mut()
+    pub fn get_mut(&mut self, fd: usize) -> &mut Option<Fileable> {
+        &mut self.entries[fd]
     }
 
     pub fn dealloc(&mut self, fd: usize) {

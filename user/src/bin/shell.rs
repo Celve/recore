@@ -11,7 +11,7 @@ use core::fmt::Display;
 
 use alloc::{string::String, vec::Vec};
 use fosix::fs::OpenFlags;
-use user::{chdir, console, exec, fork, mkdir, open, waitpid};
+use user::{chdir, close, console, dup, exec, fork, mkdir, open, waitpid};
 
 const BS: char = 8 as char;
 const DL: char = 127 as char;
@@ -71,6 +71,15 @@ fn getline() -> String {
     result
 }
 
+fn find_drain(args: &mut Vec<String>, s: &String) -> Option<String> {
+    if let Some(pos) = args.iter().position(|arg| arg == s) {
+        let iter = args.drain(pos..pos + 2);
+        iter.last()
+    } else {
+        None
+    }
+}
+
 #[no_mangle]
 fn main() {
     let mut cwd: Path = Path::new();
@@ -83,7 +92,12 @@ fn main() {
         }
 
         let args: Vec<&str> = str.split_whitespace().collect();
-        let mut cargs: Vec<String> = args.iter().map(|s| String::from(*s)).collect();
+        let vargs: Vec<String> = args.iter().map(|s| String::from(*s)).collect();
+
+        let input = find_drain(&mut vargs.clone(), &String::from("<"));
+        let output = find_drain(&mut vargs.clone(), &String::from(">"));
+
+        let mut cargs: Vec<String> = vargs.clone();
         cargs.iter_mut().for_each(|s| s.push('\0'));
         let mut uargs: Vec<*const u8> = cargs.iter().map(|str| str.as_ptr()).collect();
         uargs.push(core::ptr::null());
@@ -116,31 +130,40 @@ fn main() {
                 }
             }
 
-            "mkdir" => {
-                if args.len() == 1 {
-                    println!("[user] cd: missing operand");
-                } else {
-                    let mut path = String::from(args[1]);
-                    if path.ends_with("/") {
-                        path.pop();
-                    }
-                    path.push('\0');
-                    let dfd = open(".\0", OpenFlags::DIR);
-                    assert_ne!(dfd, -1);
-                    if mkdir(dfd as usize, path.as_str()) == -1 {
-                        println!("[user] mkdir {}: Fail to make such directory", args[1]);
-                    } else {
-                        println!("");
-                    }
-                }
-            }
-
             _ => {
-                let mut name = String::from(args[0]);
-                name.push('\0');
                 let pid = fork();
                 if pid == 0 {
-                    if exec(name.as_str(), &uargs) == -1 {
+                    if let Some(mut input) = input {
+                        input.push('\0');
+                        let input_fd = open(
+                            input.as_str(),
+                            OpenFlags::RDONLY | OpenFlags::CREATE | OpenFlags::TRUNC,
+                        );
+                        if input_fd < 0 {
+                            println!("[user] Open {} failed", input);
+                            continue;
+                        }
+                        close(0);
+                        dup(input_fd as usize);
+                        close(input_fd as usize);
+                    }
+
+                    if let Some(mut output) = output {
+                        output.push('\0');
+                        let input_fd = open(
+                            output.as_str(),
+                            OpenFlags::WRONLY | OpenFlags::CREATE | OpenFlags::TRUNC,
+                        );
+                        if input_fd < 0 {
+                            println!("[user] Open {} failed", output);
+                            continue;
+                        }
+                        close(1);
+                        dup(input_fd as usize);
+                        close(input_fd as usize);
+                    }
+
+                    if exec(cargs[0].as_str(), &uargs) == -1 {
                         println!("[user] Exec {} failed", str);
                         return;
                     }

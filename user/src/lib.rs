@@ -12,13 +12,7 @@ use alloc::vec::Vec;
 use allocator::heap::LockedBuddyHeap;
 use bitflags::bitflags;
 use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
-use syscall::{
-    file::{
-        sys_chdir, sys_close, sys_fstat, sys_getdents, sys_lseek, sys_mkdir, sys_open, sys_pipe,
-        sys_read, sys_write,
-    },
-    *,
-};
+use syscall::{file::*, *};
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
@@ -130,4 +124,8 @@ pub fn lseek(fd: usize, offset: usize, flag: SeekFlag) {
 
 pub fn pipe(fds: &mut [usize; 2]) -> isize {
     sys_pipe(fds)
+}
+
+pub fn dup(fd: usize) -> isize {
+    sys_dup(fd)
 }

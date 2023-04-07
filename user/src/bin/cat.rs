@@ -19,7 +19,7 @@ fn main(argc: usize, argv: &[&str]) {
     let filename = argv[1];
     let fd = open(filename, OpenFlags::RDONLY);
     if fd < 0 {
-        println!("cat: {}: No such file or directory", filename);
+        println!("cat: No such file or directory");
         return;
     }
 

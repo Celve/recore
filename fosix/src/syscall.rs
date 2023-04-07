@@ -1,3 +1,4 @@
+pub const SYSCALL_DUP: usize = 24;
 pub const SYSCALL_MKDIR: usize = 34;
 pub const SYSCALL_FSTAT: usize = 43;
 pub const SYSCALL_CHDIR: usize = 49;

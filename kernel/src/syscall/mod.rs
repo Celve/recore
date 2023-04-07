@@ -10,17 +10,11 @@ use crate::{
     task::processor::fetch_curr_task,
 };
 
-use self::{
-    com::sys_pipe,
-    file::{
-        sys_chdir, sys_close, sys_fstat, sys_getdents, sys_lseek, sys_mkdir, sys_open, sys_read,
-        sys_write,
-    },
-    process::{sys_exec, sys_exit, sys_fork, sys_waitpid, sys_yield},
-};
+use self::{com::sys_pipe, file::*, process::*};
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
+        SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_MKDIR => sys_mkdir(args[0], args[1]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1]),
         SYSCALL_CHDIR => sys_chdir(args[0]),

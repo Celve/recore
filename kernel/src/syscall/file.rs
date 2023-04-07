@@ -159,7 +159,19 @@ pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
     let task = fetch_curr_task();
     let mut task_guard = task.lock();
     let fd_table = task_guard.fd_table_mut();
-    let fileable = fd_table.get_mut(fd).unwrap();
+    let mut fileable = fd_table.get(fd).unwrap();
     fileable.seek(offset as usize, SeekFlag::from_bits(flags as u8).unwrap());
     0
+}
+
+pub fn sys_dup(fd: usize) -> isize {
+    let task = fetch_curr_task();
+    let mut task_guard = task.lock();
+    let fd_table = task_guard.fd_table_mut();
+    let fileable = fd_table.get(fd);
+    if let Some(fileable) = fileable {
+        fd_table.alloc(fileable) as isize
+    } else {
+        -1
+    }
 }

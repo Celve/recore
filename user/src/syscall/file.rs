@@ -47,3 +47,7 @@ pub fn sys_lseek(fd: usize, offset: usize, flag: SeekFlag) -> isize {
 pub fn sys_pipe(pipe: &mut [usize; 2]) -> isize {
     syscall(SYSCALL_PIPE, [pipe.as_mut_ptr() as usize, 0, 0])
 }
+
+pub fn sys_dup(fd: usize) -> isize {
+    syscall(SYSCALL_DUP, [fd, 0, 0])
+}

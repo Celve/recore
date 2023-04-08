@@ -1,6 +1,6 @@
 use core::{mem::size_of, num::NonZeroUsize, slice};
 
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
 use lazy_static::lazy_static;
 use lru::LruCache;
 use spin::mutex::Mutex;
@@ -14,7 +14,7 @@ pub struct CacheManager {
 }
 
 pub struct Cache {
-    data: [u8; BLK_SIZE],
+    data: Vec<u8>,
     bid: usize,
     pub dirt: bool,
 }
@@ -48,7 +48,7 @@ impl CacheManager {
 
 impl Cache {
     pub fn new(bid: usize) -> Self {
-        let mut data = [0; BLK_SIZE];
+        let mut data = vec![0; BLK_SIZE];
         DISK_MANAGER.lock().read(bid, &mut data);
         Self {
             data,

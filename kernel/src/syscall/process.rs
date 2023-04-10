@@ -135,3 +135,15 @@ pub fn sys_sigaction(sig_id: usize, new_action_ptr: usize, old_action_ptr: usize
     task_guard.sig_actions_mut()[sig_id] = *new_action;
     0
 }
+
+pub fn sys_sigprocmask(mask: u32) -> isize {
+    let task = fetch_curr_task();
+    let mut task_guard = task.lock();
+    if let Some(mask) = SignalFlags::from_bits(mask) {
+        let old_mask = task_guard.sig_mask();
+        *task_guard.sig_mask_mut() = mask;
+        old_mask.bits() as isize
+    } else {
+        -1
+    }
+}

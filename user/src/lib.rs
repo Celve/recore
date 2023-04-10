@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use allocator::heap::LockedBuddyHeap;
 use fosix::{
     fs::{DirEntry, FileStat, OpenFlags, SeekFlag},
-    signal::SignalAction,
+    signal::{SignalAction, SignalFlags},
     syscall::WaitFlags,
 };
 use syscall::{file::*, proc::*};
@@ -138,4 +138,13 @@ pub fn sigreturn() -> isize {
 
 pub fn sigaction(sig_id: usize, new_action: &SignalAction, old_action: &mut SignalAction) -> isize {
     sys_sigaction(sig_id, new_action, old_action)
+}
+
+pub fn sigprocmask(mask: SignalFlags) -> Option<SignalFlags> {
+    let res = sys_sigprocmask(mask);
+    if res < 0 {
+        None
+    } else {
+        SignalFlags::from_bits(res as u32)
+    }
 }

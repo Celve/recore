@@ -1,5 +1,8 @@
 use alloc::vec::Vec;
-use fosix::{signal::SignalAction, syscall::*};
+use fosix::{
+    signal::{SignalAction, SignalFlags},
+    syscall::*,
+};
 
 use crate::syscall::syscall;
 
@@ -51,4 +54,8 @@ pub fn sys_sigaction(
             old_action as *mut SignalAction as usize,
         ],
     )
+}
+
+pub fn sys_sigprocmask(mask: SignalFlags) -> isize {
+    syscall(SYSCALL_SIGPROCMASK, [mask.bits() as usize, 0, 0])
 }

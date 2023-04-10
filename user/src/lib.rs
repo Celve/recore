@@ -72,7 +72,7 @@ pub fn exec(path: &str, args: &Vec<*const u8>) -> isize {
 }
 
 pub fn waitpid(pid: isize, exit_code: &mut i32, flags: WaitFlags) -> isize {
-    if !flags.contains(WaitFlags::NOHANG) {
+    if flags.contains(WaitFlags::NOHANG) {
         sys_waitpid(pid, exit_code)
     } else {
         loop {

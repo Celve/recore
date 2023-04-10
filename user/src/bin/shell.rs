@@ -78,8 +78,9 @@ static FINISHED: AtomicBool = AtomicBool::new(false);
 fn sigchld_handler() {
     loop {
         let mut exit_code = 0;
-        let pid = waitpid(-1, &mut exit_code, WaitFlags::NOHANG) as usize;
+        let pid = waitpid(-1, &mut exit_code, WaitFlags::NOHANG);
         if pid > 0 {
+            let pid = pid as usize;
             let res = JOBS.lock().remove(&pid);
             if let Some(_) = res {
                 println!("[shell] Process {} exited with code {}.", pid, exit_code);

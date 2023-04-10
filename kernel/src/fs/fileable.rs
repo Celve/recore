@@ -1,20 +1,19 @@
 use fosix::fs::{FileStat, SeekFlag};
+use fs::{dir::Dir, file::File};
 
 use crate::{
     io::{stdin::Stdin, stdout::Stdout},
     ipc::pipe::Pipe,
 };
 
-use fs::{dir::Dir, file::File};
-
-use super::{disk::BlockDevice, segment::Segment};
+use super::{disk::BlkDev, segment::Segment};
 
 #[derive(Clone)]
 pub enum Fileable {
     Stdin(Stdin),
     Stdout(Stdout),
-    File(File<BlockDevice>),
-    Dir(Dir<BlockDevice>),
+    File(File<BlkDev>),
+    Dir(Dir<BlkDev>),
     Pipe(Pipe),
 }
 
@@ -70,14 +69,14 @@ impl Fileable {
 }
 
 impl Fileable {
-    pub fn as_file(&self) -> Option<File<BlockDevice>> {
+    pub fn as_file(&self) -> Option<File<BlkDev>> {
         match self {
             Fileable::File(file) => Some(file.clone()),
             _ => None,
         }
     }
 
-    pub fn as_dir(&self) -> Option<Dir<BlockDevice>> {
+    pub fn as_dir(&self) -> Option<Dir<BlkDev>> {
         match self {
             Fileable::Dir(dir) => Some(dir.clone()),
             _ => None,

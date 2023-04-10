@@ -9,7 +9,7 @@ use crate::{
     mm::{frame::Frame, memory::KERNEL_SPACE},
 };
 
-pub struct BlockDevice {
+pub struct BlkDev {
     blk: Mutex<VirtIOBlk<'static, VirIoHal>>,
 }
 
@@ -19,7 +19,7 @@ lazy_static! {
     pub static ref VIRT_IO_FRAMES: Mutex<BTreeMap<usize, Vec<Frame>>> = Mutex::new(BTreeMap::new());
 }
 
-impl DiskManager for BlockDevice {
+impl DiskManager for BlkDev {
     fn read(&self, bid: usize, buf: &mut [u8]) {
         self.blk.lock().read_block(bid, buf).unwrap();
     }
@@ -29,7 +29,7 @@ impl DiskManager for BlockDevice {
     }
 }
 
-impl BlockDevice {
+impl BlkDev {
     pub fn new() -> Self {
         unsafe {
             Self {

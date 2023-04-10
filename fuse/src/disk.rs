@@ -1,19 +1,16 @@
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 
-use std::sync::Arc;
-
 use fs::disk::DiskManager;
-use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
 use fs::config::BLK_SIZE;
 
-pub struct FileDevice {
+pub struct FileDev {
     file: Mutex<File>,
 }
 
-impl DiskManager for FileDevice {
+impl DiskManager for FileDev {
     fn read(&self, bid: usize, buf: &mut [u8]) {
         self.file
             .lock()
@@ -39,7 +36,7 @@ impl DiskManager for FileDevice {
     }
 }
 
-impl FileDevice {
+impl FileDev {
     pub fn new(file: File) -> Self {
         Self {
             file: Mutex::new(file),

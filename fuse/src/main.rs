@@ -14,7 +14,7 @@ use fs::{
     superblock::SuperBlock,
 };
 
-use crate::disk::FileDevice;
+use crate::disk::FileDev;
 
 fn main() {
     let matches = App::new("Fuse packer")
@@ -34,7 +34,7 @@ fn main() {
         )
         .get_matches();
 
-    let disk_manager = Arc::new(FileDevice::new({
+    let disk_manager = Arc::new(FileDev::new({
         let f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -88,7 +88,7 @@ fn main() {
 }
 
 fn test() {
-    let disk_manager = Arc::new(FileDevice::new({
+    let disk_manager = Arc::new(FileDev::new({
         let f = OpenOptions::new()
             .read(true)
             .write(true)

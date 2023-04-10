@@ -6,12 +6,13 @@ use alloc::{
     vec::Vec,
 };
 use fosix::signal::{SignalAction, SignalFlags};
+use fs::{dir::Dir, file::File};
 use riscv::register::sstatus::{self, SPP};
 use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
     config::{NUM_SIGNAL, TRAP_CONTEXT_START_ADDRESS},
-    fs::{Dir, File},
+    fs::disk::BlkDev,
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -41,7 +42,7 @@ pub struct TaskInner {
     children: Vec<Arc<Task>>,
     fd_table: FdTable,
     exit_code: isize,
-    cwd: Dir,
+    cwd: Dir<BlkDev>,
     sig: SignalFlags,
     sig_mask: SignalFlags,
     sig_actions: [SignalAction; NUM_SIGNAL],
@@ -65,7 +66,7 @@ pub enum TaskStatus {
 
 impl Task {
     /// Create a new task from elf data.
-    pub fn from_elf(file: File, parent: Option<Weak<Task>>) -> Self {
+    pub fn from_elf(file: File<BlkDev>, parent: Option<Weak<Task>>) -> Self {
         let file_size = file.lock().size();
         let mut elf_data = vec![0u8; file_size];
         assert_eq!(file.lock().read_at(&mut elf_data, 0), file_size);
@@ -140,7 +141,7 @@ impl Task {
     }
 
     /// Replace the current task with new elf data. Therefore, all user configurations would be reset.
-    pub fn exec(&self, file: File, args: &Vec<String>) {
+    pub fn exec(&self, file: File<BlkDev>, args: &Vec<String>) {
         let file_size = file.lock().size();
         let mut elf_data = vec![0u8; file_size];
         assert_eq!(file.lock().read_at(&mut elf_data, 0), file_size);
@@ -348,11 +349,11 @@ impl TaskInner {
         self.exit_code
     }
 
-    pub fn cwd(&self) -> Dir {
+    pub fn cwd(&self) -> Dir<BlkDev> {
         self.cwd.clone()
     }
 
-    pub fn cwd_mut(&mut self) -> &mut Dir {
+    pub fn cwd_mut(&mut self) -> &mut Dir<BlkDev> {
         &mut self.cwd
     }
 

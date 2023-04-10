@@ -4,9 +4,10 @@ mod process;
 
 use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
+use fs::{dir::Dir, file::File};
 
 use crate::{
-    fs::{disk::BlockDevice, Dir, File, FUSE},
+    fs::{disk::BlkDev, FUSE},
     task::processor::fetch_curr_task,
 };
 
@@ -45,7 +46,7 @@ fn normalize_path(path: &str) -> &str {
     }
 }
 
-fn split_path(cwd: Dir, path: &str) -> (Dir, Vec<&str>) {
+fn split_path(cwd: Dir<BlkDev>, path: &str) -> (Dir<BlkDev>, Vec<&str>) {
     let path = normalize_path(path);
     if path.starts_with("/") {
         // absolute path
@@ -59,7 +60,7 @@ fn split_path(cwd: Dir, path: &str) -> (Dir, Vec<&str>) {
     }
 }
 
-fn open_file(cwd: Dir, path: &str, flags: OpenFlags) -> Option<File> {
+fn open_file(cwd: Dir<BlkDev>, path: &str, flags: OpenFlags) -> Option<File<BlkDev>> {
     let (mut cwd, steps) = split_path(cwd, path);
     for step in steps[..steps.len() - 1].iter() {
         let temp = cwd.lock().cd(step)?;
@@ -69,7 +70,7 @@ fn open_file(cwd: Dir, path: &str, flags: OpenFlags) -> Option<File> {
     temp
 }
 
-fn open_dir(cwd: Dir, path: &str) -> Option<Dir> {
+fn open_dir(cwd: Dir<BlkDev>, path: &str) -> Option<Dir<BlkDev>> {
     let (mut cwd, steps) = split_path(cwd, path);
     for step in steps.iter() {
         let temp = cwd.lock().cd(step)?;
@@ -78,7 +79,7 @@ fn open_dir(cwd: Dir, path: &str) -> Option<Dir> {
     Some(cwd)
 }
 
-fn create_dir(cwd: Dir, path: &str) -> Option<Dir> {
+fn create_dir(cwd: Dir<BlkDev>, path: &str) -> Option<Dir<BlkDev>> {
     let (mut cwd, steps) = split_path(cwd, path);
     for step in steps[..steps.len() - 1].iter() {
         let temp = cwd.lock().cd(step)?;

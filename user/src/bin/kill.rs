@@ -12,7 +12,8 @@ extern crate alloc;
 fn main(argc: usize, argv: &[&str]) {
     assert!(argc == 3);
     assert!(argv[1].starts_with("-"));
-    let sig = argv[1][1..argv[1].len() - 1].parse::<usize>().unwrap();
-    let pid = argv[2][0..argv[2].len() - 1].parse::<usize>().unwrap();
+    let sig = argv[1][1..].parse::<usize>().unwrap();
+    let pid = argv[2].parse::<usize>().unwrap();
+    println!("kill process {} with {}.", sig, pid);
     kill(pid, sig);
 }

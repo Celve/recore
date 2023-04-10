@@ -136,8 +136,8 @@ fn main() {
     loop {
         print!("{} > ", cwd);
         let str = getline();
+        println!("");
         if str.is_empty() {
-            println!("");
             continue;
         }
 
@@ -181,6 +181,17 @@ fn main() {
                 }
             }
 
+            "jobs" => {
+                let jobs = JOBS.lock();
+                for (pid, state) in jobs.iter() {
+                    match state {
+                        ProcState::Running => println!("[{}] Running", pid),
+                        ProcState::Stopped => println!("[{}] Stopped", pid),
+                    }
+                }
+                println!("");
+            }
+
             cmd => {
                 let pid = fork();
                 if pid == 0 {
@@ -219,7 +230,6 @@ fn main() {
                         return;
                     }
                 } else if pid > 0 {
-                    println!("insert {}", pid);
                     JOBS.lock().insert(pid as usize, ProcState::Running);
                     if !background {
                         while FINISHED.load(Ordering::SeqCst) == false {

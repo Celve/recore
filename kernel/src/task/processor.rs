@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use fosix::signal::SignalFlags;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
@@ -65,7 +66,10 @@ pub fn fetch_idle_task_ctx_ptr() -> *mut TaskContext {
 pub fn switch() {
     let task = MANAGER.lock().pop();
     if let Some(task) = task {
-        *task.lock().task_status_mut() = TaskStatus::Running;
+        if task.lock().task_status() == TaskStatus::Ready {
+            *task.lock().task_status_mut() = TaskStatus::Running;
+        }
+
         let task_ctx = task.lock().task_ctx_ptr();
         let idle_task_ctx = PROCESSOR.lock().idle_task_ctx_ptr();
         PROCESSOR.lock().insert_curr_task(task);
@@ -79,13 +83,16 @@ pub fn switch() {
 
         // clear current task
         let curr_task = PROCESSOR.lock().take_curr_task().unwrap();
-        if *curr_task.lock().task_status() != TaskStatus::Zombie {
+        if curr_task.lock().task_status() != TaskStatus::Zombie {
             MANAGER.lock().push(curr_task);
         } else {
             for task in curr_task.lock().children().iter() {
                 *task.lock().parent_mut() = Some(Arc::downgrade(&INITPROC));
                 INITPROC.lock().children_mut().push(task.clone());
             }
+
+            let parent = curr_task.lock().parent().unwrap();
+            parent.kill(SignalFlags::SIGCHLD);
             println!("[kernel] One process has ended.");
         }
     } else {

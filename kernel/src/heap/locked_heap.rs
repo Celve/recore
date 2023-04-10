@@ -37,9 +37,9 @@ unsafe impl GlobalAlloc for LockedHeap {
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
         if layout.size() < 4096 {
-            self.slab_allocator.lock().dealloc(ptr, layout)
+            self.slab_allocator.lock().dealloc(ptr, layout);
         } else {
-            self.buddy_allocator.lock().dealloc(ptr, layout)
+            self.buddy_allocator.lock().dealloc(ptr, layout);
         }
     }
 }

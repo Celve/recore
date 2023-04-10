@@ -7,17 +7,32 @@ extern crate user;
 #[macro_use]
 extern crate alloc;
 
-use core::fmt::Display;
+use core::{
+    fmt::Display,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
-use alloc::{string::String, vec::Vec};
-use fosix::fs::OpenFlags;
-use user::{chdir, close, console, dup, exec, fork, mkdir, open, waitpid};
+use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use fosix::{
+    fs::OpenFlags,
+    signal::{SignalAction, SignalFlags, SIGCHLD},
+};
+use lazy_static::lazy_static;
+use spin::mutex::Mutex;
+use user::{
+    chdir, close, console, dup, exec, fork, mkdir, open, sigaction, sigreturn, waitpid, yield_now,
+};
 
 const BS: char = 8 as char;
 const DL: char = 127 as char;
 
 struct Path {
     inner: Vec<String>,
+}
+
+enum ProcState {
+    Running,
+    Stopped,
 }
 
 impl Path {
@@ -53,6 +68,28 @@ impl Display for Path {
     }
 }
 
+lazy_static! {
+    static ref JOBS: Arc<Mutex<BTreeMap<usize, ProcState>>> = Arc::new(Mutex::new(BTreeMap::new()));
+}
+
+static FINISHED: AtomicBool = AtomicBool::new(false);
+
+fn sigchld_handler() {
+    let mut exit_code = 0;
+    let pid = waitpid(-1, &mut exit_code) as usize;
+    let res = JOBS.lock().remove(&pid);
+    if let Some(_) = res {
+        println!("[shell] Process {} exited with code {}.", pid, exit_code);
+    } else {
+        panic!(
+            "[shell] Cannot find process {}, however, there is a sigchld.",
+            pid
+        );
+    }
+    FINISHED.store(true, Ordering::SeqCst);
+    sigreturn();
+}
+
 fn getline() -> String {
     let mut c = console::stdin().getchar();
     let mut result = String::new();
@@ -71,7 +108,7 @@ fn getline() -> String {
     result
 }
 
-fn find_drain(args: &mut Vec<String>, s: &String) -> Option<String> {
+fn find_drain_double(args: &mut Vec<String>, s: &String) -> Option<String> {
     if let Some(pos) = args.iter().position(|arg| arg == s) {
         let iter = args.drain(pos..pos + 2);
         iter.last()
@@ -80,8 +117,21 @@ fn find_drain(args: &mut Vec<String>, s: &String) -> Option<String> {
     }
 }
 
+fn find_drain_once(args: &mut Vec<String>, s: &String) -> bool {
+    if let Some(pos) = args.iter().position(|arg| arg == s) {
+        args.drain(pos..pos + 1);
+        true
+    } else {
+        false
+    }
+}
+
 #[no_mangle]
 fn main() {
+    let mut old_action = SignalAction::default();
+    let new_action = SignalAction::new(sigchld_handler as usize, SignalFlags::empty());
+    sigaction(SIGCHLD as usize, &new_action, &mut old_action);
+
     let mut cwd: Path = Path::new();
     loop {
         print!("{} > ", cwd);
@@ -94,8 +144,9 @@ fn main() {
         let args: Vec<&str> = str.split_whitespace().collect();
         let vargs: Vec<String> = args.iter().map(|s| String::from(*s)).collect();
 
-        let input = find_drain(&mut vargs.clone(), &String::from("<"));
-        let output = find_drain(&mut vargs.clone(), &String::from(">"));
+        let input = find_drain_double(&mut vargs.clone(), &String::from("<"));
+        let output = find_drain_double(&mut vargs.clone(), &String::from(">"));
+        let background = find_drain_once(&mut vargs.clone(), &String::from("&"));
 
         let mut cargs: Vec<String> = vargs.clone();
         cargs.iter_mut().for_each(|s| s.push('\0'));
@@ -105,7 +156,7 @@ fn main() {
         match args[0] {
             "cd" => {
                 if args.len() == 1 {
-                    println!("[user] cd: missing operand");
+                    println!("[shell] cd: missing operand");
                 } else {
                     let mut path = String::from(args[1]);
                     if path.ends_with("/") {
@@ -113,7 +164,7 @@ fn main() {
                     }
                     path.push('\0');
                     if chdir(path.as_str()) == -1 {
-                        println!("[user] cd {}: No such file or directory", args[1]);
+                        println!("[shell] cd {}: No such file or directory", args[1]);
                     } else {
                         let splited: Vec<&str> = args[1].split('/').collect();
                         for s in splited {
@@ -130,7 +181,7 @@ fn main() {
                 }
             }
 
-            _ => {
+            cmd => {
                 let pid = fork();
                 if pid == 0 {
                     if let Some(mut input) = input {
@@ -140,7 +191,7 @@ fn main() {
                             OpenFlags::RDONLY | OpenFlags::CREATE | OpenFlags::TRUNC,
                         );
                         if input_fd < 0 {
-                            println!("[user] Open {} failed", input);
+                            println!("[shell] Open {} failed", input);
                             continue;
                         }
                         close(0);
@@ -155,7 +206,7 @@ fn main() {
                             OpenFlags::WRONLY | OpenFlags::CREATE | OpenFlags::TRUNC,
                         );
                         if input_fd < 0 {
-                            println!("[user] Open {} failed", output);
+                            println!("[shell] Open {} failed", output);
                             continue;
                         }
                         close(1);
@@ -164,13 +215,22 @@ fn main() {
                     }
 
                     if exec(cargs[0].as_str(), &uargs) == -1 {
-                        println!("[user] Exec {} failed", str);
+                        println!("[shell] Exec {} failed", str);
                         return;
                     }
+                } else if pid > 0 {
+                    println!("insert {}", pid);
+                    JOBS.lock().insert(pid as usize, ProcState::Running);
+                    if !background {
+                        while FINISHED.load(Ordering::SeqCst) == false {
+                            yield_now();
+                        }
+                        FINISHED.store(false, Ordering::SeqCst);
+                    } else {
+                        println!("[shell] Process {} is running in background", pid);
+                    }
                 } else {
-                    let mut exit_code: i32 = 0;
-                    waitpid(pid, &mut exit_code);
-                    println!("[user] Process {} exit with code {}", pid, exit_code);
+                    println!("[user] Fail to exec {}", cmd);
                 }
             }
         }

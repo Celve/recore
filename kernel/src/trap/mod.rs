@@ -5,12 +5,13 @@ use riscv::register::{scause, sip, utvec::TrapMode};
 use crate::{
     config::TRAMPOLINE_START_ADDRESS,
     syscall::syscall,
-    task::{processor::fetch_curr_task, suspend_and_yield},
+    task::{processor::fetch_curr_task, suspend_yield},
 };
 
-use self::trampoline::restore;
+use self::{signal::signal_handler, trampoline::restore};
 
 pub mod context;
+pub mod signal;
 pub mod trampoline;
 
 #[no_mangle]
@@ -25,7 +26,7 @@ pub fn trap_handler() -> ! {
                 unsafe {
                     asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
                 }
-                suspend_and_yield();
+                suspend_yield();
             }
             scause::Interrupt::SupervisorTimer => todo!(),
             scause::Interrupt::SupervisorExternal => {
@@ -80,6 +81,7 @@ pub fn trap_handler() -> ! {
             scause::Exception::StoreGuestPageFault => todo!(),
         },
     }
+    signal_handler();
     restore();
 }
 

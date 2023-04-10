@@ -15,7 +15,6 @@ use super::{
 };
 use crate::config::{PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH};
 use crate::fs::segment::Segment;
-use crate::println;
 
 bitflags! {
     /// This data structure is used to define the flags of page table entry.

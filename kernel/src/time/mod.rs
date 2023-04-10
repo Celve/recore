@@ -21,7 +21,8 @@ pub fn get_time() -> usize {
 }
 
 #[link_section = ".bss.stack"]
-static mut TIMER_SCRATCH: [[usize; 5]; NCPU] = [[0; 5]; NCPU];
+#[no_mangle]
+pub static mut TIMER_SCRATCH: [[usize; 5]; NCPU] = [[0; 5]; NCPU];
 
 #[no_mangle]
 pub unsafe fn init_timer() {

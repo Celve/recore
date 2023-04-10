@@ -5,15 +5,16 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use riscv::register::sstatus::{self, SPP};
+use fosix::signal::{SignalAction, SignalFlags};
+use riscv::register::{
+    mcause::Trap,
+    sstatus::{self, SPP},
+};
 use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
-    config::TRAP_CONTEXT_START_ADDRESS,
-    fs::{
-        dir::{Dir, DirInner},
-        file::{File, FileInner},
-    },
+    config::{NUM_SIGNAL, TRAP_CONTEXT_START_ADDRESS},
+    fs::{dir::Dir, file::File},
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -24,6 +25,7 @@ use crate::{
 use super::{
     fd_table::FdTable,
     pid::{alloc_pid, Pid},
+    schedule,
 };
 use crate::task::stack::KernelStack;
 
@@ -37,12 +39,17 @@ pub struct TaskInner {
     task_status: TaskStatus,
     task_ctx: TaskContext,
     trap_ctx: PhyAddr, // raw pointer can't be shared between threads, therefore use phyaddr instead
+    trap_ctx_backup: Option<TrapContext>,
     kernel_stack: KernelStack,
     parent: Option<Weak<Task>>,
     children: Vec<Arc<Task>>,
     fd_table: FdTable,
     exit_code: isize,
     cwd: Dir,
+    sig: SignalFlags,
+    sig_mask: SignalFlags,
+    sig_actions: [SignalAction; NUM_SIGNAL],
+    sig_handling: Option<usize>,
 }
 
 #[repr(C)]
@@ -52,10 +59,11 @@ pub struct TaskContext {
     pub sr: [usize; 12],
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {
     Ready,
     Running,
+    Stopped,
     Zombie,
 }
 
@@ -103,12 +111,17 @@ impl Task {
                 task_status: TaskStatus::Ready,
                 task_ctx: TaskContext::new(restore as usize, kernel_stack.top().into()),
                 trap_ctx: trap_ctx.into(),
+                trap_ctx_backup: None,
                 kernel_stack,
                 parent,
                 children: Vec::new(),
                 exit_code: 0,
                 fd_table: FdTable::new(),
                 cwd: file.lock().parent(),
+                sig: SignalFlags::from_bits(0).unwrap(),
+                sig_mask: SignalFlags::from_bits(0).unwrap(),
+                sig_actions: [SignalAction::default(); NUM_SIGNAL],
+                sig_handling: None,
             }),
         }
     }
@@ -199,6 +212,27 @@ impl Task {
         *task.trap_ctx_mut().a1_mut() = argv;
         task.task_ctx = TaskContext::new(restore as usize, task.kernel_stack.top().into());
     }
+
+    pub fn exit(&self, exit_code: isize) {
+        let mut task = self.lock();
+        task.task_status = TaskStatus::Zombie;
+        task.exit_code = exit_code;
+    }
+
+    pub fn stop(&self) {
+        let mut task = self.lock();
+        task.task_status = TaskStatus::Stopped;
+    }
+
+    pub fn cont(&self) {
+        let mut task = self.lock();
+        task.task_status = TaskStatus::Running;
+    }
+
+    pub fn kill(&self, sig: SignalFlags) {
+        let mut task = self.lock();
+        task.sig |= sig;
+    }
 }
 
 impl Clone for Task {
@@ -228,12 +262,17 @@ impl Clone for Task {
                 task_status: TaskStatus::Ready,
                 task_ctx: TaskContext::new(restore as usize, kernel_stack.top().into()),
                 trap_ctx: trap_ctx.into(),
+                trap_ctx_backup: None,
                 kernel_stack,
                 parent: task.parent.clone(),
                 children: Vec::new(),
                 exit_code: 0,
                 fd_table,
                 cwd,
+                sig: SignalFlags::from_bits(0).unwrap(),
+                sig_mask: SignalFlags::from_bits(0).unwrap(),
+                sig_actions: [SignalAction::default(); NUM_SIGNAL],
+                sig_handling: None,
             }),
         }
     }
@@ -272,8 +311,8 @@ impl TaskInner {
         &mut self.task_status
     }
 
-    pub fn task_status(&self) -> &TaskStatus {
-        &self.task_status
+    pub fn task_status(&self) -> TaskStatus {
+        self.task_status
     }
 
     pub fn exit_code_mut(&mut self) -> &mut isize {
@@ -294,6 +333,10 @@ impl TaskInner {
 
     pub fn children(&self) -> &Vec<Arc<Task>> {
         &self.children
+    }
+
+    pub fn parent(&self) -> Option<Arc<Task>> {
+        self.parent.as_ref().and_then(|p| p.upgrade())
     }
 
     pub fn parent_mut(&mut self) -> &mut Option<Weak<Task>> {
@@ -318,6 +361,46 @@ impl TaskInner {
 
     pub fn fd_table_mut(&mut self) -> &mut FdTable {
         &mut self.fd_table
+    }
+
+    pub fn sig(&self) -> SignalFlags {
+        self.sig
+    }
+
+    pub fn sig_mut(&mut self) -> &mut SignalFlags {
+        &mut self.sig
+    }
+
+    pub fn sig_mask(&self) -> SignalFlags {
+        self.sig_mask
+    }
+
+    pub fn sig_mask_mut(&mut self) -> &mut SignalFlags {
+        &mut self.sig_mask
+    }
+
+    pub fn sig_actions(&self) -> &[SignalAction; NUM_SIGNAL] {
+        &self.sig_actions
+    }
+
+    pub fn sig_actions_mut(&mut self) -> &mut [SignalAction; NUM_SIGNAL] {
+        &mut self.sig_actions
+    }
+
+    pub fn sig_handling(&self) -> Option<usize> {
+        self.sig_handling
+    }
+
+    pub fn sig_handling_mut(&mut self) -> &mut Option<usize> {
+        &mut self.sig_handling
+    }
+
+    pub fn trap_ctx_backup(&self) -> &Option<TrapContext> {
+        &self.trap_ctx_backup
+    }
+
+    pub fn trap_ctx_backup_mut(&mut self) -> &mut Option<TrapContext> {
+        &mut self.trap_ctx_backup
     }
 }
 

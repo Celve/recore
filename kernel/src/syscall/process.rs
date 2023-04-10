@@ -1,20 +1,23 @@
 use alloc::vec::Vec;
-use fosix::fs::OpenFlags;
+use fosix::{
+    fs::OpenFlags,
+    signal::{SignalAction, SignalFlags, SIGCONT, SIGKILL, SIGSTOP},
+};
 
 use crate::task::{
-    exit_and_yield, loader::get_app_data, manager::MANAGER, processor::fetch_curr_task,
-    suspend_and_yield, task::TaskStatus,
+    exit_yield, loader::get_app_data, manager::MANAGER, processor::fetch_curr_task, suspend_yield,
+    task::TaskStatus,
 };
 
 use super::{open_file, parse_str};
 
 pub fn sys_exit(exit_code: isize) -> isize {
-    exit_and_yield(exit_code);
+    exit_yield(exit_code);
     0
 }
 
 pub fn sys_yield() -> isize {
-    suspend_and_yield();
+    suspend_yield();
     0
 }
 
@@ -67,7 +70,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
     // find satisfied children
     let result = task_guard.children().iter().position(|task| {
         let task = task.lock();
-        (pid == -1 || pid as usize == task.pid()) && *task.task_status() == TaskStatus::Zombie
+        (pid == -1 || pid as usize == task.pid()) && task.task_status() == TaskStatus::Zombie
     });
 
     return if let Some(pos) = result {
@@ -87,4 +90,47 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
     } else {
         -1
     };
+}
+
+#[no_mangle]
+pub fn sys_sigreturn() -> isize {
+    let task = fetch_curr_task();
+    let mut task_guard = task.lock();
+    *task_guard.trap_ctx_mut() = task_guard.trap_ctx_backup_mut().take().unwrap();
+    task_guard.trap_ctx().a0() as isize
+}
+
+pub fn sys_kill(pid: usize, sig: usize) -> isize {
+    let manager = MANAGER.lock();
+    let target = manager.iter().find(|task| {
+        let task_guard = task.lock();
+        task_guard.pid() == pid as usize && task_guard.pid() != 1
+    });
+    if let Some(task) = target {
+        task.kill(SignalFlags::from_bits(1 << sig).unwrap());
+        0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_sigaction(sig_id: usize, new_action_ptr: usize, old_action_ptr: usize) -> isize {
+    if new_action_ptr == 0
+        || old_action_ptr == 0
+        || sig_id == SIGKILL as usize
+        || sig_id == SIGSTOP as usize
+        || sig_id == SIGCONT as usize
+    {
+        return -1;
+    }
+
+    let task = fetch_curr_task();
+    let mut task_guard = task.lock();
+    let page_table = task_guard.user_mem().page_table();
+    let new_action = page_table.translate_any::<SignalAction>(new_action_ptr.into());
+    let old_action = page_table.translate_any::<SignalAction>(old_action_ptr.into());
+
+    *old_action = task_guard.sig_actions()[sig_id];
+    task_guard.sig_actions_mut()[sig_id] = *new_action;
+    0
 }

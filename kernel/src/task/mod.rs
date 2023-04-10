@@ -11,20 +11,22 @@ pub mod stack;
 mod switch;
 pub mod task;
 
-pub fn suspend_and_yield() {
+pub fn suspend_yield() {
     schedule();
 }
 
-pub fn exit_and_yield(exit_code: isize) {
-    // modify task status and exit code
-    {
-        let curr_task = fetch_curr_task();
-        let mut curr_task_guard = curr_task.lock();
-        *curr_task_guard.task_status_mut() = TaskStatus::Zombie;
-        *curr_task_guard.exit_code_mut() = exit_code;
-    }
-
+pub fn stop_yield() {
+    fetch_curr_task().stop();
     schedule();
+}
+
+pub fn exit_yield(exit_code: isize) {
+    fetch_curr_task().exit(exit_code);
+    schedule();
+}
+
+pub fn cont() {
+    fetch_curr_task().cont();
 }
 
 pub fn schedule() {

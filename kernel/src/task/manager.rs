@@ -26,6 +26,14 @@ impl Manager {
     pub fn pop(&mut self) -> Option<Arc<Task>> {
         self.tasks.pop_front()
     }
+
+    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<Arc<Task>> {
+        self.tasks.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> alloc::collections::vec_deque::IterMut<Arc<Task>> {
+        self.tasks.iter_mut()
+    }
 }
 
 lazy_static! {

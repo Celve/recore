@@ -33,6 +33,10 @@ impl TrapContext {
         }
     }
 
+    pub fn a0(&self) -> usize {
+        self.saved_regs[10]
+    }
+
     pub fn a0_mut(&mut self) -> &mut usize {
         &mut self.saved_regs[10]
     }

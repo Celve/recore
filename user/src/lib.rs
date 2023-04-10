@@ -10,9 +10,11 @@ pub mod syscall;
 
 use alloc::vec::Vec;
 use allocator::heap::LockedBuddyHeap;
-use bitflags::bitflags;
-use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
-use syscall::{file::*, *};
+use fosix::{
+    fs::{DirEntry, FileStat, OpenFlags, SeekFlag},
+    signal::SignalAction,
+};
+use syscall::{file::*, proc::*};
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
@@ -128,4 +130,16 @@ pub fn pipe(fds: &mut [usize; 2]) -> isize {
 
 pub fn dup(fd: usize) -> isize {
     sys_dup(fd)
+}
+
+pub fn kill(pid: usize, sig: usize) -> isize {
+    sys_kill(pid, sig)
+}
+
+pub fn sigreturn() -> isize {
+    sys_sigreturn()
+}
+
+pub fn sigaction(sig_id: usize, new_action: &SignalAction, old_action: &mut SignalAction) -> isize {
+    sys_sigaction(sig_id, new_action, old_action)
 }

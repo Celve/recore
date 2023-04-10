@@ -4,47 +4,61 @@ use alloc::sync::Arc;
 use fosix::fs::{FilePerm, FileStat, SeekFlag};
 use spin::mutex::Mutex;
 
+use crate::{disk::DiskManager, fuse::Fuse};
+
 use super::{
-    cache::CACHE_MANAGER,
     dir::Dir,
     inode::{Inode, InodePtr},
 };
 
-#[derive(Clone)]
-pub struct File {
-    inner: Arc<Mutex<FileInner>>,
+pub struct File<D: DiskManager> {
+    inner: Arc<Mutex<FileInner<D>>>,
 }
 
-pub struct FileInner {
-    myself: InodePtr,
-    parent: InodePtr,
+pub struct FileInner<D: DiskManager> {
+    myself: InodePtr<D>,
+    parent: InodePtr<D>,
     offset: usize,
     perm: FilePerm,
+    fuse: Arc<Fuse<D>>,
 }
 
-impl File {
-    pub fn new(myself: InodePtr, parent: InodePtr, perm: FilePerm) -> Self {
+impl<D: DiskManager> Clone for File<D> {
+    fn clone(&self) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(FileInner::new(myself, parent, perm))),
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<D: DiskManager> File<D> {
+    pub fn new(
+        myself: InodePtr<D>,
+        parent: InodePtr<D>,
+        perm: FilePerm,
+        fuse: Arc<Fuse<D>>,
+    ) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(FileInner::new(myself, parent, perm, fuse))),
         }
     }
 
-    pub fn lock(&self) -> MutexGuard<FileInner> {
+    pub fn lock(&self) -> MutexGuard<FileInner<D>> {
         self.inner.lock()
     }
 }
 
-impl FileInner {
+impl<D: DiskManager> FileInner<D> {
     pub fn read_at(&self, buf: &mut [u8], offset: usize) -> usize {
         if !self.perm.contains(FilePerm::READABLE) {
             return 0;
         }
 
-        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
+        let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
         let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
 
-        inode.read_at(buf, offset)
+        inode.read_at(buf, offset, self.fuse.clone())
     }
 
     pub fn write_at(&self, buf: &[u8], offset: usize) -> usize {
@@ -52,11 +66,11 @@ impl FileInner {
             return 0;
         }
 
-        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
+        let cache = self.fuse.cache_manager().get(self.myself.bid());
         let mut cache_guard = cache.lock();
         let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
 
-        inode.write_at(buf, offset)
+        inode.write_at(buf, offset, self.fuse.clone())
     }
 
     pub fn trunc(&mut self) -> usize {
@@ -64,28 +78,28 @@ impl FileInner {
             return 0;
         }
 
-        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
+        let cache = self.fuse.cache_manager().get(self.myself.bid());
         let mut cache_guard = cache.lock();
         let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
 
         self.offset = 0;
-        inode.trunc()
+        inode.trunc(self.fuse.clone())
     }
 
     pub fn size(&self) -> usize {
-        let cache = CACHE_MANAGER.lock().get(self.myself.bid());
+        let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
         let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
 
         inode.size()
     }
 
-    pub fn parent(&self) -> Dir {
-        Dir::new(self.parent)
+    pub fn parent(&self) -> Dir<D> {
+        Dir::new(self.parent.clone(), self.fuse.clone())
     }
 }
 
-impl FileInner {
+impl<D: DiskManager> FileInner<D> {
     pub fn seek(&mut self, new_offset: usize, flag: SeekFlag) {
         match flag {
             SeekFlag::SET => self.offset = new_offset,
@@ -112,13 +126,19 @@ impl FileInner {
     }
 }
 
-impl FileInner {
-    pub fn new(myself: InodePtr, parent: InodePtr, perm: FilePerm) -> Self {
+impl<D: DiskManager> FileInner<D> {
+    pub fn new(
+        myself: InodePtr<D>,
+        parent: InodePtr<D>,
+        perm: FilePerm,
+        fuse: Arc<Fuse<D>>,
+    ) -> Self {
         Self {
             myself,
             parent,
             offset: 0,
             perm,
+            fuse,
         }
     }
 }

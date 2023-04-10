@@ -6,15 +6,12 @@ use alloc::{
     vec::Vec,
 };
 use fosix::signal::{SignalAction, SignalFlags};
-use riscv::register::{
-    mcause::Trap,
-    sstatus::{self, SPP},
-};
+use riscv::register::sstatus::{self, SPP};
 use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
     config::{NUM_SIGNAL, TRAP_CONTEXT_START_ADDRESS},
-    fs::{dir::Dir, file::File},
+    fs::{Dir, File},
     mm::{
         address::{PhyAddr, VirAddr},
         memory::{Memory, KERNEL_SPACE},
@@ -25,7 +22,6 @@ use crate::{
 use super::{
     fd_table::FdTable,
     pid::{alloc_pid, Pid},
-    schedule,
 };
 use crate::task::stack::KernelStack;
 

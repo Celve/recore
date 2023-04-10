@@ -6,7 +6,7 @@ use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
 
 use crate::{
-    fs::{dir::Dir, file::File, fuse::FUSE},
+    fs::{disk::BlockDevice, Dir, File, FUSE},
     task::processor::fetch_curr_task,
 };
 

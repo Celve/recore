@@ -5,18 +5,16 @@ use crate::{
     ipc::pipe::Pipe,
 };
 
-use super::{
-    dir::{Dir, DirInner},
-    file::{File, FileInner},
-    segment::Segment,
-};
+use fs::{dir::Dir, file::File};
+
+use super::{disk::BlockDevice, segment::Segment};
 
 #[derive(Clone)]
 pub enum Fileable {
     Stdin(Stdin),
     Stdout(Stdout),
-    File(File),
-    Dir(Dir),
+    File(File<BlockDevice>),
+    Dir(Dir<BlockDevice>),
     Pipe(Pipe),
 }
 
@@ -72,14 +70,14 @@ impl Fileable {
 }
 
 impl Fileable {
-    pub fn as_file(&self) -> Option<File> {
+    pub fn as_file(&self) -> Option<File<BlockDevice>> {
         match self {
             Fileable::File(file) => Some(file.clone()),
             _ => None,
         }
     }
 
-    pub fn as_dir(&self) -> Option<Dir> {
+    pub fn as_dir(&self) -> Option<Dir<BlockDevice>> {
         match self {
             Fileable::Dir(dir) => Some(dir.clone()),
             _ => None,

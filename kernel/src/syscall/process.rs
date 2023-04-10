@@ -96,6 +96,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
 pub fn sys_sigreturn() -> isize {
     let task = fetch_curr_task();
     let mut task_guard = task.lock();
+    task_guard.sig_handling_mut().take();
     *task_guard.trap_ctx_mut() = task_guard.trap_ctx_backup_mut().take().unwrap();
     task_guard.trap_ctx().a0() as isize
 }

@@ -16,6 +16,7 @@ spin = { path = "../spin" }
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
 lru = "0.10.0"
 fosix = { path = "../fosix"}
+fs = { path = "../fs" }
 
 [profile.release]
 # opt-level = 0

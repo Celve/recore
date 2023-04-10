@@ -1,65 +1,73 @@
 use core::{mem::size_of, num::NonZeroUsize, slice};
 
 use alloc::{sync::Arc, vec::Vec};
-use lazy_static::lazy_static;
 use lru::LruCache;
 use spin::mutex::Mutex;
 
-use crate::config::{BLK_SIZE, CACHE_SIZE};
+use crate::{
+    config::{BLK_SIZE, CACHE_SIZE},
+    disk::DiskManager,
+};
 
-use super::disk::DISK_MANAGER;
-
-pub struct CacheManager {
-    pub caches: LruCache<usize, Arc<Mutex<Cache>>>,
+pub struct CacheManager<D: DiskManager> {
+    caches: Mutex<LruCache<usize, Arc<Mutex<Cache<D>>>>>,
+    disk_manager: Arc<D>,
 }
 
-pub struct Cache {
+pub struct Cache<D: DiskManager> {
     data: Vec<u8>,
     bid: usize,
-    pub dirt: bool,
+    dirt: bool,
+    disk_manager: Arc<D>,
 }
 
-lazy_static! {
-    pub static ref CACHE_MANAGER: Mutex<CacheManager> = Mutex::new(CacheManager::new());
-}
-
-impl CacheManager {
-    pub fn new() -> Self {
+impl<D: DiskManager> CacheManager<D> {
+    pub fn new(disk_manager: Arc<D>) -> Self {
         Self {
-            caches: LruCache::new(NonZeroUsize::new(CACHE_SIZE).unwrap()),
+            caches: Mutex::new(LruCache::new(NonZeroUsize::new(CACHE_SIZE).unwrap())),
+            disk_manager,
         }
     }
 
-    pub fn get(&mut self, bid: usize) -> Arc<Mutex<Cache>> {
-        if !self.caches.contains(&bid) {
-            self.caches.put(bid, Arc::new(Mutex::new(Cache::new(bid))));
+    pub fn get(&self, bid: usize) -> Arc<Mutex<Cache<D>>> {
+        let mut caches = self.caches.lock();
+        if !caches.contains(&bid) {
+            caches.put(
+                bid,
+                Arc::new(Mutex::new(Cache::new(bid, self.disk_manager.clone()))),
+            );
         }
-        self.caches.get(&bid).unwrap().clone()
+        caches.get(&bid).unwrap().clone()
     }
 
-    pub fn clear(&mut self) {
-        self.caches.clear();
+    pub fn clear(&self) {
+        self.caches.lock().clear();
     }
 
     pub fn len(&self) -> usize {
-        self.caches.len()
+        self.caches.lock().len()
+    }
+
+    pub fn disk_manager(&self) -> Arc<D> {
+        self.disk_manager.clone()
     }
 }
 
-impl Cache {
-    pub fn new(bid: usize) -> Self {
+impl<D: DiskManager> Cache<D> {
+    pub fn new(bid: usize, disk_manager: Arc<D>) -> Self {
         let mut data = vec![0; BLK_SIZE];
-        DISK_MANAGER.lock().read(bid, &mut data);
+        disk_manager.read(bid, &mut data);
         Self {
             data,
             bid,
             dirt: false,
+            disk_manager,
         }
     }
 
     pub fn sync(&mut self) {
         if self.dirt {
-            DISK_MANAGER.lock().write(self.bid, &mut self.data);
+            self.disk_manager.write(self.bid, &mut self.data);
             self.dirt = false
         }
     }
@@ -93,7 +101,7 @@ impl Cache {
     }
 }
 
-impl Drop for Cache {
+impl<D: DiskManager> Drop for Cache<D> {
     fn drop(&mut self) {
         self.sync();
     }

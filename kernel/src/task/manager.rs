@@ -1,6 +1,6 @@
 use super::task::Task;
 
-use crate::{fs::fuse::FUSE, task::loader::get_app_data};
+use crate::fs::FUSE;
 
 use alloc::{collections::VecDeque, sync::Arc};
 use fosix::fs::OpenFlags;

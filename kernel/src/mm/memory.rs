@@ -11,7 +11,6 @@ use crate::{
         VIRTIO_BASE_ADDRESS, VIRTIO_MAP_SIZE,
     },
     mm::{address::PhyAddr, page_table::PTEFlags},
-    println,
 };
 
 use alloc::vec::Vec;

@@ -1,24 +1,20 @@
+mod disk;
+
 use std::{
-    fs::{read_dir, File},
+    fs::{read_dir, File, OpenOptions},
     io::Read,
+    sync::Arc,
 };
 
 use clap::{App, Arg};
 use fosix::fs::OpenFlags;
-use fuse::FUSE;
+use fs::{
+    cache::{self, CacheManager},
+    fuse::Fuse,
+    superblock::SuperBlock,
+};
 
-use crate::cache::CACHE_MANAGER;
-
-mod bitmap;
-mod cache;
-mod config;
-mod dir;
-mod disk;
-mod file;
-mod fuse;
-mod inode;
-mod segment;
-mod superblock;
+use crate::disk::FileDevice;
 
 fn main() {
     let matches = App::new("Fuse packer")
@@ -38,8 +34,25 @@ fn main() {
         )
         .get_matches();
 
-    FUSE.alloc_root();
-    let root = FUSE.root();
+    let disk_manager = Arc::new(FileDevice::new({
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(format!("{}", "fs.img"))
+            .unwrap();
+        f.set_len(33802 * 512).unwrap();
+        f
+    }));
+
+    let fuse = Arc::new(Fuse::new(
+        SuperBlock::new(4096, 32768),
+        Arc::new(CacheManager::new(disk_manager)),
+    ));
+
+    fuse.alloc_root();
+    let root = fuse.root();
 
     let src_path = matches.value_of("source").unwrap();
     let target_path = matches.value_of("target").unwrap();
@@ -69,13 +82,32 @@ fn main() {
     }
 
     drop(root);
-    CACHE_MANAGER.lock().clear();
-    assert_eq!(CACHE_MANAGER.lock().len(), 0);
+    let cache_manager = fuse.cache_manager();
+    cache_manager.clear();
+    assert_eq!(cache_manager.len(), 0);
 }
 
 fn test() {
-    FUSE.alloc_root();
-    let root = FUSE.root();
+    let disk_manager = Arc::new(FileDevice::new({
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(format!("{}", "fs.img"))
+            .unwrap();
+        f.set_len(33802 * 512).unwrap();
+        f
+    }));
+
+    let fuse = Arc::new(Fuse::new(
+        SuperBlock::new(4096, 32768),
+        Arc::new(CacheManager::new(disk_manager)),
+    ));
+
+    fuse.alloc_root();
+    let root = fuse.root();
+
     for i in 0..129 {
         root.lock().mkdir(format!("{i}").as_str());
     }

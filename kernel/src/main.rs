@@ -28,7 +28,7 @@ use riscv::register::*;
 use task::processor::run_tasks;
 use time::init_timer;
 
-use crate::{fs::fuse::FUSE, trap::set_kernel_stvec};
+use crate::{fs::FUSE, trap::set_kernel_stvec};
 
 global_asm!(include_str!("app.s"));
 

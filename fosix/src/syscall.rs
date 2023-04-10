@@ -1,3 +1,5 @@
+use bitflags::bitflags;
+
 pub const SYSCALL_DUP: usize = 24;
 pub const SYSCALL_MKDIR: usize = 34;
 pub const SYSCALL_FSTAT: usize = 43;
@@ -17,3 +19,9 @@ pub const SYSCALL_SIGRETURN: usize = 139;
 pub const SYSCALL_FORK: usize = 220;
 pub const SYSCALL_EXEC: usize = 221;
 pub const SYSCALL_WAITPID: usize = 260;
+
+bitflags! {
+    pub struct WaitFlags: u8 {
+        const NOHANG = 1 << 0;
+    }
+}

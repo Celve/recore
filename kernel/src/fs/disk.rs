@@ -1,4 +1,5 @@
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use fs::disk::DiskManager;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
@@ -8,7 +9,7 @@ use crate::{
     mm::{frame::Frame, memory::KERNEL_SPACE},
 };
 
-pub struct DiskManager {
+pub struct BlockDevice {
     blk: Mutex<VirtIOBlk<'static, VirIoHal>>,
 }
 
@@ -16,10 +17,19 @@ pub struct VirIoHal;
 
 lazy_static! {
     pub static ref VIRT_IO_FRAMES: Mutex<BTreeMap<usize, Vec<Frame>>> = Mutex::new(BTreeMap::new());
-    pub static ref DISK_MANAGER: Arc<Mutex<DiskManager>> = Arc::new(Mutex::new(DiskManager::new()));
 }
 
-impl DiskManager {
+impl DiskManager for BlockDevice {
+    fn read(&self, bid: usize, buf: &mut [u8]) {
+        self.blk.lock().read_block(bid, buf).unwrap();
+    }
+
+    fn write(&self, bid: usize, buf: &[u8]) {
+        self.blk.lock().write_block(bid, buf).unwrap();
+    }
+}
+
+impl BlockDevice {
     pub fn new() -> Self {
         unsafe {
             Self {
@@ -28,14 +38,6 @@ impl DiskManager {
                 ),
             }
         }
-    }
-
-    pub fn read(&self, bid: usize, buf: &mut [u8]) {
-        self.blk.lock().read_block(bid, buf).unwrap();
-    }
-
-    pub fn write(&self, bid: usize, buf: &[u8]) {
-        self.blk.lock().write_block(bid, buf).unwrap();
     }
 }
 

@@ -1,5 +1,3 @@
-use crate::fs::{file::FileInner, segment::Segment};
-
 use super::uart::recv_from_uart;
 
 #[derive(Clone, Copy)]

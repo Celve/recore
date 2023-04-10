@@ -1,8 +1,8 @@
-use crate::config::BLK_SIZE;
+use alloc::sync::Arc;
 
-use super::cache::CACHE_MANAGER;
+use crate::{cache::CacheManager, config::BLK_SIZE, disk::DiskManager};
 
-pub struct BitMap {
+pub struct BitMap<D: DiskManager> {
     /// The start block id of the bitmap.
     start_bid: usize,
 
@@ -11,13 +11,15 @@ pub struct BitMap {
 
     /// The number of availabe bits.
     available: usize,
+
+    cache_manager: Arc<CacheManager<D>>,
 }
 
-impl BitMap {
+impl<D: DiskManager> BitMap<D> {
     pub fn alloc(&mut self) -> Option<usize> {
         if self.available > 0 {
             for bid in self.start_bid..self.start_bid + self.len {
-                let cache = CACHE_MANAGER.lock().get(bid);
+                let cache = self.cache_manager.get(bid);
                 let mut cache_guard = cache.try_lock().unwrap();
                 let data = cache_guard.as_array_mut::<u64>();
                 let bytes_pair = data
@@ -41,12 +43,18 @@ impl BitMap {
     }
 }
 
-impl BitMap {
-    pub fn new(start_bid: usize, len: usize, available: usize) -> Self {
+impl<D: DiskManager> BitMap<D> {
+    pub fn new(
+        start_bid: usize,
+        len: usize,
+        available: usize,
+        cache_manager: Arc<CacheManager<D>>,
+    ) -> Self {
         Self {
             start_bid,
             len,
             available,
+            cache_manager,
         }
     }
 
@@ -54,7 +62,7 @@ impl BitMap {
     pub fn get(&self, bid: usize) -> bool {
         let (blk, byte, bit) = Self::locate(bid);
 
-        let cache = CACHE_MANAGER.lock().get(self.start_bid + blk);
+        let cache = self.cache_manager.get(self.start_bid + blk);
         let mut cache_guard = cache.lock();
         cache_guard.as_array_mut::<u64>()[byte] >> bit & 1 == 1
     }
@@ -63,7 +71,7 @@ impl BitMap {
     pub fn set(&self, bid: usize) -> bool {
         let (blk, byte, bit) = Self::locate(bid);
 
-        let cache = CACHE_MANAGER.lock().get(self.start_bid + blk);
+        let cache = self.cache_manager.get(self.start_bid + blk);
         let mut data = cache.lock();
         let data_guard = data.as_array_mut::<u64>();
         let old = data_guard[byte] >> bit & 1 == 1;
@@ -75,7 +83,7 @@ impl BitMap {
     pub fn clear(&self, bid: usize) -> bool {
         let (blk, byte, bit) = Self::locate(bid);
 
-        let cache = CACHE_MANAGER.lock().get(self.start_bid + blk);
+        let cache = self.cache_manager.get(self.start_bid + blk);
         let mut data = cache.lock();
         let data_guard = data.as_array_mut::<u64>();
         let old = data_guard[byte] >> bit & 1 == 1;

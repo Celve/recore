@@ -13,6 +13,7 @@ use allocator::heap::LockedBuddyHeap;
 use fosix::{
     fs::{DirEntry, FileStat, OpenFlags, SeekFlag},
     signal::SignalAction,
+    syscall::WaitFlags,
 };
 use syscall::{file::*, proc::*};
 
@@ -70,20 +71,15 @@ pub fn exec(path: &str, args: &Vec<*const u8>) -> isize {
     sys_exec(path, args)
 }
 
-pub fn wait(exit_code: &mut i32) -> isize {
-    loop {
-        match sys_waitpid(-1, exit_code) {
-            -2 => yield_now(),
-            pid => return pid,
-        }
-    }
-}
-
-pub fn waitpid(pid: isize, exit_code: &mut i32) -> isize {
-    loop {
-        match sys_waitpid(pid, exit_code) {
-            -2 => yield_now(),
-            pid => return pid,
+pub fn waitpid(pid: isize, exit_code: &mut i32, flags: WaitFlags) -> isize {
+    if !flags.contains(WaitFlags::NOHANG) {
+        sys_waitpid(pid, exit_code)
+    } else {
+        loop {
+            match sys_waitpid(pid, exit_code) {
+                -2 => yield_now(),
+                pid => return pid,
+            }
         }
     }
 }

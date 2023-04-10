@@ -9,7 +9,7 @@ extern crate alloc;
 
 use alloc::vec;
 use fosix::fs::{FileStat, OpenFlags, SeekFlag};
-use user::{exec, fork, fstat, lseek, open, read, wait, write, yield_now};
+use user::{exec, fork, fstat, lseek, open, read, write, yield_now};
 
 #[no_mangle]
 fn main() {

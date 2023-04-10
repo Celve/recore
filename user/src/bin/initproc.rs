@@ -7,7 +7,8 @@ extern crate user;
 #[macro_use]
 extern crate alloc;
 
-use user::{exec, fork, wait, yield_now};
+use fosix::syscall::WaitFlags;
+use user::{exec, fork, waitpid, yield_now};
 
 #[no_mangle]
 fn main() {
@@ -16,7 +17,7 @@ fn main() {
     } else {
         let mut exit_code: i32 = 0;
         loop {
-            let pid = wait(&mut exit_code);
+            let pid = waitpid(-1, &mut exit_code, WaitFlags::empty());
             match pid {
                 -1 => return,
                 -2 => yield_now(),

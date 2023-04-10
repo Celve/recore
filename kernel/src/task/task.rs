@@ -232,6 +232,11 @@ impl Task {
     pub fn kill(&self, sig: SignalFlags) {
         let mut task = self.lock();
         task.sig |= sig;
+        println!(
+            "[kernel] Process {} receives signal {}",
+            task.pid(),
+            sig.bits()
+        );
     }
 }
 

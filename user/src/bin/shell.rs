@@ -16,6 +16,7 @@ use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 use fosix::{
     fs::OpenFlags,
     signal::{SignalAction, SignalFlags, SIGCHLD},
+    syscall::WaitFlags,
 };
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
@@ -75,19 +76,24 @@ lazy_static! {
 static FINISHED: AtomicBool = AtomicBool::new(false);
 
 fn sigchld_handler() {
-    let mut exit_code = 0;
-    let pid = waitpid(-1, &mut exit_code) as usize;
-    let res = JOBS.lock().remove(&pid);
-    if let Some(_) = res {
-        println!("[shell] Process {} exited with code {}.", pid, exit_code);
-    } else {
-        panic!(
-            "[shell] Cannot find process {}, however, there is a sigchld.",
-            pid
-        );
+    loop {
+        let mut exit_code = 0;
+        let pid = waitpid(-1, &mut exit_code, WaitFlags::NOHANG) as usize;
+        if pid > 0 {
+            let res = JOBS.lock().remove(&pid);
+            if let Some(_) = res {
+                println!("[shell] Process {} exited with code {}.", pid, exit_code);
+            } else {
+                panic!(
+                    "[shell] Cannot find process {}, however, there is a sigchld.",
+                    pid
+                );
+            }
+            FINISHED.store(true, Ordering::SeqCst);
+        } else {
+            sigreturn();
+        }
     }
-    FINISHED.store(true, Ordering::SeqCst);
-    sigreturn();
 }
 
 fn getline() -> String {

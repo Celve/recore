@@ -93,7 +93,7 @@ pub fn switch() {
 
             let parent = curr_task.lock().parent().unwrap();
             parent.kill(SignalFlags::SIGCHLD);
-            println!("[kernel] One process has ended.");
+            println!("[kernel] Process {} has ended.", curr_task.lock().pid());
         }
     } else {
         panic!("[kernel] Shutdown.");

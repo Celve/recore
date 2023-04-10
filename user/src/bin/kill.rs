@@ -14,6 +14,6 @@ fn main(argc: usize, argv: &[&str]) {
     assert!(argv[1].starts_with("-"));
     let sig = argv[1][1..].parse::<usize>().unwrap();
     let pid = argv[2].parse::<usize>().unwrap();
-    println!("kill process {} with {}.", sig, pid);
+    println!("kill process {} with {}.", pid, sig);
     kill(pid, sig);
 }

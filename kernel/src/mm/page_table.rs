@@ -43,6 +43,15 @@ pub struct PageTableEntry {
     pub bits: usize,
 }
 
+/// The page table is only an abstraction towards the real page tables interleaved by page table entries.
+/// It could be seen as an entry point for normal programs for stuffs that dealing with mapping.
+///
+/// RAII is used here. The frame collections control when to free those allocated frames used by page tables.
+pub struct PageTable {
+    root: PhyPageNum,
+    frames: Mutex<Vec<Frame>>,
+}
+
 impl PageTableEntry {
     pub fn new(ppn: PhyPageNum, flags: PTEFlags) -> Self {
         Self {
@@ -76,15 +85,6 @@ impl PageTableEntry {
     pub fn is_valid(&self) -> bool {
         self.get_flags().contains(PTEFlags::V)
     }
-}
-
-/// The page table is only an abstraction towards the real page tables interleaved by page table entries.
-/// It could be seen as an entry point for normal programs for stuffs that dealing with mapping.
-///
-/// RAII is used here. The frame collections control when to free those allocated frames used by page tables.
-pub struct PageTable {
-    root: PhyPageNum,
-    frames: Mutex<Vec<Frame>>,
 }
 
 impl PageTable {

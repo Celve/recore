@@ -13,13 +13,13 @@ use crate::{
     mm::{address::PhyAddr, page_table::PTEFlags},
 };
 
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use bitflags::bitflags;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
 pub struct Memory {
-    page_table: PageTable,
+    page_table: Arc<PageTable>,
     pub areas: Vec<Area>,
 }
 
@@ -42,7 +42,7 @@ pub enum MappingType {
 impl Memory {
     pub fn empty() -> Self {
         Self {
-            page_table: PageTable::new(),
+            page_table: Arc::new(PageTable::new()),
             areas: Vec::new(),
         }
     }
@@ -284,8 +284,8 @@ impl Memory {
         ));
     }
 
-    pub fn page_table(&self) -> &PageTable {
-        &self.page_table
+    pub fn page_table(&self) -> Arc<PageTable> {
+        self.page_table.clone()
     }
 }
 

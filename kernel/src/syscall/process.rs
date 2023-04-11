@@ -41,9 +41,7 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
         let mut args = Vec::new();
         loop {
             let arg = {
-                let task = fetch_curr_task();
-                let task_guard = task.lock();
-                let page_table = task_guard.user_mem().page_table();
+                let page_table = fetch_curr_task().lock().user_mem().page_table();
                 page_table.translate_any::<usize>((args_ptr as usize).into())
             };
             if *arg == 0 {

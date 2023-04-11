@@ -1,6 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use spin::mutex::Mutex;
 
 use core::arch::asm;
 use core::cmp::{max, min};
@@ -83,7 +84,7 @@ impl PageTableEntry {
 /// RAII is used here. The frame collections control when to free those allocated frames used by page tables.
 pub struct PageTable {
     root: PhyPageNum,
-    frames: Vec<Frame>,
+    frames: Mutex<Vec<Frame>>,
 }
 
 impl PageTable {
@@ -95,17 +96,17 @@ impl PageTable {
         );
         Self {
             root: frame.ppn(),
-            frames: vec![frame],
+            frames: Mutex::new(vec![frame]),
         }
     }
 
-    pub fn map(&mut self, vpn: VirPageNum, ppn: PhyPageNum, flags: PTEFlags) {
+    pub fn map(&self, vpn: VirPageNum, ppn: PhyPageNum, flags: PTEFlags) {
         let pte = self.create_pte(vpn);
         pte.set_ppn(ppn);
         pte.set_flags(flags | PTEFlags::V);
     }
 
-    pub fn unmap(&mut self, vpn: VirPageNum) {
+    pub fn unmap(&self, vpn: VirPageNum) {
         // TODO: some frames in page table might never be used again, hence deallocation is meaningful
         let pte = self
             .find_pte(vpn)
@@ -119,7 +120,7 @@ impl PageTable {
     }
 
     /// Find the page table entry with given virtual page number, creating new page table entry when necessary.
-    fn create_pte(&mut self, vpn: VirPageNum) -> &mut PageTableEntry {
+    fn create_pte(&self, vpn: VirPageNum) -> &mut PageTableEntry {
         let indices = vpn.indices();
         let mut ptes = self.root.as_raw_ptes();
         for (i, idx) in indices.iter().enumerate() {
@@ -131,7 +132,7 @@ impl PageTable {
                 let frame = Frame::new();
                 pte.set_ppn(frame.ppn());
                 pte.set_flags(PTEFlags::V);
-                self.frames.push(frame);
+                self.frames.lock().push(frame);
             }
             ptes = pte.get_ppn().as_raw_ptes();
         }
@@ -258,7 +259,7 @@ impl PageTable {
 
 impl Drop for PageTable {
     fn drop(&mut self) {
-        self.frames.iter().for_each(|frame| drop(frame));
+        self.frames.lock().iter().for_each(|frame| drop(frame));
     }
 }
 

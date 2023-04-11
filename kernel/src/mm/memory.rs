@@ -20,7 +20,7 @@ use spin::mutex::Mutex;
 
 pub struct Memory {
     page_table: Arc<PageTable>,
-    pub areas: Vec<Area>,
+    areas: Mutex<Vec<Area>>,
 }
 
 bitflags! {
@@ -43,7 +43,7 @@ impl Memory {
     pub fn empty() -> Self {
         Self {
             page_table: Arc::new(PageTable::new()),
-            areas: Vec::new(),
+            areas: Mutex::new(Vec::new()),
         }
     }
 
@@ -149,7 +149,7 @@ impl Memory {
     }
 
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
-        let mut result = Self::empty();
+        let result = Self::empty();
 
         let elf_file =
             xmas_elf::ElfFile::new(elf_data).expect("[memory_set] Fail to parse ELF file.");
@@ -220,8 +220,8 @@ impl Memory {
 
 impl Clone for Memory {
     fn clone(&self) -> Self {
-        let mut result = Self::empty();
-        self.areas.iter().for_each(|area| {
+        let result = Self::empty();
+        self.areas.lock().iter().for_each(|area| {
             let new_area = area.clone();
             if area.map_type() == MappingType::Framed {
                 new_area.copy_from_existed(area);
@@ -234,7 +234,7 @@ impl Clone for Memory {
 }
 
 impl Memory {
-    pub fn map(&mut self, area: Area) {
+    pub fn map(&self, area: Area) {
         println!(
             "[mem] Map area [{:#x}, {:#x})",
             area.range().start.0,
@@ -244,23 +244,23 @@ impl Memory {
             self.page_table
                 .map(vpn, area.frame(i).ppn(), area.map_perm().into());
         });
-        self.areas.push(area);
+        self.areas.lock().push(area);
     }
 
-    pub fn unmap(&mut self, vpn: VirPageNum) {
-        let pos = self
-            .areas
+    pub fn unmap(&self, vpn: VirPageNum) {
+        let mut areas = self.areas.lock();
+        let pos = areas
             .iter()
             .position(|area| area.range().start == vpn)
             .expect("[memory_set] Fail to find vpn in areas.");
-        let area = &self.areas[pos];
+        let area = &areas[pos];
         area.range().iter().for_each(|vpn| {
             self.page_table.unmap(vpn);
         });
-        self.areas.remove(pos);
+        areas.remove(pos);
     }
 
-    fn map_trampoline(&mut self) {
+    fn map_trampoline(&self) {
         extern "C" {
             fn strampoline();
         }
@@ -276,7 +276,7 @@ impl Memory {
         );
     }
 
-    fn map_trap_context(&mut self) {
+    fn map_trap_context(&self) {
         self.map(Area::new_framed(
             VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num(),
             VirAddr::from(TRAP_CONTEXT_END_ADDRESS).ceil_to_vir_page_num(),

@@ -32,7 +32,7 @@ pub struct Task {
 
 pub struct TaskInner {
     pid: Pid,
-    user_mem: Memory,
+    user_mem: Arc<Memory>,
     task_status: TaskStatus,
     task_ctx: TaskContext,
     trap_ctx: PhyAddr, // raw pointer can't be shared between threads, therefore use phyaddr instead
@@ -104,7 +104,7 @@ impl Task {
         Self {
             inner: Mutex::new(TaskInner {
                 pid,
-                user_mem,
+                user_mem: Arc::new(user_mem),
                 task_status: TaskStatus::Ready,
                 task_ctx: TaskContext::new(restore as usize, kernel_stack.top().into()),
                 trap_ctx: trap_ctx.into(),
@@ -203,7 +203,7 @@ impl Task {
         }
 
         // replace some
-        task.user_mem = user_mem;
+        task.user_mem = Arc::new(user_mem);
         task.trap_ctx = trap_ctx.into();
         *task.trap_ctx_mut().a0_mut() = args.len();
         *task.trap_ctx_mut().a1_mut() = argv;
@@ -260,7 +260,7 @@ impl Clone for Task {
         Self {
             inner: Mutex::new(TaskInner {
                 pid,
-                user_mem,
+                user_mem: Arc::new(user_mem),
                 task_status: TaskStatus::Ready,
                 task_ctx: TaskContext::new(restore as usize, kernel_stack.top().into()),
                 trap_ctx: trap_ctx.into(),

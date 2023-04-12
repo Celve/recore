@@ -96,7 +96,6 @@ fn create_dir(cwd: Dir<BlkDev>, path: &str) -> Option<Dir<BlkDev>> {
 fn parse_str(path: usize) -> String {
     fetch_curr_task()
         .lock()
-        .user_mem()
         .page_table()
         .translate_str(path.into())
 }

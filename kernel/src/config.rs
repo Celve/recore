@@ -19,9 +19,7 @@ pub const PTE_FLAG_WIDTH: usize = 10;
 
 pub const MEMORY_END: usize = 0x88_000_000;
 
-pub const TRAMPOLINE_START_ADDRESS: usize = usize::MAX - PAGE_SIZE + 1; // `usize::MAX` is included.
-pub const TRAP_CONTEXT_START_ADDRESS: usize = TRAMPOLINE_START_ADDRESS - PAGE_SIZE;
-pub const TRAP_CONTEXT_END_ADDRESS: usize = TRAMPOLINE_START_ADDRESS;
+pub const TRAMPOLINE_ADDR: usize = usize::MAX - PAGE_SIZE + 1; // `usize::MAX` is included.
 
 pub const USER_STACK_SIZE: usize = 0x10000;
 pub const KERNEL_STACK_SIZE: usize = 0x10000;

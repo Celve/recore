@@ -1,7 +1,5 @@
 use core::mem::size_of;
 
-use alloc::vec::Vec;
-
 use crate::{fs::fileable::Fileable, ipc::pipe::Pipe, task::processor::fetch_curr_task};
 
 pub fn sys_pipe(pipe_ptr: usize) -> isize {
@@ -18,7 +16,6 @@ pub fn sys_pipe(pipe_ptr: usize) -> isize {
     };
 
     let mut dst_bytes = task_guard
-        .user_mem()
         .page_table()
         .translate_bytes(pipe_ptr.into(), size_of::<[usize; 2]>());
     dst_bytes

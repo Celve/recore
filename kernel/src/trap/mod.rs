@@ -3,7 +3,7 @@ use core::arch::asm;
 use riscv::register::{scause, sip, utvec::TrapMode};
 
 use crate::{
-    config::TRAMPOLINE_START_ADDRESS,
+    config::TRAMPOLINE_ADDR,
     syscall::syscall,
     task::{processor::fetch_curr_task, suspend_yield},
 };
@@ -44,9 +44,9 @@ pub fn trap_handler() -> ! {
             scause::Exception::UserEnvCall => {
                 let (id, args) = {
                     let task = fetch_curr_task();
-                    let task_guard = task.lock();
+                    let mut task_guard = task.lock();
                     let trap_ctx = task_guard.trap_ctx_mut();
-                    task_guard.trap_ctx_mut().user_sepc += 4; // it must be added here
+                    trap_ctx.user_sepc += 4; // it must be added here
                     (
                         trap_ctx.saved_regs[17],
                         [
@@ -59,7 +59,7 @@ pub fn trap_handler() -> ! {
                 let result = syscall(id, args);
                 {
                     let task = fetch_curr_task();
-                    let task_guard = task.lock();
+                    let mut task_guard = task.lock();
                     *task_guard.trap_ctx_mut().a0_mut() = result as usize;
                 }
             }
@@ -94,5 +94,5 @@ pub fn set_kernel_stvec() {
 }
 
 pub fn set_user_stvec() {
-    unsafe { riscv::register::stvec::write(TRAMPOLINE_START_ADDRESS, TrapMode::Direct) };
+    unsafe { riscv::register::stvec::write(TRAMPOLINE_ADDR, TrapMode::Direct) };
 }

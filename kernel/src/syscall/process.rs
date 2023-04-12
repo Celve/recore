@@ -41,7 +41,7 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
         let mut args = Vec::new();
         loop {
             let arg = {
-                let page_table = fetch_curr_task().lock().user_mem().page_table();
+                let page_table = fetch_curr_task().lock().page_table();
                 page_table.translate_any::<usize>((args_ptr as usize).into())
             };
             if *arg == 0 {
@@ -74,7 +74,6 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
     return if let Some(pos) = result {
         let removed_task = task_guard.children_mut().remove(pos);
         *task_guard
-            .user_mem()
             .page_table()
             .translate_any::<isize>(exit_code_ptr.into()) = removed_task.lock().exit_code();
         let pid = removed_task.lock().pid() as isize;
@@ -125,7 +124,7 @@ pub fn sys_sigaction(sig_id: usize, new_action_ptr: usize, old_action_ptr: usize
 
     let task = fetch_curr_task();
     let mut task_guard = task.lock();
-    let page_table = task_guard.user_mem().page_table();
+    let page_table = task_guard.page_table();
     let new_action = page_table.translate_any::<SignalAction>(new_action_ptr.into());
     let old_action = page_table.translate_any::<SignalAction>(old_action_ptr.into());
 

@@ -1,21 +1,30 @@
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
 use core::arch::asm;
 use core::cmp::{max, min};
-use core::mem::{size_of, transmute};
+use core::mem::size_of;
 
 use super::address::{GenOffset, PhyAddr, VirAddr};
-use super::memory::KERNEL_SPACE;
+use super::area::Area;
+use super::memory::MemSet;
 use super::{
     address::{PhyPageNum, VirPageNum},
     frame::Frame,
     memory::MappingPermission,
 };
-use crate::config::{PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH};
+use crate::config::{
+    MEMORY_END, PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH, TRAMPOLINE_ADDR, UART_BASE_ADDRESS,
+    UART_MAP_SIZE, VIRTIO_BASE_ADDRESS, VIRTIO_MAP_SIZE,
+};
 use crate::fs::segment::Segment;
+use crate::mm::memory::KERNEL_MEMSET;
+use crate::task::stack::{KernelStack, UserStack};
+use crate::trap::context::TrapCtxHandle;
 
 bitflags! {
     /// This data structure is used to define the flags of page table entry.
@@ -52,38 +61,194 @@ pub struct PageTable {
     frames: Mutex<Vec<Frame>>,
 }
 
-impl PageTableEntry {
-    pub fn new(ppn: PhyPageNum, flags: PTEFlags) -> Self {
-        Self {
-            bits: ppn.0 << PTE_FLAG_WIDTH | flags.bits as usize,
+impl PageTable {
+    pub fn new_kernel(self: &Arc<Self>) -> MemSet {
+        extern "C" {
+            fn stext();
+            fn etext();
+            fn srodata();
+            fn erodata();
+            fn sdata();
+            fn edata();
+            fn sbss_with_stack();
+            fn ebss();
+            fn ekernel();
         }
+
+        let mut areas = Vec::new();
+
+        // map .text section
+        areas.push(self.new_identical_area(
+            VirAddr::from(stext as usize).floor_to_vir_page_num(),
+            VirAddr::from(etext as usize).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::X,
+        ));
+
+        // map .rodata section
+        areas.push(self.new_identical_area(
+            VirAddr::from(srodata as usize).floor_to_vir_page_num(),
+            VirAddr::from(erodata as usize).ceil_to_vir_page_num(),
+            MappingPermission::R,
+        ));
+
+        // map .data section
+        areas.push(self.new_identical_area(
+            VirAddr::from(sdata as usize).floor_to_vir_page_num(),
+            VirAddr::from(edata as usize).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
+        // map .bss section
+        areas.push(self.new_identical_area(
+            VirAddr::from(sbss_with_stack as usize).floor_to_vir_page_num(),
+            VirAddr::from(ebss as usize).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
+        areas.push(self.new_identical_area(
+            VirAddr::from(ekernel as usize).floor_to_vir_page_num(),
+            VirAddr::from(MEMORY_END).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
+        areas.push(self.new_identical_area(
+            VirAddr::from(UART_BASE_ADDRESS).floor_to_vir_page_num(),
+            VirAddr::from(UART_BASE_ADDRESS + UART_MAP_SIZE).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
+        areas.push(self.new_identical_area(
+            VirAddr::from(VIRTIO_BASE_ADDRESS).floor_to_vir_page_num(),
+            VirAddr::from(VIRTIO_BASE_ADDRESS + VIRTIO_MAP_SIZE).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
+        self.map_trampoline();
+
+        MemSet::new(areas)
     }
 
-    pub fn get_ppn(&self) -> PhyPageNum {
-        let mut bits = self.bits;
-        bits = bits >> PTE_FLAG_WIDTH;
-        bits = bits & ((1 << PPN_WIDTH) - 1);
-        PhyPageNum(bits)
+    pub fn new_user(
+        self: &Arc<Self>,
+        elf_data: &[u8],
+    ) -> (VirAddr, VirAddr, MemSet, TrapCtxHandle, UserStack) {
+        let mut areas = Vec::new();
+
+        let elf_file =
+            xmas_elf::ElfFile::new(elf_data).expect("[memory_set] Fail to parse ELF file.");
+        let elf_header = elf_file.header;
+        let magic = elf_header.pt1.magic;
+        if magic != [0x7f, 0x45, 0x4c, 0x46] {
+            panic!("[memory_set] Invalid ELF file.");
+        }
+
+        let ph_count = elf_header.pt2.ph_count();
+        let mut end_vpn = VirPageNum(0);
+        for i in 0..ph_count {
+            let ph = elf_file
+                .program_header(i)
+                .expect("[memory_set] Fail to get program header.");
+            if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
+                let start_va: VirAddr = (ph.virtual_addr() as usize).into();
+                let end_va: VirAddr = (ph.virtual_addr() as usize + ph.mem_size() as usize).into();
+                let mut map_perm = MappingPermission::U;
+                let ph_flags = ph.flags();
+
+                if ph_flags.is_read() {
+                    map_perm |= MappingPermission::R;
+                }
+                if ph_flags.is_write() {
+                    map_perm |= MappingPermission::W;
+                }
+                if ph_flags.is_execute() {
+                    map_perm |= MappingPermission::X;
+                }
+                println!(
+                    "[mem] Start va is {:#x} and end va is {:#x}",
+                    usize::from(start_va),
+                    usize::from(end_va)
+                );
+                let area = self.new_framed_area(
+                    start_va.floor_to_vir_page_num(),
+                    end_va.ceil_to_vir_page_num(),
+                    map_perm,
+                );
+                end_vpn = end_va.ceil_to_vir_page_num();
+                area.copy_from_raw_bytes(
+                    &elf_file.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
+                );
+                areas.push(area);
+            }
+        }
+
+        self.map_trampoline();
+
+        let trap_ctx_handle = self.new_trap_ctx(1);
+
+        // map user stack
+        let base: VirAddr = (end_vpn + 1).into(); // for guard page
+        let user_stack = self.new_user_stack(base, 1);
+
+        (
+            base,
+            (elf_file.header.pt2.entry_point() as usize).into(),
+            MemSet::new(areas),
+            trap_ctx_handle,
+            user_stack,
+        )
+    }
+}
+
+impl PageTable {
+    pub fn new_identical_area(
+        self: &Arc<Self>,
+        start_vpn: VirPageNum,
+        end_vpn: VirPageNum,
+        map_perm: MappingPermission,
+    ) -> Area {
+        Area::new_identical(start_vpn, end_vpn, map_perm, self)
     }
 
-    pub fn set_ppn(&mut self, ppn: PhyPageNum) {
-        let flags = self.bits & ((1 << PTE_FLAG_WIDTH) - 1);
-        self.bits = ppn.0 << PTE_FLAG_WIDTH | flags;
+    pub fn new_framed_area(
+        self: &Arc<Self>,
+        start_vpn: VirPageNum,
+        end_vpn: VirPageNum,
+        map_perm: MappingPermission,
+    ) -> Area {
+        Area::new_framed(start_vpn, end_vpn, map_perm, self)
     }
 
-    pub fn set_flags(&mut self, flags: PTEFlags) {
-        let ppn = self.get_ppn();
-        self.bits = ppn.0 << PTE_FLAG_WIDTH | flags.bits as usize;
+    pub fn new_linear_area(
+        self: &Arc<Self>,
+        start_vpn: VirPageNum,
+        start_ppn: PhyPageNum,
+        len: usize,
+        map_perm: MappingPermission,
+    ) -> Area {
+        Area::new_linear(start_vpn, start_ppn, len, map_perm, self)
     }
 
-    pub fn get_flags(&self) -> PTEFlags {
-        // truncate
-        PTEFlags::from_bits(self.bits as u8)
-            .expect("[page_table] Try to convert an invalid page table entry.")
+    pub fn new_trap_ctx(self: &Arc<Self>, tid: usize) -> TrapCtxHandle {
+        TrapCtxHandle::new(tid, self)
     }
 
-    pub fn is_valid(&self) -> bool {
-        self.get_flags().contains(PTEFlags::V)
+    pub fn new_user_stack(self: &Arc<Self>, base: VirAddr, tid: usize) -> UserStack {
+        UserStack::new(base, tid, self)
+    }
+
+    pub fn new_kernel_stack(self: &Arc<Self>, pid: usize) -> KernelStack {
+        KernelStack::new(pid, self)
+    }
+
+    pub fn map_trampoline(self: &Self) {
+        extern "C" {
+            fn strampoline();
+        }
+        self.map(
+            VirAddr::from(TRAMPOLINE_ADDR).floor_to_vir_page_num(),
+            PhyAddr::from(strampoline as usize).floor_to_phy_page_num(),
+            PTEFlags::R | PTEFlags::X,
+        )
     }
 }
 
@@ -106,12 +271,36 @@ impl PageTable {
         pte.set_flags(flags | PTEFlags::V);
     }
 
+    pub fn map_area(&self, area: &Area) {
+        println!(
+            "[mem] Map area [{:#x}, {:#x})",
+            usize::from(area.range().start),
+            usize::from(area.range().end),
+        );
+        let flags = area.map_perm().into();
+        area.range()
+            .iter()
+            .zip(area.frames().iter())
+            .for_each(|(vpn, frame)| {
+                self.map(vpn, frame.ppn(), flags);
+            });
+    }
+
     pub fn unmap(&self, vpn: VirPageNum) {
         // TODO: some frames in page table might never be used again, hence deallocation is meaningful
         let pte = self
             .find_pte(vpn)
             .expect("[page_table] Unmap a non-exist page table entry.");
         pte.set_flags(PTEFlags::empty());
+    }
+
+    pub fn unmap_area(&self, area: &Area) {
+        println!(
+            "[mem] Unmap area [{:#x}, {:#x})",
+            usize::from(area.range().start),
+            usize::from(area.range().end),
+        );
+        area.range().iter().for_each(|vpn| self.unmap(vpn));
     }
 
     /// Convert the root physical page number of page table to a form that can be used by `satp` register.
@@ -270,9 +459,49 @@ impl From<MappingPermission> for PTEFlags {
 }
 
 pub fn activate_page_table() {
-    let satp = KERNEL_SPACE.lock().page_table().to_satp();
+    assert_ne!(KERNEL_MEMSET.len(), 0);
+    let satp = KERNEL_PAGE_TABLE.to_satp();
     riscv::register::satp::write(satp);
     unsafe {
         asm!("sfence.vma");
     }
+}
+
+impl PageTableEntry {
+    pub fn new(ppn: PhyPageNum, flags: PTEFlags) -> Self {
+        Self {
+            bits: ppn.0 << PTE_FLAG_WIDTH | flags.bits as usize,
+        }
+    }
+
+    pub fn get_ppn(&self) -> PhyPageNum {
+        let mut bits = self.bits;
+        bits = bits >> PTE_FLAG_WIDTH;
+        bits = bits & ((1 << PPN_WIDTH) - 1);
+        PhyPageNum(bits)
+    }
+
+    pub fn set_ppn(&mut self, ppn: PhyPageNum) {
+        let flags = self.bits & ((1 << PTE_FLAG_WIDTH) - 1);
+        self.bits = ppn.0 << PTE_FLAG_WIDTH | flags;
+    }
+
+    pub fn set_flags(&mut self, flags: PTEFlags) {
+        let ppn = self.get_ppn();
+        self.bits = ppn.0 << PTE_FLAG_WIDTH | flags.bits as usize;
+    }
+
+    pub fn get_flags(&self) -> PTEFlags {
+        // truncate
+        PTEFlags::from_bits(self.bits as u8)
+            .expect("[page_table] Try to convert an invalid page table entry.")
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.get_flags().contains(PTEFlags::V)
+    }
+}
+
+lazy_static! {
+    pub static ref KERNEL_PAGE_TABLE: Arc<PageTable> = Arc::new(PageTable::new());
 }

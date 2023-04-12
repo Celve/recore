@@ -6,7 +6,7 @@ use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
 
 use crate::{
     config::VIRTIO_BASE_ADDRESS,
-    mm::{frame::Frame, memory::KERNEL_SPACE},
+    mm::{frame::Frame, page_table::KERNEL_PAGE_TABLE},
 };
 
 pub struct BlkDev {
@@ -59,11 +59,6 @@ impl Hal for VirIoHal {
     }
 
     fn virt_to_phys(vaddr: virtio_drivers::VirtAddr) -> virtio_drivers::PhysAddr {
-        KERNEL_SPACE
-            .lock()
-            .page_table()
-            .translate_va(vaddr.into())
-            .unwrap()
-            .into()
+        KERNEL_PAGE_TABLE.translate_va(vaddr.into()).unwrap().into()
     }
 }

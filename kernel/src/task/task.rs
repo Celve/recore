@@ -11,18 +11,24 @@ use riscv::register::sstatus::{self, SPP};
 use spin::mutex::{Mutex, MutexGuard};
 
 use crate::{
-    config::{NUM_SIGNAL, TRAP_CONTEXT_START_ADDRESS},
+    config::NUM_SIGNAL,
     fs::disk::BlkDev,
     mm::{
         address::{PhyAddr, VirAddr},
-        memory::{Memory, KERNEL_SPACE},
+        memory::MemSet,
+        page_table::{PageTable, KERNEL_PAGE_TABLE},
     },
-    trap::{context::TrapContext, trampoline::restore, trap_handler},
+    trap::{
+        context::{TrapCtx, TrapCtxHandle},
+        trampoline::restore,
+        trap_handler,
+    },
 };
 
 use super::{
     fd_table::FdTable,
     pid::{alloc_pid, Pid},
+    stack::UserStack,
 };
 use crate::task::stack::KernelStack;
 
@@ -32,11 +38,13 @@ pub struct Task {
 
 pub struct TaskInner {
     pid: Pid,
-    user_mem: Arc<Memory>,
+    user_mem: MemSet,
+    page_table: Arc<PageTable>,
     task_status: TaskStatus,
     task_ctx: TaskContext,
-    trap_ctx: PhyAddr, // raw pointer can't be shared between threads, therefore use phyaddr instead
-    trap_ctx_backup: Option<TrapContext>,
+    trap_ctx_handle: TrapCtxHandle,
+    trap_ctx_backup: Option<TrapCtx>,
+    user_stack: UserStack,
     kernel_stack: KernelStack,
     parent: Option<Weak<Task>>,
     children: Vec<Arc<Task>>,
@@ -47,6 +55,7 @@ pub struct TaskInner {
     sig_mask: SignalFlags,
     sig_actions: [SignalAction; NUM_SIGNAL],
     sig_handling: Option<usize>,
+    base: VirAddr,
 }
 
 #[repr(C)]
@@ -71,44 +80,37 @@ impl Task {
         let mut elf_data = vec![0u8; file_size];
         assert_eq!(file.lock().read_at(&mut elf_data, 0), file_size);
 
+        let page_table = Arc::new(PageTable::new());
+        let (base, user_sepc, user_mem, mut trap_ctx_handle, user_stack) =
+            page_table.new_user(&elf_data);
+
+        println!("[trap] User's sepc is {:#x}", usize::from(user_sepc));
+
         let pid = alloc_pid();
-        let (user_mem, user_sp, user_sepc) = Memory::from_elf(&elf_data);
-        let page_table = user_mem.page_table();
+        let kernel_stack = KERNEL_PAGE_TABLE.new_kernel_stack(pid.0);
 
-        let trap_ctx = page_table
-            .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
-            .expect("[task] Unable to access trap context.")
-            .get_ppn();
-        println!(
-            "[trap] Map {:#x} -> {:#x}",
-            usize::from(VirAddr::from(TRAP_CONTEXT_START_ADDRESS)),
-            usize::from(trap_ctx)
-        );
-        println!("[trap] User's sepc is {:#x}", user_sepc);
-
-        let kernel_stack = KernelStack::new(pid.0);
-
-        let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
+        let trap_ctx = trap_ctx_handle.trap_ctx_mut();
         let mut sstatus = sstatus::read();
         sstatus.set_spp(SPP::User);
-        unsafe {
-            *raw_trap_ctx = TrapContext::new(
-                user_sp,
-                user_sepc,
-                sstatus.bits(),
-                kernel_stack.top().into(),
-                trap_handler as usize,
-                KERNEL_SPACE.lock().page_table().to_satp(),
-            );
-        }
+        *trap_ctx = TrapCtx::new(
+            user_stack.top().into(),
+            user_sepc.into(),
+            sstatus.bits(),
+            kernel_stack.top().into(),
+            trap_handler as usize,
+            KERNEL_PAGE_TABLE.to_satp(),
+        );
+
         Self {
             inner: Mutex::new(TaskInner {
                 pid,
-                user_mem: Arc::new(user_mem),
+                user_mem,
+                page_table,
                 task_status: TaskStatus::Ready,
                 task_ctx: TaskContext::new(restore as usize, kernel_stack.top().into()),
-                trap_ctx: trap_ctx.into(),
+                trap_ctx_handle,
                 trap_ctx_backup: None,
+                user_stack,
                 kernel_stack,
                 parent,
                 children: Vec::new(),
@@ -119,6 +121,7 @@ impl Task {
                 sig_mask: SignalFlags::from_bits(0).unwrap(),
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 sig_handling: None,
+                base,
             }),
         }
     }
@@ -147,8 +150,10 @@ impl Task {
         assert_eq!(file.lock().read_at(&mut elf_data, 0), file_size);
 
         let mut task = self.lock();
-        let (user_mem, mut user_sp, user_sepc) = Memory::from_elf(&elf_data);
-        let page_table = user_mem.page_table();
+        let page_table = Arc::new(PageTable::new());
+        let (base, user_sepc, user_mem, mut trap_ctx_handle, user_stack) =
+            page_table.new_user(&elf_data);
+        let mut user_sp: usize = user_stack.top().into();
 
         // push args
         let mut acc = 0;
@@ -184,27 +189,24 @@ impl Task {
                 .for_each(|(i, byte)| **byte = src_bytes[i]);
         }
 
-        let trap_ctx = page_table
-            .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
-            .expect("[task] Unable to access trap context.")
-            .get_ppn();
-        let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
+        let trap_ctx = trap_ctx_handle.trap_ctx_mut();
         let mut sstatus = sstatus::read();
         sstatus.set_spp(SPP::User);
-        unsafe {
-            *raw_trap_ctx = TrapContext::new(
-                user_sp,
-                user_sepc,
-                sstatus.bits(),
-                task.kernel_stack.top().into(),
-                trap_handler as usize,
-                KERNEL_SPACE.lock().page_table().to_satp(),
-            );
-        }
+        *trap_ctx = TrapCtx::new(
+            user_sp,
+            user_sepc.into(),
+            sstatus.bits(),
+            task.kernel_stack.top().into(),
+            trap_handler as usize,
+            KERNEL_PAGE_TABLE.to_satp(),
+        );
 
         // replace some
-        task.user_mem = Arc::new(user_mem);
-        task.trap_ctx = trap_ctx.into();
+        task.page_table = page_table;
+        task.base = base;
+        task.user_mem = user_mem;
+        task.user_stack = user_stack;
+        task.trap_ctx_handle = trap_ctx_handle;
         *task.trap_ctx_mut().a0_mut() = args.len();
         *task.trap_ctx_mut().a1_mut() = argv;
         task.task_ctx = TaskContext::new(restore as usize, task.kernel_stack.top().into());
@@ -240,32 +242,34 @@ impl Task {
 impl Clone for Task {
     fn clone(&self) -> Self {
         let task = self.lock();
+
+        let page_table = Arc::new(PageTable::new());
+        let user_mem = task.user_mem.renew(&page_table);
+        let mut trap_ctx_handle = task.trap_ctx_handle.renew(&page_table);
+        let user_stack = task.user_stack.renew(&page_table);
+        page_table.map_trampoline();
+
         let pid = alloc_pid();
-        let user_mem = task.user_mem().clone();
-        let page_table = user_mem.page_table();
-        let trap_ctx = page_table
-            .translate_vpn(VirAddr::from(TRAP_CONTEXT_START_ADDRESS).floor_to_vir_page_num())
-            .expect("[task] Unable to access trap context.")
-            .get_ppn();
-        let kernel_stack = KernelStack::new(pid.0);
+        let kernel_stack = KERNEL_PAGE_TABLE.new_kernel_stack(pid.0);
+
         let cwd = task.cwd.clone();
         let fd_table = task.fd_table().clone();
 
         // we have to modify the kernel sp both in trap ctx and task ctx
-        let raw_trap_ctx = trap_ctx.as_raw_bytes() as *mut [u8] as *mut TrapContext;
-        unsafe {
-            (*raw_trap_ctx).kernel_sp = kernel_stack.top().into();
-        }
+        let trap_ctx = trap_ctx_handle.trap_ctx_mut();
+        trap_ctx.kernel_sp = kernel_stack.top().into();
 
         Self {
             inner: Mutex::new(TaskInner {
                 pid,
-                user_mem: Arc::new(user_mem),
+                user_mem,
+                page_table,
                 task_status: TaskStatus::Ready,
                 task_ctx: TaskContext::new(restore as usize, kernel_stack.top().into()),
-                trap_ctx: trap_ctx.into(),
+                trap_ctx_handle,
                 trap_ctx_backup: None,
                 kernel_stack,
+                user_stack,
                 parent: task.parent.clone(),
                 children: Vec::new(),
                 exit_code: 0,
@@ -275,6 +279,7 @@ impl Clone for Task {
                 sig_mask: SignalFlags::from_bits(0).unwrap(),
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 sig_handling: None,
+                base: task.base,
             }),
         }
     }
@@ -293,20 +298,20 @@ impl TaskInner {
         &self.task_ctx
     }
 
-    pub fn trap_ctx_ptr(&self) -> *mut TrapContext {
-        self.trap_ctx.as_mut().unwrap()
+    pub fn trap_ctx(&self) -> &TrapCtx {
+        self.trap_ctx_handle.trap_ctx()
     }
 
-    pub fn trap_ctx_ref(&self) -> *const TrapContext {
-        self.trap_ctx.as_ref().unwrap()
+    pub fn trap_ctx_handle(&self) -> &TrapCtxHandle {
+        &self.trap_ctx_handle
     }
 
-    pub fn trap_ctx(&self) -> &TrapContext {
-        self.trap_ctx.as_ref().unwrap()
+    pub fn trap_ctx_handle_mut(&mut self) -> &mut TrapCtxHandle {
+        &mut self.trap_ctx_handle
     }
 
-    pub fn trap_ctx_mut(&self) -> &mut TrapContext {
-        self.trap_ctx.as_mut().unwrap()
+    pub fn trap_ctx_mut(&mut self) -> &mut TrapCtx {
+        self.trap_ctx_handle.trap_ctx_mut()
     }
 
     pub fn task_status_mut(&mut self) -> &mut TaskStatus {
@@ -321,8 +326,12 @@ impl TaskInner {
         &mut self.exit_code
     }
 
-    pub fn user_mem(&self) -> &Memory {
+    pub fn user_mem(&self) -> &MemSet {
         &self.user_mem
+    }
+
+    pub fn page_table(&self) -> Arc<PageTable> {
+        self.page_table.clone()
     }
 
     pub fn pid(&self) -> usize {
@@ -397,11 +406,11 @@ impl TaskInner {
         &mut self.sig_handling
     }
 
-    pub fn trap_ctx_backup(&self) -> &Option<TrapContext> {
+    pub fn trap_ctx_backup(&self) -> &Option<TrapCtx> {
         &self.trap_ctx_backup
     }
 
-    pub fn trap_ctx_backup_mut(&mut self) -> &mut Option<TrapContext> {
+    pub fn trap_ctx_backup_mut(&mut self) -> &mut Option<TrapCtx> {
         &mut self.trap_ctx_backup
     }
 }

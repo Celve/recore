@@ -10,7 +10,7 @@ pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
     let (mut fileable, mut seg) = {
         let task = fetch_curr_task();
         let task_guard = task.lock();
-        let page_table = task_guard.user_mem().page_table();
+        let page_table = task_guard.page_table();
         let fd_table = task_guard.fd_table();
         let fileable = fd_table.get(fd).unwrap();
         (
@@ -26,7 +26,7 @@ pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
     let (mut fileable, seg) = {
         let task = fetch_curr_task();
         let task_guard = task.lock();
-        let page_table = task_guard.user_mem().page_table();
+        let page_table = task_guard.page_table();
         let fd_table = task_guard.fd_table();
         let fileable = fd_table.get(fd).unwrap();
         (
@@ -110,7 +110,6 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
     let task = fetch_curr_task();
     let task_guard = task.lock();
     let mut dst_bytes = task_guard
-        .user_mem()
         .page_table()
         .translate_bytes(des_ptr.into(), des_len * size_of::<DirEntry>());
 
@@ -139,7 +138,6 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
     let task = fetch_curr_task();
     let task_guard = task.lock();
     let mut dst_bytes = task_guard
-        .user_mem()
         .page_table()
         .translate_bytes(stat_ptr.into(), size_of::<FileStat>());
 

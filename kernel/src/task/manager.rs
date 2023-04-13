@@ -1,47 +1,39 @@
+use core::num::NonZeroUsize;
+
 use super::task::Task;
 
-use crate::fs::FUSE;
-
-use alloc::{collections::VecDeque, sync::Arc};
-use fosix::fs::OpenFlags;
+use alloc::sync::Arc;
 use lazy_static::lazy_static;
+use lru::LruCache;
 use spin::mutex::Mutex;
 
-pub struct Manager {
+pub struct TaskManager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    tasks: VecDeque<Arc<Task>>,
+    tasks: Mutex<LruCache<(usize, usize), Arc<Task>>>,
 }
 
-impl Manager {
-    pub fn new(task: Arc<Task>) -> Self {
-        let mut tasks: VecDeque<Arc<Task>> = VecDeque::new();
-        tasks.push_back(task);
-        Self { tasks }
+impl TaskManager {
+    pub fn new() -> Self {
+        Self {
+            tasks: Mutex::new(LruCache::new(NonZeroUsize::new(1024).unwrap())),
+        }
     }
 
-    pub fn push(&mut self, task: Arc<Task>) {
-        self.tasks.push_back(task);
+    pub fn push(&self, task: Arc<Task>) {
+        let pid = task.proc().pid();
+        let tid = task.lock().tid();
+        self.tasks.lock().push((pid, tid), task);
     }
 
-    pub fn pop(&mut self) -> Option<Arc<Task>> {
-        self.tasks.pop_front()
+    pub fn pop(&self) -> Option<Arc<Task>> {
+        self.tasks.lock().pop_lru().map(|(_, task)| task)
     }
 
-    pub fn iter(&self) -> alloc::collections::vec_deque::Iter<Arc<Task>> {
-        self.tasks.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> alloc::collections::vec_deque::IterMut<Arc<Task>> {
-        self.tasks.iter_mut()
+    pub fn remove(&self, pid: usize, tid: usize) {
+        self.tasks.lock().pop(&(pid, tid));
     }
 }
 
 lazy_static! {
-    pub static ref INITPROC: Arc<Task> = Arc::new(Task::from_elf(
-        FUSE.root().lock().open("initproc", OpenFlags::RDONLY).unwrap(),
-        None
-    ));
-
-    /// Manager only loads the initproc at the beginning.
-    pub static ref MANAGER: Mutex<Manager> = Mutex::new(Manager::new(INITPROC.clone()));
+    pub static ref TASK_MANAGER: TaskManager = TaskManager::new();
 }

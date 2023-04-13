@@ -54,6 +54,14 @@ impl TrapCtx {
     pub fn a1_mut(&mut self) -> &mut usize {
         &mut self.saved_regs[11]
     }
+
+    pub fn user_sp(&self) -> usize {
+        self.saved_regs[2]
+    }
+
+    pub fn user_sp_mut(&mut self) -> &mut usize {
+        &mut self.saved_regs[2]
+    }
 }
 
 impl TrapCtxHandle {
@@ -84,7 +92,7 @@ impl TrapCtxHandle {
         unsafe { &*(usize::from(self.area.frames().first().unwrap().ppn()) as *const TrapCtx) }
     }
 
-    pub fn trap_ctx_mut(&mut self) -> &mut TrapCtx {
+    pub fn trap_ctx_mut(&self) -> &mut TrapCtx {
         unsafe { &mut *(usize::from(self.area.frames().first().unwrap().ppn()) as *mut TrapCtx) }
     }
 }

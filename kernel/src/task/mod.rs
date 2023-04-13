@@ -1,14 +1,13 @@
-use crate::task::{processor::fetch_idle_task_ctx_ptr, task::TaskContext};
+use crate::task::{
+    context::TaskContext,
+    processor::{fetch_curr_task, fetch_idle_task_ctx_ptr},
+};
 
-use self::{processor::fetch_curr_task, task::TaskStatus};
+use self::processor::fetch_curr_proc;
 
-pub mod fd_table;
-pub mod loader;
+pub mod context;
 pub mod manager;
-pub mod pid;
 pub mod processor;
-pub mod stack;
-mod switch;
 pub mod task;
 
 pub fn suspend_yield() {
@@ -16,17 +15,17 @@ pub fn suspend_yield() {
 }
 
 pub fn stop_yield() {
-    fetch_curr_task().stop();
+    fetch_curr_proc().stop();
     schedule();
 }
 
 pub fn exit_yield(exit_code: isize) {
-    fetch_curr_task().exit(exit_code);
+    fetch_curr_proc().exit(exit_code);
     schedule();
 }
 
 pub fn cont() {
-    fetch_curr_task().cont();
+    fetch_curr_proc().cont();
 }
 
 pub fn schedule() {

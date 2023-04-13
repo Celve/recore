@@ -23,7 +23,7 @@ use crate::config::{
 };
 use crate::fs::segment::Segment;
 use crate::mm::memory::KERNEL_MEMSET;
-use crate::task::stack::{KernelStack, UserStack};
+use crate::proc::stack::{KernelStack, UserStack};
 use crate::trap::context::TrapCtxHandle;
 
 bitflags! {
@@ -128,10 +128,7 @@ impl PageTable {
         MemSet::new(areas)
     }
 
-    pub fn new_user(
-        self: &Arc<Self>,
-        elf_data: &[u8],
-    ) -> (VirAddr, VirAddr, MemSet, TrapCtxHandle, UserStack) {
+    pub fn new_user(self: &Arc<Self>, elf_data: &[u8]) -> (VirAddr, VirAddr, MemSet) {
         let mut areas = Vec::new();
 
         let elf_file =
@@ -183,18 +180,16 @@ impl PageTable {
 
         self.map_trampoline();
 
-        let trap_ctx_handle = self.new_trap_ctx(1);
+        // let trap_ctx_handle = self.new_trap_ctx(1);
 
         // map user stack
         let base: VirAddr = (end_vpn + 1).into(); // for guard page
-        let user_stack = self.new_user_stack(base, 1);
+                                                  // let user_stack = self.new_user_stack(base, 1);
 
         (
             base,
             (elf_file.header.pt2.entry_point() as usize).into(),
             MemSet::new(areas),
-            trap_ctx_handle,
-            user_stack,
         )
     }
 }
@@ -234,10 +229,6 @@ impl PageTable {
 
     pub fn new_user_stack(self: &Arc<Self>, base: VirAddr, tid: usize) -> UserStack {
         UserStack::new(base, tid, self)
-    }
-
-    pub fn new_kernel_stack(self: &Arc<Self>, pid: usize) -> KernelStack {
-        KernelStack::new(pid, self)
     }
 
     pub fn map_trampoline(self: &Self) {

@@ -1,11 +1,11 @@
 use core::mem::size_of;
 
-use crate::{fs::fileable::Fileable, ipc::pipe::Pipe, task::processor::fetch_curr_task};
+use crate::{fs::fileable::Fileable, ipc::pipe::Pipe, task::processor::fetch_curr_proc};
 
 pub fn sys_pipe(pipe_ptr: usize) -> isize {
-    let task = fetch_curr_task();
-    let mut task_guard = task.lock();
-    let fd_table = task_guard.fd_table_mut();
+    let proc = fetch_curr_proc();
+    let mut proc_guard = proc.lock();
+    let fd_table = proc_guard.fd_table_mut();
 
     let (pipe_read, pipe_write) = Pipe::new();
     let fd_read = fd_table.alloc(Fileable::Pipe(pipe_read));
@@ -15,7 +15,7 @@ pub fn sys_pipe(pipe_ptr: usize) -> isize {
         core::slice::from_raw_parts(&src_fds as *const _ as *const u8, size_of::<[usize; 2]>())
     };
 
-    let mut dst_bytes = task_guard
+    let mut dst_bytes = proc_guard
         .page_table()
         .translate_bytes(pipe_ptr.into(), size_of::<[usize; 2]>());
     dst_bytes

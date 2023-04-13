@@ -14,6 +14,7 @@ mod fs;
 mod heap;
 mod ipc;
 mod mm;
+mod proc;
 mod syscall;
 mod task;
 mod time;

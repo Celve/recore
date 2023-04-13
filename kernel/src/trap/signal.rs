@@ -1,9 +1,12 @@
-use fosix::signal::{SignalFlags, SIGKILL};
+use fosix::signal::SignalFlags;
 
 use crate::{
     config::NUM_SIGNAL,
     task::{
-        cont, exit_yield, processor::fetch_curr_task, stop_yield, suspend_yield, task::TaskStatus,
+        cont, exit_yield,
+        processor::{fetch_curr_proc, fetch_curr_task},
+        stop_yield, suspend_yield,
+        task::TaskStatus,
     },
 };
 
@@ -13,11 +16,13 @@ pub fn signal_handler() {
             let sigs = {
                 let task = fetch_curr_task();
                 let task_guard = task.lock();
-                let sig = task_guard.sig();
+                let proc = fetch_curr_proc();
+                let proc_guard = proc.lock();
+                let sig = task_guard.sigs();
                 let sig_mask = task_guard.sig_mask();
 
                 if let Some(sig_handling) = task_guard.sig_handling() {
-                    sig & !sig_mask & !task_guard.sig_actions()[sig_handling].mask()
+                    sig & !sig_mask & !proc_guard.sig_actions()[sig_handling].mask()
                 } else {
                     sig & !sig_mask
                 }
@@ -27,7 +32,7 @@ pub fn signal_handler() {
                 let sig = SignalFlags::from_bits(1 << i).unwrap();
                 if sigs.contains(sig) {
                     println!("[kernel] Receive signal {}", i);
-                    *fetch_curr_task().lock().sig_mut() ^= sig;
+                    *fetch_curr_task().lock().sigs_mut() ^= sig;
                     if sig == SignalFlags::SIGKILL
                         || sig == SignalFlags::SIGSTOP
                         || sig == SignalFlags::SIGCONT
@@ -66,9 +71,9 @@ fn kernel_signal_handler(sigid: usize) {
 
 fn user_signal_handler(sigid: usize) {
     let handler = {
-        let task = fetch_curr_task();
-        let task_guard = task.lock();
-        task_guard.sig_actions()[sigid].handler()
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.sig_actions()[sigid].handler()
     };
 
     if handler != 0 {

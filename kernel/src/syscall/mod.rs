@@ -1,6 +1,6 @@
 mod com;
 mod file;
-mod process;
+mod proc;
 
 use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
@@ -8,10 +8,10 @@ use fs::{dir::Dir, file::File};
 
 use crate::{
     fs::{disk::BlkDev, FUSE},
-    task::processor::fetch_curr_task,
+    task::processor::fetch_curr_proc,
 };
 
-use self::{com::sys_pipe, file::*, process::*};
+use self::{com::sys_pipe, file::*, proc::*};
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
@@ -94,7 +94,7 @@ fn create_dir(cwd: Dir<BlkDev>, path: &str) -> Option<Dir<BlkDev>> {
 }
 
 fn parse_str(path: usize) -> String {
-    fetch_curr_task()
+    fetch_curr_proc()
         .lock()
         .page_table()
         .translate_str(path.into())

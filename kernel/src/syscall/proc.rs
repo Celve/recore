@@ -4,14 +4,20 @@ use fosix::{
     signal::{SignalAction, SignalFlags, SIGCONT, SIGKILL, SIGSTOP},
 };
 
-use crate::task::{
-    exit_yield, loader::get_app_data, manager::MANAGER, processor::fetch_curr_task, suspend_yield,
-    task::TaskStatus,
+use crate::{
+    proc::{manager::PROC_MANAGER, proc::ProcStatus},
+    task::{
+        exit_yield,
+        manager::TASK_MANAGER,
+        processor::{fetch_curr_proc, fetch_curr_task},
+        suspend_yield,
+    },
 };
 
 use super::{open_file, parse_str};
 
 pub fn sys_exit(exit_code: isize) -> isize {
+    *fetch_curr_proc().lock().proc_status_mut() = ProcStatus::Zombie;
     exit_yield(exit_code);
     0
 }
@@ -22,17 +28,20 @@ pub fn sys_yield() -> isize {
 }
 
 pub fn sys_fork() -> isize {
-    let task = fetch_curr_task().fork();
-    let pid = task.lock().pid();
+    let proc = fetch_curr_proc().fork();
+    let pid = proc.pid();
+    let task = proc.lock().main_task();
     *task.lock().trap_ctx_mut().a0_mut() = 0;
-    MANAGER.lock().push(task);
+    PROC_MANAGER.push(proc);
+    TASK_MANAGER.push(task);
     println!("[kernel] Fork a new process with pid {}.", pid);
     pid as isize
 }
 
 pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
+    println!("[kernel] Try exec a new program.");
     let name = parse_str(path);
-    let cwd = fetch_curr_task().lock().cwd();
+    let cwd = fetch_curr_proc().lock().cwd();
     let file = open_file(cwd, &name, OpenFlags::RDONLY);
     if let Some(file) = file {
         println!("[kernel] Exec a new program.");
@@ -41,7 +50,7 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
         let mut args = Vec::new();
         loop {
             let arg = {
-                let page_table = fetch_curr_task().lock().page_table();
+                let page_table = fetch_curr_proc().lock().page_table();
                 page_table.translate_any::<usize>((args_ptr as usize).into())
             };
             if *arg == 0 {
@@ -53,7 +62,7 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
             args_ptr = unsafe { args_ptr.add(1) };
         }
 
-        fetch_curr_task().exec(file, &args);
+        fetch_curr_proc().exec(file, &args);
         args.len() as isize // otherwise it would be overrided
     } else {
         println!("[kernel] Fail to exec {}.", name);
@@ -62,26 +71,25 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
 }
 
 pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
-    let task = fetch_curr_task();
-    let mut task_guard = task.lock();
+    let proc = fetch_curr_proc();
+    let mut proc_guard = proc.lock();
 
     // find satisfied children
-    let result = task_guard.children().iter().position(|task| {
-        let task = task.lock();
-        (pid == -1 || pid as usize == task.pid()) && task.task_status() == TaskStatus::Zombie
+    let result = proc_guard.children().iter().position(|proc| {
+        (pid == -1 || pid as usize == proc.pid()) && proc.lock().proc_status() == ProcStatus::Zombie
     });
 
     return if let Some(pos) = result {
-        let removed_task = task_guard.children_mut().remove(pos);
-        *task_guard
+        let removed_task = proc_guard.children_mut().remove(pos);
+        *proc_guard
             .page_table()
             .translate_any::<isize>(exit_code_ptr.into()) = removed_task.lock().exit_code();
-        let pid = removed_task.lock().pid() as isize;
+        let pid = removed_task.pid() as isize;
         pid
-    } else if task_guard
+    } else if proc_guard
         .children()
         .iter()
-        .any(|task| pid == -1 || task.lock().pid() == pid as usize)
+        .any(|task| pid == -1 || task.pid() == pid as usize)
     {
         -2
     } else {
@@ -99,11 +107,11 @@ pub fn sys_sigreturn() -> isize {
 }
 
 pub fn sys_kill(pid: usize, sig: usize) -> isize {
-    let manager = MANAGER.lock();
-    let target = manager.iter().find(|task| {
-        let task_guard = task.lock();
-        task_guard.pid() == pid as usize && task_guard.pid() != 1
-    });
+    // let target = PROC_MANAGER.find(|task| {
+    // let task_guard = task.lock();
+    // task_guard.pid().id() == pid as usize && task_guard.pid().id() != 1
+    // });
+    let target = PROC_MANAGER.get(pid);
     if let Some(task) = target {
         task.kill(SignalFlags::from_bits(1 << sig).unwrap());
         0
@@ -122,14 +130,14 @@ pub fn sys_sigaction(sig_id: usize, new_action_ptr: usize, old_action_ptr: usize
         return -1;
     }
 
-    let task = fetch_curr_task();
-    let mut task_guard = task.lock();
-    let page_table = task_guard.page_table();
+    let proc = fetch_curr_proc();
+    let mut proc_guard = proc.lock();
+    let page_table = proc_guard.page_table();
     let new_action = page_table.translate_any::<SignalAction>(new_action_ptr.into());
     let old_action = page_table.translate_any::<SignalAction>(old_action_ptr.into());
 
-    *old_action = task_guard.sig_actions()[sig_id];
-    task_guard.sig_actions_mut()[sig_id] = *new_action;
+    *old_action = proc_guard.sig_actions()[sig_id];
+    proc_guard.sig_actions_mut()[sig_id] = *new_action;
     0
 }
 

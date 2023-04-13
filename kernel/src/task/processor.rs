@@ -3,12 +3,15 @@ use fosix::signal::SignalFlags;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
-use crate::task::{manager::INITPROC, task::TaskStatus};
-
-use super::{
-    manager::MANAGER,
-    task::{Task, TaskContext},
+use crate::{
+    proc::{
+        manager::{INITPROC, PROC_MANAGER},
+        proc::{Proc, ProcStatus},
+    },
+    task::task::TaskStatus,
 };
+
+use super::{context::TaskContext, manager::TASK_MANAGER, task::Task};
 
 pub struct Processor {
     /// The current task that the processor is exeucting.
@@ -30,16 +33,16 @@ impl Processor {
         &mut self.idle_task_ctx
     }
 
-    pub fn clone_curr_task(&self) -> Option<Arc<Task>> {
+    pub fn curr_task(&self) -> Option<Arc<Task>> {
         self.curr_task.clone()
     }
 
-    pub fn take_curr_task(&mut self) -> Option<Arc<Task>> {
+    pub fn curr_task_take(&mut self) -> Option<Arc<Task>> {
         self.curr_task.take()
     }
 
-    pub fn insert_curr_task(&mut self, task: Arc<Task>) {
-        self.curr_task = Some(task);
+    pub fn curr_task_mut(&mut self) -> &mut Option<Arc<Task>> {
+        &mut self.curr_task
     }
 }
 
@@ -47,12 +50,17 @@ lazy_static! {
     static ref PROCESSOR: Mutex<Processor> = Mutex::new(Processor::new());
 }
 
-/// Fetch the current task with processor locked.
+/// Fetch the current task.
 pub fn fetch_curr_task() -> Arc<Task> {
     PROCESSOR
         .lock()
-        .clone_curr_task()
+        .curr_task()
         .expect("[kernel] There is no running task currently.")
+}
+
+/// Fetch the current process.
+pub fn fetch_curr_proc() -> Arc<Proc> {
+    fetch_curr_task().proc()
 }
 
 /// Fetch the idle task context pointer with processor locked.
@@ -64,7 +72,7 @@ pub fn fetch_idle_task_ctx_ptr() -> *mut TaskContext {
 ///
 /// When the next task yields, it will get into this function again.
 pub fn switch() {
-    let task = MANAGER.lock().pop();
+    let task = TASK_MANAGER.pop();
     if let Some(task) = task {
         if task.lock().task_status() == TaskStatus::Ready {
             *task.lock().task_status_mut() = TaskStatus::Running;
@@ -72,7 +80,7 @@ pub fn switch() {
 
         let task_ctx = task.lock().task_ctx_ptr();
         let idle_task_ctx = PROCESSOR.lock().idle_task_ctx_ptr();
-        PROCESSOR.lock().insert_curr_task(task);
+        *PROCESSOR.lock().curr_task_mut() = Some(task);
 
         extern "C" {
             fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
@@ -82,18 +90,28 @@ pub fn switch() {
         }
 
         // clear current task
-        let curr_task = PROCESSOR.lock().take_curr_task().unwrap();
-        if curr_task.lock().task_status() != TaskStatus::Zombie {
-            MANAGER.lock().push(curr_task);
-        } else {
-            for task in curr_task.lock().children().iter() {
-                *task.lock().parent_mut() = Some(Arc::downgrade(&INITPROC));
-                INITPROC.lock().children_mut().push(task.clone());
-            }
+        let task = PROCESSOR.lock().curr_task_take().unwrap();
+        let proc = task.proc();
 
-            let parent = curr_task.lock().parent().unwrap();
+        if proc.lock().proc_status() == ProcStatus::Zombie {
+            let proc_guard = proc.lock();
+            let pid = proc.pid();
+            let tasks = proc_guard.tasks();
+            tasks.iter().for_each(|task| {
+                let tid = task.lock().tid();
+                TASK_MANAGER.remove(pid, tid);
+            });
+            PROC_MANAGER.remove(pid);
+
+            for child in proc_guard.children().iter() {
+                *child.lock().parent_mut() = Some(Arc::downgrade(&INITPROC));
+                INITPROC.lock().children_mut().push(child.clone());
+            }
+            let parent = proc_guard.parent().unwrap();
             parent.kill(SignalFlags::SIGCHLD);
-            println!("[kernel] Process {} has ended.", curr_task.lock().pid());
+            println!("[kernel] Process {} has ended.", proc.pid());
+        } else if task.lock().task_status() != TaskStatus::Zombie {
+            TASK_MANAGER.push(task);
         }
     } else {
         panic!("[kernel] Shutdown.");
@@ -101,6 +119,8 @@ pub fn switch() {
 }
 
 pub fn run_tasks() {
+    let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
+    TASK_MANAGER.push(task);
     loop {
         switch();
     }

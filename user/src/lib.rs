@@ -15,7 +15,7 @@ use fosix::{
     signal::{SignalAction, SignalFlags},
     syscall::WaitFlags,
 };
-use syscall::{file::*, proc::*};
+use syscall::{file::*, proc::*, task::*};
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
@@ -55,7 +55,7 @@ fn main(argc: usize, argv: &[&str]) -> i32 {
     panic!("[user] main() is not implemented.")
 }
 
-fn exit(exit_code: i32) -> ! {
+pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code);
 }
 
@@ -146,5 +146,22 @@ pub fn sigprocmask(mask: SignalFlags) -> Option<SignalFlags> {
         None
     } else {
         SignalFlags::from_bits(res as u32)
+    }
+}
+
+pub fn thread_create(entry: usize, arg: usize) -> isize {
+    sys_thread_create(entry, arg)
+}
+
+pub fn gettid() -> isize {
+    sys_gettid()
+}
+
+pub fn waittid(tid: isize, exit_code_ptr: usize) -> isize {
+    loop {
+        match sys_waittid(tid, exit_code_ptr) {
+            -2 => yield_now(),
+            tid => return tid,
+        }
     }
 }

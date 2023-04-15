@@ -1,6 +1,7 @@
 mod com;
 mod file;
 mod proc;
+mod task;
 
 use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
@@ -11,7 +12,12 @@ use crate::{
     task::processor::fetch_curr_proc,
 };
 
-use self::{com::sys_pipe, file::*, proc::*};
+use self::{
+    com::sys_pipe,
+    file::*,
+    proc::*,
+    task::{sys_gettid, sys_thread_create, sys_waittid},
+};
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
@@ -35,7 +41,10 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_FORK => sys_fork(),
         SYSCALL_EXEC => sys_exec(args[0], args[1] as *const usize),
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1]),
-        _ => todo!(),
+        SYSCALL_THREAD_CREATE => sys_thread_create(args[0], args[1]),
+        SYSCALL_GETTID => sys_gettid(),
+        SYSCALL_WAITTID => sys_waittid(args[0] as isize, args[1]),
+        _ => panic!("[kernel] Unknown syscall id: {}", id),
     }
 }
 

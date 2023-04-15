@@ -6,9 +6,9 @@ use spin::mutex::Mutex;
 use crate::{
     proc::{
         manager::{INITPROC, PROC_MANAGER},
-        proc::{Proc, ProcStatus},
+        proc::{Proc, ProcState},
     },
-    task::task::TaskStatus,
+    task::task::TaskState,
 };
 
 use super::{context::TaskContext, manager::TASK_MANAGER, task::Task};
@@ -74,8 +74,8 @@ pub fn fetch_idle_task_ctx_ptr() -> *mut TaskContext {
 pub fn switch() {
     let task = TASK_MANAGER.pop();
     if let Some(task) = task {
-        if task.lock().task_status() == TaskStatus::Ready {
-            *task.lock().task_status_mut() = TaskStatus::Running;
+        if task.lock().task_status() == TaskState::Ready {
+            *task.lock().task_status_mut() = TaskState::Running;
         }
 
         let task_ctx = task.lock().task_ctx_ptr();
@@ -93,7 +93,7 @@ pub fn switch() {
         let task = PROCESSOR.lock().curr_task_take().unwrap();
         let proc = task.proc();
 
-        if proc.lock().proc_status() == ProcStatus::Zombie {
+        if proc.lock().proc_status() == ProcState::Zombie {
             let proc_guard = proc.lock();
             let pid = proc.pid();
             let tasks = proc_guard.tasks();
@@ -110,8 +110,14 @@ pub fn switch() {
             let parent = proc_guard.parent().unwrap();
             parent.kill(SignalFlags::SIGCHLD);
             println!("[kernel] Process {} has ended.", proc.pid());
-        } else if task.lock().task_status() != TaskStatus::Zombie {
+        } else if task.lock().task_status() != TaskState::Zombie {
             TASK_MANAGER.push(task);
+        } else {
+            println!(
+                "[kernel] Thread {} with pid {} has ended.",
+                task.lock().tid(),
+                proc.pid()
+            );
         }
     } else {
         panic!("[kernel] Shutdown.");

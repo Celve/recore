@@ -6,7 +6,7 @@ use crate::{
         cont, exit_yield,
         processor::{fetch_curr_proc, fetch_curr_task},
         stop_yield, suspend_yield,
-        task::TaskStatus,
+        task::TaskState,
     },
 };
 
@@ -48,7 +48,7 @@ pub fn signal_handler() {
             }
 
             let status = fetch_curr_task().lock().task_status();
-            if status != TaskStatus::Stopped {
+            if status != TaskState::Stopped {
                 break;
             }
 

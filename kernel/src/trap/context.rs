@@ -95,4 +95,8 @@ impl TrapCtxHandle {
     pub fn trap_ctx_mut(&self) -> &mut TrapCtx {
         unsafe { &mut *(usize::from(self.area.frames().first().unwrap().ppn()) as *mut TrapCtx) }
     }
+
+    pub fn trap_ctx_ptr(&self) -> usize {
+        TRAMPOLINE_ADDR - PAGE_SIZE * self.tid
+    }
 }

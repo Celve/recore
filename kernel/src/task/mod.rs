@@ -15,17 +15,24 @@ pub fn suspend_yield() {
 }
 
 pub fn stop_yield() {
-    fetch_curr_proc().stop();
+    fetch_curr_task().stop();
     schedule();
 }
 
 pub fn exit_yield(exit_code: isize) {
-    fetch_curr_proc().exit(exit_code);
+    let task = fetch_curr_task();
+    task.exit(exit_code);
+
+    // if it's the main thread
+    if task.lock().tid() == 1 {
+        fetch_curr_proc().exit(exit_code);
+    }
+
     schedule();
 }
 
 pub fn cont() {
-    fetch_curr_proc().cont();
+    fetch_curr_task().cont();
 }
 
 pub fn schedule() {

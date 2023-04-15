@@ -32,6 +32,10 @@ impl TaskManager {
     pub fn remove(&self, pid: usize, tid: usize) {
         self.tasks.lock().pop(&(pid, tid));
     }
+
+    pub fn len(&self) -> usize {
+        self.tasks.lock().len()
+    }
 }
 
 lazy_static! {

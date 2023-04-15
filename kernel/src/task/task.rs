@@ -31,7 +31,7 @@ pub struct TaskInner {
     tid: Arc<Id>,
     gid: Arc<Id>,
     page_table: Arc<PageTable>,
-    task_status: TaskStatus,
+    task_status: TaskState,
     task_ctx: TaskContext,
     trap_ctx_handle: TrapCtxHandle,
     trap_ctx_backup: Option<TrapCtx>,
@@ -44,7 +44,7 @@ pub struct TaskInner {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
-pub enum TaskStatus {
+pub enum TaskState {
     Ready,
     Running,
     Stopped,
@@ -82,7 +82,7 @@ impl Task {
                 tid,
                 gid,
                 page_table,
-                task_status: TaskStatus::Running,
+                task_status: TaskState::Running,
                 task_ctx,
                 trap_ctx_handle,
                 trap_ctx_backup: None,
@@ -99,11 +99,12 @@ impl Task {
 
     pub fn renew(
         &self,
+        tid: Arc<Id>,
         gid: Arc<Id>,
-        base: VirAddr,
         proc: Weak<Proc>,
         page_table: Arc<PageTable>,
     ) -> Self {
+        assert_eq!(self.lock().tid.id(), tid.id());
         let kernel_stack = KernelStack::new(gid.id());
         let task_ctx = TaskContext::new(restore as usize, kernel_stack.top().into());
         let trap_ctx_handle = self.lock().trap_ctx_handle.renew(&page_table);
@@ -115,10 +116,10 @@ impl Task {
 
         Self {
             inner: Mutex::new(TaskInner {
-                tid: self.lock().tid.clone(),
+                tid,
                 gid,
                 page_table,
-                task_status: TaskStatus::Running,
+                task_status: TaskState::Running,
                 task_ctx,
                 trap_ctx_handle,
                 trap_ctx_backup,
@@ -133,7 +134,7 @@ impl Task {
         }
     }
 
-    pub fn exec(&self, base: VirAddr, entry: VirAddr, page_table: Arc<PageTable>) {
+    pub fn exec(&self, tid: Arc<Id>, base: VirAddr, entry: VirAddr, page_table: Arc<PageTable>) {
         let mut task = self.lock();
 
         let task_ctx = TaskContext::new(restore as usize, task.kernel_stack.top().into());
@@ -152,6 +153,7 @@ impl Task {
             KERNEL_PAGE_TABLE.to_satp(),
         );
 
+        task.tid = tid;
         task.task_ctx = task_ctx;
         task.trap_ctx_handle = trap_ctx_handle;
         task.user_stack = user_stack;
@@ -170,12 +172,12 @@ impl Task {
 impl Task {
     pub fn stop(&self) {
         let mut task = self.lock();
-        task.task_status = TaskStatus::Stopped;
+        task.task_status = TaskState::Stopped;
     }
 
     pub fn cont(&self) {
         let mut task = self.lock();
-        task.task_status = TaskStatus::Running;
+        task.task_status = TaskState::Running;
     }
 
     pub fn kill(&self, sig: SignalFlags) {
@@ -183,7 +185,7 @@ impl Task {
         task.sigs |= sig;
         println!(
             "[kernel] Thread {} in process {} receives signal {}",
-            task.tid.id(),
+            task.tid(),
             self.proc.upgrade().unwrap().pid(),
             sig.bits()
         );
@@ -191,17 +193,17 @@ impl Task {
 
     pub fn exit(&self, exit_code: isize) {
         let mut task = self.lock();
-        task.task_status = TaskStatus::Zombie;
+        task.task_status = TaskState::Zombie;
         task.exit_code = exit_code;
     }
 }
 
 impl TaskInner {
-    pub fn task_status(&self) -> TaskStatus {
+    pub fn task_status(&self) -> TaskState {
         self.task_status
     }
 
-    pub fn task_status_mut(&mut self) -> &mut TaskStatus {
+    pub fn task_status_mut(&mut self) -> &mut TaskState {
         &mut self.task_status
     }
 
@@ -219,6 +221,10 @@ impl TaskInner {
 
     pub fn trap_ctx_mut(&mut self) -> &mut TrapCtx {
         self.trap_ctx_handle.trap_ctx_mut()
+    }
+
+    pub fn trap_ctx_ptr(&mut self) -> usize {
+        self.trap_ctx_handle.trap_ctx_ptr()
     }
 
     pub fn trap_ctx_backup(&self) -> Option<&TrapCtx> {
@@ -259,6 +265,10 @@ impl TaskInner {
 
     pub fn sig_handling_mut(&mut self) -> &mut Option<usize> {
         &mut self.sig_handling
+    }
+
+    pub fn exit_code(&self) -> isize {
+        self.exit_code
     }
 
     pub fn tid(&self) -> usize {

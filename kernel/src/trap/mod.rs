@@ -1,5 +1,6 @@
 use core::arch::asm;
 
+use fosix::syscall::SYSCALL_THREAD_CREATE;
 use riscv::register::{scause, sip, utvec::TrapMode};
 
 use crate::{
@@ -61,6 +62,9 @@ pub fn trap_handler() -> ! {
                     let task = fetch_curr_task();
                     let mut task_guard = task.lock();
                     *task_guard.trap_ctx_mut().a0_mut() = result as usize;
+                    if id == SYSCALL_THREAD_CREATE {
+                        println!("user_pc: {:#x}", task_guard.trap_ctx().user_sepc);
+                    }
                 }
             }
             scause::Exception::InstructionMisaligned => todo!(),

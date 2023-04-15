@@ -5,19 +5,19 @@ use fosix::{
 };
 
 use crate::{
-    proc::{manager::PROC_MANAGER, proc::ProcStatus},
+    proc::{manager::PROC_MANAGER, proc::ProcState},
     task::{
         exit_yield,
         manager::TASK_MANAGER,
         processor::{fetch_curr_proc, fetch_curr_task},
         suspend_yield,
+        task::TaskState,
     },
 };
 
 use super::{open_file, parse_str};
 
 pub fn sys_exit(exit_code: isize) -> isize {
-    *fetch_curr_proc().lock().proc_status_mut() = ProcStatus::Zombie;
     exit_yield(exit_code);
     0
 }
@@ -70,21 +70,25 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
     }
 }
 
+pub fn sys_getpid() -> isize {
+    fetch_curr_proc().pid() as isize
+}
+
 pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
     let proc = fetch_curr_proc();
     let mut proc_guard = proc.lock();
 
     // find satisfied children
     let result = proc_guard.children().iter().position(|proc| {
-        (pid == -1 || pid as usize == proc.pid()) && proc.lock().proc_status() == ProcStatus::Zombie
+        (pid == -1 || pid as usize == proc.pid()) && proc.lock().proc_status() == ProcState::Zombie
     });
 
     return if let Some(pos) = result {
-        let removed_task = proc_guard.children_mut().remove(pos);
+        let removed_proc = proc_guard.children_mut().remove(pos);
         *proc_guard
             .page_table()
-            .translate_any::<isize>(exit_code_ptr.into()) = removed_task.lock().exit_code();
-        let pid = removed_task.pid() as isize;
+            .translate_any::<isize>(exit_code_ptr.into()) = removed_proc.lock().exit_code();
+        let pid = removed_proc.pid() as isize;
         pid
     } else if proc_guard
         .children()
@@ -112,8 +116,8 @@ pub fn sys_kill(pid: usize, sig: usize) -> isize {
     // task_guard.pid().id() == pid as usize && task_guard.pid().id() != 1
     // });
     let target = PROC_MANAGER.get(pid);
-    if let Some(task) = target {
-        task.kill(SignalFlags::from_bits(1 << sig).unwrap());
+    if let Some(proc) = target {
+        proc.kill(SignalFlags::from_bits(1 << sig).unwrap());
         0
     } else {
         -1

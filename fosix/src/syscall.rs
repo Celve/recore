@@ -20,6 +20,9 @@ pub const SYSCALL_SIGRETURN: usize = 139;
 pub const SYSCALL_FORK: usize = 220;
 pub const SYSCALL_EXEC: usize = 221;
 pub const SYSCALL_WAITPID: usize = 260;
+pub const SYSCALL_THREAD_CREATE: usize = 1000;
+pub const SYSCALL_GETTID: usize = 1001;
+pub const SYSCALL_WAITTID: usize = 1002;
 
 bitflags! {
     pub struct WaitFlags: u8 {

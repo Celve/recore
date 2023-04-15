@@ -31,7 +31,7 @@ pub struct ProcInner {
     tid_allocator: Arc<IdAllocator>,
     user_mem: MemSet,
     page_table: Arc<PageTable>,
-    proc_staus: ProcStatus,
+    proc_staus: ProcState,
     parent: Option<Weak<Proc>>,
     children: Vec<Arc<Proc>>,
     tasks: Vec<Arc<Task>>,
@@ -42,18 +42,9 @@ pub struct ProcInner {
     base: VirAddr,
 }
 
-#[repr(C)]
-pub struct TaskContext {
-    pub ra: usize,
-    pub sp: usize,
-    pub sr: [usize; 12],
-}
-
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ProcStatus {
-    Ready,
+pub enum ProcState {
     Running,
-    Stopped,
     Zombie,
 }
 
@@ -76,7 +67,7 @@ impl Proc {
                 tid_allocator: tid_allocator.clone(),
                 user_mem,
                 page_table: page_table.clone(),
-                proc_staus: ProcStatus::Ready,
+                proc_staus: ProcState::Running,
                 parent,
                 children: Vec::new(),
                 tasks: Vec::new(),
@@ -133,7 +124,7 @@ impl Proc {
         let (base, user_sepc, user_mem) = page_table.new_user(&elf_data);
         let tid_allocator = Arc::new(IdAllocator::new());
         let task = proc.main_task();
-        task.exec(base, user_sepc, page_table.clone());
+        task.exec(tid_allocator.alloc(), base, user_sepc, page_table.clone());
         let mut user_sp: usize = task.lock().user_stack().top().into();
 
         // push args
@@ -148,7 +139,6 @@ impl Proc {
             let src_bytes = ptr.to_ne_bytes();
             let mut dst_bytes =
                 page_table.translate_bytes((user_sp - offset).into(), src_bytes.len());
-            println!("write {:#x} in {:#x}", ptr, user_sp - offset);
             dst_bytes
                 .iter_mut()
                 .enumerate()
@@ -189,20 +179,25 @@ impl Proc {
         proc.tasks = vec![task];
     }
 
+    pub fn new_task(self: &Arc<Self>, entry: VirAddr, arg: usize) -> Arc<Task> {
+        let mut proc = self.lock();
+        let task = Arc::new(Task::new(
+            proc.tid_allocator.alloc(),
+            GID_ALLOCATOR.alloc(),
+            proc.base,
+            entry,
+            Arc::downgrade(self),
+            proc.page_table.clone(),
+        ));
+        *task.lock().trap_ctx_mut().a0_mut() = arg;
+        proc.tasks.push(task.clone());
+        task
+    }
+
     pub fn exit(&self, exit_code: isize) {
         let mut proc = self.lock();
-        proc.proc_staus = ProcStatus::Zombie;
+        proc.proc_staus = ProcState::Zombie;
         proc.exit_code = exit_code;
-    }
-
-    pub fn stop(&self) {
-        let mut proc = self.lock();
-        proc.proc_staus = ProcStatus::Stopped;
-    }
-
-    pub fn cont(&self) {
-        let mut proc = self.lock();
-        proc.proc_staus = ProcStatus::Running;
     }
 
     pub fn kill(&self, sig: SignalFlags) {
@@ -228,14 +223,15 @@ impl Proc {
 
         let cwd = proc.cwd.clone();
         let fd_table = proc.fd_table().clone();
+        let tid_allocator = Arc::new(IdAllocator::new());
 
         let forked = Arc::new(Self {
             pid: PID_ALLOCATOR.alloc(),
             inner: Mutex::new(ProcInner {
-                tid_allocator: Arc::new(IdAllocator::new()),
+                tid_allocator: tid_allocator.clone(),
                 user_mem,
                 page_table: page_table.clone(),
-                proc_staus: ProcStatus::Ready,
+                proc_staus: ProcState::Running,
                 parent: proc.parent.clone(),
                 children: Vec::new(),
                 tasks: Vec::new(),
@@ -243,7 +239,7 @@ impl Proc {
                 fd_table,
                 cwd,
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
-                base: proc.base,
+                base,
             }),
         });
 
@@ -252,8 +248,8 @@ impl Proc {
             .iter()
             .map(|task| {
                 Arc::new(task.renew(
+                    tid_allocator.alloc(),
                     GID_ALLOCATOR.alloc(),
-                    base,
                     Arc::downgrade(&forked),
                     page_table.clone(),
                 ))
@@ -265,11 +261,11 @@ impl Proc {
 }
 
 impl ProcInner {
-    pub fn proc_status_mut(&mut self) -> &mut ProcStatus {
+    pub fn proc_status_mut(&mut self) -> &mut ProcState {
         &mut self.proc_staus
     }
 
-    pub fn proc_status(&self) -> ProcStatus {
+    pub fn proc_status(&self) -> ProcState {
         self.proc_staus
     }
 
@@ -336,22 +332,8 @@ impl ProcInner {
     pub fn tasks(&self) -> &Vec<Arc<Task>> {
         &self.tasks
     }
-}
 
-impl TaskContext {
-    pub fn empty() -> Self {
-        Self {
-            ra: 0,
-            sp: 0,
-            sr: [0; 12],
-        }
-    }
-
-    pub fn new(ra: usize, sp: usize) -> Self {
-        Self {
-            ra,
-            sp,
-            sr: [0; 12],
-        }
+    pub fn tasks_mut(&mut self) -> &mut Vec<Arc<Task>> {
+        &mut self.tasks
     }
 }

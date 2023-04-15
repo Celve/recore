@@ -44,3 +44,5 @@ pub const VIRTIO_MAP_SIZE: usize = 0x1000;
 pub const RING_BUFFER_SIZE: usize = 128;
 
 pub const NUM_SIGNAL: usize = 32;
+
+pub const CLOCK_FREQ: usize = 12500000;

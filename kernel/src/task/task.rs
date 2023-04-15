@@ -170,16 +170,19 @@ impl Task {
 }
 
 impl Task {
+    /// Set the task state to stopped by locking it.
     pub fn stop(&self) {
         let mut task = self.lock();
         task.task_status = TaskState::Stopped;
     }
 
+    /// Set the task state to continue by locking it.
     pub fn cont(&self) {
         let mut task = self.lock();
         task.task_status = TaskState::Running;
     }
 
+    /// Append the task's signal flags by locking it.
     pub fn kill(&self, sig: SignalFlags) {
         let mut task = self.lock();
         task.sigs |= sig;
@@ -191,6 +194,7 @@ impl Task {
         );
     }
 
+    /// Set the task state to zombie by locking it with exit code set.
     pub fn exit(&self, exit_code: isize) {
         let mut task = self.lock();
         task.task_status = TaskState::Zombie;

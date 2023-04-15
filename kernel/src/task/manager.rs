@@ -19,12 +19,14 @@ impl TaskManager {
         }
     }
 
+    /// Push a new task to the task manager.
     pub fn push(&self, task: Arc<Task>) {
         let pid = task.proc().pid();
         let tid = task.lock().tid();
         self.tasks.lock().push((pid, tid), task);
     }
 
+    /// Pop the least recently executed task.
     pub fn pop(&self) -> Option<Arc<Task>> {
         self.tasks.lock().pop_lru().map(|(_, task)| task)
     }

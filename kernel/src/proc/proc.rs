@@ -179,6 +179,7 @@ impl Proc {
         proc.tasks = vec![task];
     }
 
+    /// Create a new thread that starts from `entry` with `arg` as its argument.
     pub fn new_task(self: &Arc<Self>, entry: VirAddr, arg: usize) -> Arc<Task> {
         let mut proc = self.lock();
         let task = Arc::new(Task::new(
@@ -212,6 +213,7 @@ impl Proc {
 }
 
 impl Proc {
+    /// Renew a process with a new page table. It's cloning that wrap inside `Arc`.
     fn renew(self: &Arc<Self>) -> Arc<Self> {
         let proc = self.lock();
 

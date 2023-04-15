@@ -47,7 +47,7 @@ pub fn signal_handler() {
                 }
             }
 
-            let status = fetch_curr_task().lock().task_status();
+            let status = fetch_curr_task().lock().task_state();
             if status != TaskState::Stopped {
                 break;
             }

@@ -13,7 +13,10 @@ use crate::{
     config::NUM_SIGNAL,
     fs::disk::BlkDev,
     mm::{address::VirAddr, memory::MemSet, page_table::PageTable},
-    proc::id::{GID_ALLOCATOR, PID_ALLOCATOR},
+    proc::{
+        id::{GID_ALLOCATOR, PID_ALLOCATOR},
+        manager::{INITPROC, PROC_MANAGER},
+    },
     task::task::Task,
 };
 
@@ -90,6 +93,10 @@ impl Proc {
         res.lock().tasks.push(task);
 
         res
+    }
+
+    pub fn phantom(self: &Arc<Self>) -> Weak<Self> {
+        Arc::downgrade(self)
     }
 
     pub fn lock(&self) -> MutexGuard<ProcInner> {
@@ -197,8 +204,21 @@ impl Proc {
 
     pub fn exit(&self, exit_code: isize) {
         let mut proc = self.lock();
+        let pid = self.pid();
+
         proc.proc_staus = ProcState::Zombie;
         proc.exit_code = exit_code;
+        proc.tasks = vec![];
+
+        PROC_MANAGER.remove(pid);
+
+        for child in proc.children().iter() {
+            *child.lock().parent_mut() = Some(INITPROC.phantom());
+            INITPROC.lock().children_mut().push(child.clone());
+        }
+        let parent = proc.parent().unwrap();
+        parent.kill(SignalFlags::SIGCHLD);
+        println!("[kernel] Process {} has ended.", pid);
     }
 
     pub fn kill(&self, sig: SignalFlags) {

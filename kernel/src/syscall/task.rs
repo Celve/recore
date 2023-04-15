@@ -4,7 +4,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     let proc = fetch_curr_proc();
     let task = proc.new_task(entry.into(), arg);
 
-    TASK_MANAGER.push(task.clone());
+    TASK_MANAGER.push(&task);
     println!("Task manager has {}.", TASK_MANAGER.len());
 
     let tid = task.lock().tid();
@@ -27,7 +27,7 @@ pub fn sys_waittid(tid: isize, exit_code_ptr: usize) -> isize {
     // find satisfied children
     let result = proc_guard.tasks().iter().position(|task| {
         (tid == -1 || tid as usize == task.lock().tid())
-            && task.lock().task_status() == TaskState::Zombie
+            && task.lock().task_state() == TaskState::Zombie
     });
 
     return if let Some(pos) = result {

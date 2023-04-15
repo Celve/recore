@@ -11,7 +11,6 @@ use crate::{
         manager::TASK_MANAGER,
         processor::{fetch_curr_proc, fetch_curr_task},
         suspend_yield,
-        task::TaskState,
     },
 };
 
@@ -32,8 +31,8 @@ pub fn sys_fork() -> isize {
     let pid = proc.pid();
     let task = proc.lock().main_task();
     *task.lock().trap_ctx_mut().a0_mut() = 0;
-    PROC_MANAGER.push(proc);
-    TASK_MANAGER.push(task);
+    PROC_MANAGER.push(&proc);
+    TASK_MANAGER.push(&task);
     println!("[kernel] Fork a new process with pid {}.", pid);
     pid as isize
 }

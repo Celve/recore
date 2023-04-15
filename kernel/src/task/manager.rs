@@ -2,14 +2,14 @@ use core::num::NonZeroUsize;
 
 use super::task::Task;
 
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use lazy_static::lazy_static;
 use lru::LruCache;
 use spin::mutex::Mutex;
 
 pub struct TaskManager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    tasks: Mutex<LruCache<(usize, usize), Arc<Task>>>,
+    tasks: Mutex<LruCache<(usize, usize), Weak<Task>>>,
 }
 
 impl TaskManager {
@@ -20,15 +20,18 @@ impl TaskManager {
     }
 
     /// Push a new task to the task manager.
-    pub fn push(&self, task: Arc<Task>) {
+    pub fn push(&self, task: &Arc<Task>) {
         let pid = task.proc().pid();
         let tid = task.lock().tid();
-        self.tasks.lock().push((pid, tid), task);
+        self.tasks.lock().push((pid, tid), task.phantom());
     }
 
     /// Pop the least recently executed task.
     pub fn pop(&self) -> Option<Arc<Task>> {
-        self.tasks.lock().pop_lru().map(|(_, task)| task)
+        self.tasks
+            .lock()
+            .pop_lru()
+            .and_then(|(_, task)| task.upgrade())
     }
 
     pub fn remove(&self, pid: usize, tid: usize) {

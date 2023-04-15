@@ -170,6 +170,12 @@ impl Task {
 }
 
 impl Task {
+    pub fn phantom(self: &Arc<Self>) -> Weak<Self> {
+        Arc::downgrade(self)
+    }
+}
+
+impl Task {
     /// Set the task state to stopped by locking it.
     pub fn stop(&self) {
         let mut task = self.lock();
@@ -203,7 +209,7 @@ impl Task {
 }
 
 impl TaskInner {
-    pub fn task_status(&self) -> TaskState {
+    pub fn task_state(&self) -> TaskState {
         self.task_status
     }
 

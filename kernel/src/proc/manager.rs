@@ -4,7 +4,7 @@ use crate::fs::FUSE;
 
 use alloc::{
     collections::{BTreeMap, VecDeque},
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 use fosix::fs::OpenFlags;
 use lazy_static::lazy_static;
@@ -12,26 +12,29 @@ use spin::mutex::Mutex;
 
 pub struct ProcManager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    procs: Mutex<BTreeMap<usize, Arc<Proc>>>,
+    procs: Mutex<BTreeMap<usize, Weak<Proc>>>,
 }
 
 impl ProcManager {
-    pub fn new(proc: Arc<Proc>) -> Self {
+    pub fn new(proc: &Arc<Proc>) -> Self {
         let mut procs = BTreeMap::new();
         let pid = proc.pid();
-        procs.insert(pid, proc);
+        procs.insert(pid, proc.phantom());
         Self {
             procs: Mutex::new(procs),
         }
     }
 
-    pub fn push(&self, proc: Arc<Proc>) {
+    pub fn push(&self, proc: &Arc<Proc>) {
         let pid = proc.pid();
-        self.procs.lock().insert(pid, proc);
+        self.procs.lock().insert(pid, proc.phantom());
     }
 
     pub fn pop(&self) -> Option<Arc<Proc>> {
-        self.procs.lock().pop_first().map(|(_, proc)| proc)
+        self.procs
+            .lock()
+            .pop_first()
+            .and_then(|(_, proc)| proc.upgrade())
     }
 
     pub fn remove(&self, pid: usize) {
@@ -39,7 +42,7 @@ impl ProcManager {
     }
 
     pub fn get(&self, key: usize) -> Option<Arc<Proc>> {
-        self.procs.lock().get(&key).cloned()
+        self.procs.lock().get(&key).and_then(|proc| proc.upgrade())
     }
 }
 
@@ -50,5 +53,5 @@ lazy_static! {
     );
 
     /// Manager only loads the initproc at the beginning.
-    pub static ref PROC_MANAGER: ProcManager = ProcManager::new(INITPROC.clone());
+    pub static ref PROC_MANAGER: ProcManager = ProcManager::new(&INITPROC);
 }

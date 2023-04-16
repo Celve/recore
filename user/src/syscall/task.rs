@@ -1,4 +1,4 @@
-use fosix::syscall::{SYSCALL_GETTID, SYSCALL_THREAD_CREATE, SYSCALL_WAITTID};
+use fosix::syscall::{SYSCALL_GETTID, SYSCALL_SLEEP, SYSCALL_THREAD_CREATE, SYSCALL_WAITTID};
 
 use crate::println;
 
@@ -14,4 +14,8 @@ pub fn sys_gettid() -> isize {
 
 pub fn sys_waittid(tid: isize, exit_code_ptr: usize) -> isize {
     syscall(SYSCALL_WAITTID, [tid as usize, exit_code_ptr, 0])
+}
+
+pub fn sys_sleep(ms: usize) -> isize {
+    syscall(SYSCALL_SLEEP, [ms, 0, 0])
 }

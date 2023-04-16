@@ -165,3 +165,7 @@ pub fn waittid(tid: isize, exit_code_ptr: usize) -> isize {
         }
     }
 }
+
+pub fn sleep(ms: usize) -> isize {
+    sys_sleep(ms)
+}

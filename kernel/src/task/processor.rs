@@ -8,7 +8,8 @@ use crate::{
         manager::{INITPROC, PROC_MANAGER},
         proc::{Proc, ProcState},
     },
-    task::task::TaskState,
+    task::{task::TaskState, timer::TIMER},
+    time::get_time,
 };
 
 use super::{context::TaskContext, manager::TASK_MANAGER, task::Task};
@@ -115,6 +116,9 @@ pub fn switch() {
                 );
             }
         }
+
+        // check if timer is up
+        TIMER.notify(get_time());
     } else {
         panic!("[kernel] Shutdown.");
     }

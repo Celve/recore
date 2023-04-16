@@ -12,12 +12,7 @@ use crate::{
     task::processor::fetch_curr_proc,
 };
 
-use self::{
-    com::sys_pipe,
-    file::*,
-    proc::*,
-    task::{sys_gettid, sys_thread_create, sys_waittid},
-};
+use self::{com::sys_pipe, file::*, proc::*, task::*};
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
@@ -33,6 +28,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_READ => sys_read(args[0], args[1], args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1], args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as isize),
+        SYSCALL_SLEEP => sys_sleep(args[0] as usize),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_KILL => sys_kill(args[0], args[1]),
         SYSCALL_SIGACTION => sys_sigaction(args[0], args[1], args[2]),

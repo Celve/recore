@@ -1,4 +1,13 @@
-use crate::task::{manager::TASK_MANAGER, processor::fetch_curr_proc, task::TaskState};
+use crate::{
+    config::CLOCK_FREQ,
+    task::{
+        manager::TASK_MANAGER,
+        processor::{fetch_curr_proc, fetch_curr_task},
+        task::TaskState,
+        timer::TIMER,
+    },
+    time::get_time,
+};
 
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     let proc = fetch_curr_proc();
@@ -46,4 +55,17 @@ pub fn sys_waittid(tid: isize, exit_code_ptr: usize) -> isize {
     } else {
         -1
     };
+}
+
+/// Sleep the thread for the specified millisecond.
+///
+/// In the current design, the sleep would be interrupted by a external signal SIGCONT.
+pub fn sys_sleep(time_ms: usize) -> isize {
+    let curr_time = get_time();
+    let target_time = curr_time + CLOCK_FREQ * time_ms / 1000;
+    let task = fetch_curr_task();
+    task.stop();
+
+    TIMER.subscribe(target_time, &task);
+    0
 }

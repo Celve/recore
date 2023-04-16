@@ -9,6 +9,7 @@ pub mod context;
 pub mod manager;
 pub mod processor;
 pub mod task;
+pub mod timer;
 
 pub fn suspend_yield() {
     schedule();

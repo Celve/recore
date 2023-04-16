@@ -18,7 +18,7 @@ use super::{
     memory::MappingPermission,
 };
 use crate::config::{
-    MEMORY_END, PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH, TRAMPOLINE_ADDR, UART_BASE_ADDRESS,
+    CLINT, MEMORY_END, PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH, TRAMPOLINE_ADDR, UART_BASE_ADDRESS,
     UART_MAP_SIZE, VIRTIO_BASE_ADDRESS, VIRTIO_MAP_SIZE,
 };
 use crate::fs::segment::Segment;
@@ -120,6 +120,12 @@ impl PageTable {
         areas.push(self.new_identical_area(
             VirAddr::from(VIRTIO_BASE_ADDRESS).floor_to_vir_page_num(),
             VirAddr::from(VIRTIO_BASE_ADDRESS + VIRTIO_MAP_SIZE).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
+        areas.push(self.new_identical_area(
+            VirAddr::from(CLINT).floor_to_vir_page_num(),
+            VirAddr::from(CLINT + 0x10000).ceil_to_vir_page_num(),
             MappingPermission::R | MappingPermission::W,
         ));
 

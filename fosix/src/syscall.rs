@@ -24,6 +24,9 @@ pub const SYSCALL_WAITPID: usize = 260;
 pub const SYSCALL_THREAD_CREATE: usize = 1000;
 pub const SYSCALL_GETTID: usize = 1001;
 pub const SYSCALL_WAITTID: usize = 1002;
+pub const SYSCALL_MUTEX_CREATE: usize = 1010;
+pub const SYSCALL_MUTEX_LOCK: usize = 1011;
+pub const SYSCALL_MUTEX_UNLOCK: usize = 1012;
 
 bitflags! {
     pub struct WaitFlags: u8 {

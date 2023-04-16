@@ -89,10 +89,18 @@ pub fn trap_handler() -> ! {
     restore();
 }
 
+/// This is the trap handler for the supervisor mode.
+///
+/// It should be aligned to 4.
+#[repr(align(4))]
 pub fn fail() {
     panic!("[kernel] Get into trap when in supervisor mode.");
 }
 
+/// Set the trap handler to the `fail` function when trap occurs in the supervisor mode.
+///
+/// It has been proved that kernel would not trap in the supervisor mode when receiving the supervisor software interrupt.
+/// It might due to the mechanism of the RISC-V.
 pub fn set_kernel_stvec() {
     unsafe { riscv::register::stvec::write(fail as usize, TrapMode::Direct) };
 }

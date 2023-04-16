@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-#![feature(linkage, panic_info_message)]
+#![feature(linkage, panic_info_message, optimize_attribute)]
 
 extern crate alloc;
 
@@ -168,4 +168,16 @@ pub fn waittid(tid: isize, exit_code_ptr: usize) -> isize {
 
 pub fn sleep(ms: usize) -> isize {
     sys_sleep(ms)
+}
+
+pub fn mutex_create(blocked: bool) -> isize {
+    sys_mutex_create(blocked)
+}
+
+pub fn mutex_lock(id: usize) -> isize {
+    sys_mutex_lock(id)
+}
+
+pub fn mutex_unlock(id: usize) -> isize {
+    sys_mutex_unlock(id)
 }

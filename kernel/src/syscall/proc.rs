@@ -151,3 +151,37 @@ pub fn sys_sigprocmask(mask: u32) -> isize {
         -1
     }
 }
+
+pub fn sys_mutex_create(blocked: bool) -> isize {
+    let proc = fetch_curr_proc();
+    let mut proc_guard = proc.lock();
+    proc_guard.lock_table_mut().alloc(blocked) as isize
+}
+
+pub fn sys_mutex_lock(id: usize) -> isize {
+    let lock = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.lock_table().get(id)
+    };
+    if let Some(lock) = lock {
+        lock.lock();
+        0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_mutex_unlock(id: usize) -> isize {
+    let lock = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.lock_table().get(id)
+    };
+    if let Some(lock) = lock {
+        lock.unlock();
+        0
+    } else {
+        -1
+    }
+}

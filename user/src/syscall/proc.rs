@@ -59,3 +59,15 @@ pub fn sys_sigaction(
 pub fn sys_sigprocmask(mask: SignalFlags) -> isize {
     syscall(SYSCALL_SIGPROCMASK, [mask.bits() as usize, 0, 0])
 }
+
+pub fn sys_mutex_create(blocked: bool) -> isize {
+    syscall(SYSCALL_MUTEX_CREATE, [blocked as usize, 0, 0])
+}
+
+pub fn sys_mutex_lock(id: usize) -> isize {
+    syscall(SYSCALL_MUTEX_LOCK, [id, 0, 0])
+}
+
+pub fn sys_mutex_unlock(id: usize) -> isize {
+    syscall(SYSCALL_MUTEX_UNLOCK, [id, 0, 0])
+}

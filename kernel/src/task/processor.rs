@@ -1,6 +1,7 @@
 use alloc::sync::{Arc, Weak};
 use fosix::signal::SignalFlags;
 use lazy_static::lazy_static;
+use riscv::register::stvec;
 use spin::mutex::Mutex;
 
 use crate::{

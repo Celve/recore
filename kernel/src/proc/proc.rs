@@ -17,15 +17,13 @@ use crate::{
         id::{GID_ALLOCATOR, PID_ALLOCATOR},
         manager::{INITPROC, PROC_MANAGER},
     },
-    task::{
-        manager::TASK_MANAGER,
-        task::{Task, TaskState},
-    },
+    task::task::Task,
 };
 
 use super::{
     fd_table::FdTable,
     id::{Id, IdAllocator},
+    lock_table::LockTable,
 };
 
 pub struct Proc {
@@ -46,6 +44,7 @@ pub struct ProcInner {
     cwd: Dir<BlkDev>,
     sig_actions: [SignalAction; NUM_SIGNAL],
     base: VirAddr,
+    lock_table: LockTable,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -82,6 +81,7 @@ impl Proc {
                 cwd: file.lock().parent(),
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 base,
+                lock_table: LockTable::new(),
             }),
         });
 
@@ -251,6 +251,7 @@ impl Proc {
         let cwd = proc.cwd.clone();
         let fd_table = proc.fd_table().clone();
         let tid_allocator = Arc::new(IdAllocator::new());
+        assert_eq!(proc.lock_table.len(), 0); // the cloning of mutexes is not supported yet
 
         let forked = Arc::new(Self {
             pid: PID_ALLOCATOR.alloc(),
@@ -267,6 +268,7 @@ impl Proc {
                 cwd,
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 base,
+                lock_table: LockTable::new(),
             }),
         });
 
@@ -362,5 +364,13 @@ impl ProcInner {
 
     pub fn tasks_mut(&mut self) -> &mut Vec<Arc<Task>> {
         &mut self.tasks
+    }
+
+    pub fn lock_table(&self) -> &LockTable {
+        &self.lock_table
+    }
+
+    pub fn lock_table_mut(&mut self) -> &mut LockTable {
+        &mut self.lock_table
     }
 }

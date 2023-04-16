@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-#![feature(naked_functions, asm_const, const_cmp)]
+#![feature(naked_functions, asm_const, const_cmp, fn_align)]
 
 #[macro_use]
 extern crate alloc;
@@ -15,6 +15,7 @@ mod heap;
 mod ipc;
 mod mm;
 mod proc;
+mod sync;
 mod syscall;
 mod task;
 mod time;

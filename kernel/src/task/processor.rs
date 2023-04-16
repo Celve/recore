@@ -80,7 +80,7 @@ pub fn switch() {
     };
     if let Some(task) = task {
         if task.lock().task_state() == TaskState::Ready {
-            *task.lock().task_status_mut() = TaskState::Running;
+            *task.lock().task_state_mut() = TaskState::Running;
         }
 
         let task_ctx = task.lock().task_ctx_ptr();
@@ -97,44 +97,24 @@ pub fn switch() {
         // clear current task
         let task = PROCESSOR.lock().curr_task_take();
         if let Some(task) = task {
-            if task.lock().task_state() != TaskState::Zombie {
+            if task.lock().task_state() == TaskState::Running {
                 TASK_MANAGER.push(&task);
-            } else {
+            } else if task.lock().task_state() == TaskState::Zombie {
                 let proc = task.proc();
                 println!(
                     "[kernel] Thread {} with pid {} has ended.",
                     task.lock().tid(),
                     proc.pid()
                 );
+            } else {
+                let proc = task.proc();
+                println!(
+                    "[kernel] Thread {} with pid {} has stopped.",
+                    task.lock().tid(),
+                    proc.pid()
+                );
             }
         }
-
-        // if proc.lock().proc_status() == ProcState::Zombie {
-        //     let proc_guard = proc.lock();
-        //     let pid = proc.pid();
-        //     let tasks = proc_guard.tasks();
-        //     tasks.iter().for_each(|task| {
-        //         let tid = task.lock().tid();
-        //         TASK_MANAGER.remove(pid, tid);
-        //     });
-        //     PROC_MANAGER.remove(pid);
-
-        //     for child in proc_guard.children().iter() {
-        //         *child.lock().parent_mut() = Some(Arc::downgrade(&INITPROC));
-        //         INITPROC.lock().children_mut().push(child.clone());
-        //     }
-        //     let parent = proc_guard.parent().unwrap();
-        //     parent.kill(SignalFlags::SIGCHLD);
-        //     println!("[kernel] Process {} has ended.", proc.pid());
-        // } else if task.lock().task_status() != TaskState::Zombie {
-        //     TASK_MANAGER.push(task);
-        // } else {
-        //     println!(
-        //         "[kernel] Thread {} with pid {} has ended.",
-        //         task.lock().tid(),
-        //         proc.pid()
-        //     );
-        // }
     } else {
         panic!("[kernel] Shutdown.");
     }

@@ -17,7 +17,10 @@ use crate::{
         id::{GID_ALLOCATOR, PID_ALLOCATOR},
         manager::{INITPROC, PROC_MANAGER},
     },
-    task::task::Task,
+    task::{
+        manager::TASK_MANAGER,
+        task::{Task, TaskState},
+    },
 };
 
 use super::{
@@ -223,7 +226,9 @@ impl Proc {
 
     pub fn kill(&self, sig: SignalFlags) {
         let proc = self.lock();
-        *proc.tasks[0].lock().sigs_mut() |= sig;
+        let task = &proc.tasks[0];
+        task.kill(sig);
+
         println!(
             "[kernel] Process {} receives signal {}",
             self.pid(),

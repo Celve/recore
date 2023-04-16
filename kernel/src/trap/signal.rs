@@ -3,9 +3,9 @@ use fosix::signal::SignalFlags;
 use crate::{
     config::NUM_SIGNAL,
     task::{
-        cont, exit_yield,
+        exit_yield,
         processor::{fetch_curr_proc, fetch_curr_task},
-        stop_yield, suspend_yield,
+        suspend_yield,
         task::TaskState,
     },
 };
@@ -42,6 +42,8 @@ pub fn signal_handler() {
                     } else {
                         // signal is a user signal
                         user_signal_handler(i);
+
+                        // break to do the action in user mode
                         break;
                     }
                 }
@@ -52,17 +54,24 @@ pub fn signal_handler() {
                 break;
             }
 
+            // for stop, it yields here
             suspend_yield();
         }
     }
 }
 
 fn kernel_signal_handler(sigid: usize) {
+    println!(
+        "kernel signal handler is now handling {} with pid {} and tid {}",
+        sigid,
+        fetch_curr_proc().pid(),
+        fetch_curr_task().lock().tid()
+    );
     let sig = SignalFlags::from_bits(1 << sigid).unwrap();
     match sig {
-        SignalFlags::SIGKILL => exit_yield(-2),
-        SignalFlags::SIGSTOP => stop_yield(),
-        SignalFlags::SIGCONT => cont(),
+        SignalFlags::SIGKILL => exit_yield(-2), // yield immediately
+        SignalFlags::SIGSTOP => fetch_curr_task().stop(), // do not yield immediately
+        SignalFlags::SIGCONT => fetch_curr_task().cont(),
         _ => {
             panic!("[kernel] Unhandled kernel signal.")
         }

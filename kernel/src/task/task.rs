@@ -13,6 +13,7 @@ use crate::{
         proc::Proc,
         stack::{KernelStack, UserStack},
     },
+    task::manager::TASK_MANAGER,
     trap::{
         context::{TrapCtx, TrapCtxHandle},
         trampoline::restore,
@@ -189,15 +190,25 @@ impl Task {
     }
 
     /// Append the task's signal flags by locking it.
-    pub fn kill(&self, sig: SignalFlags) {
+    pub fn kill(self: &Arc<Self>, sig: SignalFlags) {
         let mut task = self.lock();
         task.sigs |= sig;
+
         println!(
             "[kernel] Thread {} in process {} receives signal {}",
             task.tid(),
             self.proc.upgrade().unwrap().pid(),
             sig.bits()
         );
+
+        if sig.contains(SignalFlags::SIGCONT) && task.task_state() == TaskState::Stopped {
+            println!(
+                "[kernel] Process {} Thread 1 is continued.",
+                self.proc().pid()
+            );
+            drop(task);
+            TASK_MANAGER.push(self);
+        }
     }
 
     /// Set the task state to zombie by locking it with exit code set.
@@ -213,7 +224,7 @@ impl TaskInner {
         self.task_status
     }
 
-    pub fn task_status_mut(&mut self) -> &mut TaskState {
+    pub fn task_state_mut(&mut self) -> &mut TaskState {
         &mut self.task_status
     }
 
@@ -283,5 +294,9 @@ impl TaskInner {
 
     pub fn tid(&self) -> usize {
         self.tid.id()
+    }
+
+    pub fn gid(&self) -> usize {
+        self.gid.id()
     }
 }

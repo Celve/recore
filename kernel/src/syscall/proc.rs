@@ -110,10 +110,6 @@ pub fn sys_sigreturn() -> isize {
 }
 
 pub fn sys_kill(pid: usize, sig: usize) -> isize {
-    // let target = PROC_MANAGER.find(|task| {
-    // let task_guard = task.lock();
-    // task_guard.pid().id() == pid as usize && task_guard.pid().id() != 1
-    // });
     let target = PROC_MANAGER.get(pid);
     if let Some(proc) = target {
         proc.kill(SignalFlags::from_bits(1 << sig).unwrap());

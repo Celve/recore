@@ -23,6 +23,7 @@ impl TaskManager {
     pub fn push(&self, task: &Arc<Task>) {
         let pid = task.proc().pid();
         let tid = task.lock().tid();
+        assert!(self.tasks.lock().get(&(pid, tid)).is_none());
         self.tasks.lock().push((pid, tid), task.phantom());
     }
 

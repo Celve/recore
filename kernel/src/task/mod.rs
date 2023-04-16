@@ -14,11 +14,6 @@ pub fn suspend_yield() {
     schedule();
 }
 
-pub fn stop_yield() {
-    fetch_curr_task().stop();
-    schedule();
-}
-
 pub fn exit_yield(exit_code: isize) {
     let task = fetch_curr_task();
     task.exit(exit_code);
@@ -29,10 +24,6 @@ pub fn exit_yield(exit_code: isize) {
     }
 
     schedule();
-}
-
-pub fn cont() {
-    fetch_curr_task().cont();
 }
 
 pub fn schedule() {

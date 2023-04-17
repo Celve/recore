@@ -1,3 +1,6 @@
+# Timer interrupt could only be received from machine mode. 
+# We could not delegate it to supervisor mode direclty.
+# Therefore, we set up a software interrupt here to delegate it to supervisor mode indirectly.
     .section .text.trap
     .globl _timertrap
     .align 2

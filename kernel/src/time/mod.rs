@@ -1,7 +1,6 @@
 use core::arch::global_asm;
 
 use crate::config::{CLINT, NCPU, TIMER_INTERVAL};
-use lazy_static::lazy_static;
 use riscv::register::*;
 
 global_asm!(include_str!("trap.s"));

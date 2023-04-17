@@ -76,7 +76,7 @@ unsafe fn rust_start() -> ! {
     mideleg::set_ssoft();
 
     asm!(
-        "csrw mideleg, {mideleg}",
+        "csrw mideleg, {mideleg}", // some bits could not be set by this method
         "csrw medeleg, {medeleg}",
         "mret",
         medeleg = in(reg) !0,

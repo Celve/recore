@@ -34,6 +34,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_SIGACTION => sys_sigaction(args[0], args[1], args[2]),
         SYSCALL_SIGPROCMASK => sys_sigprocmask(args[0] as u32),
         SYSCALL_SIGRETURN => sys_sigreturn(),
+        SYSCALL_GETPID => sys_getpid(),
         SYSCALL_FORK => sys_fork(),
         SYSCALL_EXEC => sys_exec(args[0], args[1] as *const usize),
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1]),

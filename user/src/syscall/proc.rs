@@ -26,6 +26,10 @@ pub fn sys_exec(path: &str, args: &Vec<*const u8>) -> isize {
     )
 }
 
+pub fn sys_getpid() -> isize {
+    syscall(SYSCALL_GETPID, [0; 3])
+}
+
 pub fn sys_waitpid(pid: isize, exit_code: &mut i32) -> isize {
     syscall(
         SYSCALL_WAITPID,

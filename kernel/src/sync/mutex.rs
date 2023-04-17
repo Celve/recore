@@ -3,7 +3,9 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use alloc::{sync::Weak, vec::Vec};
 use spin::mutex::Mutex;
 
-use crate::task::{manager::TASK_MANAGER, processor::fetch_curr_task, suspend_yield, task::Task};
+use crate::task::{processor::fetch_curr_task, suspend_yield, task::Task};
+
+use super::waiting_queue::WaitingQueue;
 
 pub struct SpinMutex {
     locked: AtomicBool, // actually, it doesn't need atomic
@@ -11,7 +13,7 @@ pub struct SpinMutex {
 
 pub struct BlockMutex {
     locked: AtomicBool, // actually, it doesn't need atomic
-    waitings: Mutex<Vec<Weak<Task>>>,
+    queue: Mutex<WaitingQueue>,
 }
 
 impl SpinMutex {
@@ -44,7 +46,7 @@ impl BlockMutex {
             let task = fetch_curr_task();
             task.stop();
 
-            self.waitings.lock().push(task.phantom());
+            self.queue.lock().push(&task);
             suspend_yield();
         }
     }
@@ -52,16 +54,7 @@ impl BlockMutex {
     pub fn unlock(&self) {
         self.locked.store(false, Ordering::Release);
 
-        let task = loop {
-            let task = self.waitings.lock().pop();
-            if let Some(task) = task {
-                if let Some(task) = task.upgrade() {
-                    break Some(task);
-                }
-            } else {
-                break None;
-            }
-        };
+        let task = self.queue.lock().pop();
         if let Some(task) = task {
             task.wake_up();
         }
@@ -84,7 +77,7 @@ impl BlockMutex {
     pub fn new() -> Self {
         Self {
             locked: AtomicBool::new(false),
-            waitings: Mutex::new(Vec::new()),
+            queue: Mutex::new(WaitingQueue::new()),
         }
     }
 }

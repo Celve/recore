@@ -6,34 +6,27 @@ use spin::mutex::Mutex;
 
 use crate::task::{suspend_yield, task::Task};
 
+use super::waiting_queue::WaitingQueue;
+
 pub struct Condvar {
-    waitings: Mutex<Vec<Weak<Task>>>,
+    waitings: Mutex<WaitingQueue>,
 }
 
 impl Condvar {
     pub fn new() -> Self {
         Self {
-            waitings: Mutex::new(Vec::new()),
+            waitings: Mutex::new(WaitingQueue::new()),
         }
     }
 
     pub fn wait(&self, task: &Arc<Task>) {
         task.stop();
-        self.waitings.lock().push(task.phantom());
+        self.waitings.lock().push(&task);
         suspend_yield();
     }
 
     pub fn notify_one(&self) {
-        let task = loop {
-            let opt_task = self.waitings.lock().pop();
-            if let Some(weak_task) = opt_task {
-                if let Some(arc_task) = weak_task.upgrade() {
-                    break Some(arc_task);
-                }
-            } else {
-                break None;
-            }
-        };
+        let task = self.waitings.lock().pop();
         if let Some(task) = task {
             task.wake_up();
         }
@@ -42,9 +35,13 @@ impl Condvar {
     pub fn notify_all(&self) {
         let mut waitings = self.waitings.lock();
         while let Some(task) = waitings.pop() {
-            if let Some(task) = task.upgrade() {
-                task.wake_up();
-            }
+            task.wake_up();
         }
+    }
+}
+
+impl Default for Condvar {
+    fn default() -> Self {
+        Self::new()
     }
 }

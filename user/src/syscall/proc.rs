@@ -71,3 +71,15 @@ pub fn sys_mutex_lock(id: usize) -> isize {
 pub fn sys_mutex_unlock(id: usize) -> isize {
     syscall(SYSCALL_MUTEX_UNLOCK, [id, 0, 0])
 }
+
+pub fn sys_semaphore_create(counter: usize) -> isize {
+    syscall(SYSCALL_SEMAPHORE_CREATE, [counter, 0, 0])
+}
+
+pub fn sys_semaphore_up(id: usize) -> isize {
+    syscall(SYSCALL_SEMAPHORE_UP, [id, 0, 0])
+}
+
+pub fn sys_semaphore_down(id: usize) -> isize {
+    syscall(SYSCALL_SEMAPHORE_DOWN, [id, 0, 0])
+}

@@ -14,7 +14,6 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     let task = proc.new_task(entry.into(), arg);
 
     TASK_MANAGER.push(&task);
-    println!("Task manager has {}.", TASK_MANAGER.len());
 
     let tid = task.lock().tid();
     println!(

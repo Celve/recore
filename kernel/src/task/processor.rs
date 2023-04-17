@@ -1,14 +1,9 @@
 use alloc::sync::{Arc, Weak};
-use fosix::signal::SignalFlags;
 use lazy_static::lazy_static;
-use riscv::register::stvec;
 use spin::mutex::Mutex;
 
 use crate::{
-    proc::{
-        manager::{INITPROC, PROC_MANAGER},
-        proc::{Proc, ProcState},
-    },
+    proc::{manager::PROC_MANAGER, proc::Proc},
     task::{task::TaskState, timer::TIMER},
     time::get_time,
 };

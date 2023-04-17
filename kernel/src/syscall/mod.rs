@@ -43,6 +43,9 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_MUTEX_CREATE => sys_mutex_create(args[0] == 1),
         SYSCALL_MUTEX_LOCK => sys_mutex_lock(args[0]),
         SYSCALL_MUTEX_UNLOCK => sys_mutex_unlock(args[0]),
+        SYSCALL_SEMAPHORE_CREATE => sys_semaphore_create(args[0]),
+        SYSCALL_SEMAPHORE_UP => sys_semaphore_up(args[0]),
+        SYSCALL_SEMAPHORE_DOWN => sys_semaphore_down(args[0]),
         _ => panic!("[kernel] Unknown syscall id: {}", id),
     }
 }

@@ -17,10 +17,12 @@ use crate::{
         id::{GID_ALLOCATOR, PID_ALLOCATOR},
         manager::{INITPROC, PROC_MANAGER},
     },
+    sync::semaphore::Semaphore,
     task::task::Task,
 };
 
 use super::{
+    alloc_table::AllocTable,
     fd_table::FdTable,
     id::{Id, IdAllocator},
     lock_table::LockTable,
@@ -45,6 +47,7 @@ pub struct ProcInner {
     sig_actions: [SignalAction; NUM_SIGNAL],
     base: VirAddr,
     lock_table: LockTable,
+    sema_table: AllocTable<Arc<Semaphore>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -82,6 +85,7 @@ impl Proc {
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 base,
                 lock_table: LockTable::new(),
+                sema_table: AllocTable::new(),
             }),
         });
 
@@ -252,6 +256,7 @@ impl Proc {
         let fd_table = proc.fd_table().clone();
         let tid_allocator = Arc::new(IdAllocator::new());
         assert_eq!(proc.lock_table.len(), 0); // the cloning of mutexes is not supported yet
+        assert_eq!(proc.sema_table.len(), 0); // the cloning of mutexes is not supported yet
 
         let forked = Arc::new(Self {
             pid: PID_ALLOCATOR.alloc(),
@@ -269,6 +274,7 @@ impl Proc {
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 base,
                 lock_table: LockTable::new(),
+                sema_table: AllocTable::new(),
             }),
         });
 
@@ -372,5 +378,13 @@ impl ProcInner {
 
     pub fn lock_table_mut(&mut self) -> &mut LockTable {
         &mut self.lock_table
+    }
+
+    pub fn sema_table(&self) -> &AllocTable<Arc<Semaphore>> {
+        &self.sema_table
+    }
+
+    pub fn sema_table_mut(&mut self) -> &mut AllocTable<Arc<Semaphore>> {
+        &mut self.sema_table
     }
 }

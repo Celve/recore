@@ -59,8 +59,7 @@ impl BlockMutex {
             }
         };
         if let Some(task) = task {
-            task.cont();
-            TASK_MANAGER.push(&task);
+            task.wake_up();
         }
     }
 }

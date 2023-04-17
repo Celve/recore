@@ -5,7 +5,7 @@ use alloc::{
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
-use super::{manager::TASK_MANAGER, task::Task};
+use super::task::Task;
 
 pub struct Timer {
     tasks: Mutex<BinaryHeap<TimerUnit>>,
@@ -44,8 +44,7 @@ impl Timer {
                 break;
             }
             if let Some(task) = timer_unit.task.upgrade() {
-                task.cont();
-                TASK_MANAGER.push(&task);
+                task.wake_up();
             }
             top = self.tasks.lock().pop();
         }

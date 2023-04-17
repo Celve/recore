@@ -189,6 +189,11 @@ impl Task {
         task.task_status = TaskState::Running;
     }
 
+    pub fn wake_up(self: &Arc<Self>) {
+        self.lock().task_status = TaskState::Running;
+        TASK_MANAGER.push(self);
+    }
+
     /// Append the task's signal flags by locking it.
     pub fn kill(self: &Arc<Self>, sig: SignalFlags) {
         let mut task = self.lock();

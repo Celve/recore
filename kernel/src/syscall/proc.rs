@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use fosix::{
     fs::OpenFlags,
     signal::{SignalAction, SignalFlags, SIGCONT, SIGKILL, SIGSTOP},
@@ -6,6 +6,7 @@ use fosix::{
 
 use crate::{
     proc::{manager::PROC_MANAGER, proc::ProcState},
+    sync::semaphore::Semaphore,
     task::{
         exit_yield,
         manager::TASK_MANAGER,
@@ -180,6 +181,42 @@ pub fn sys_mutex_unlock(id: usize) -> isize {
     };
     if let Some(lock) = lock {
         lock.unlock();
+        0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_semaphore_create(counter: usize) -> isize {
+    let proc = fetch_curr_proc();
+    let mut proc_guard = proc.lock();
+    proc_guard
+        .sema_table_mut()
+        .alloc(Arc::new(Semaphore::new(counter))) as isize
+}
+
+pub fn sys_semaphore_down(id: usize) -> isize {
+    let sema = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.sema_table().get(id)
+    };
+    if let Some(sema) = sema {
+        sema.down();
+        0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_semaphore_up(id: usize) -> isize {
+    let sema = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.sema_table().get(id)
+    };
+    if let Some(sema) = sema {
+        sema.up();
         0
     } else {
         -1

@@ -1,7 +1,7 @@
 use core::arch::{asm, global_asm};
 
-use crate::config::{PAGE_SIZE, TRAMPOLINE_ADDR};
-use crate::task::processor::{fetch_curr_proc, fetch_curr_task};
+use crate::config::TRAMPOLINE_ADDR;
+use crate::task::processor::fetch_curr_task;
 use crate::trap::set_user_stvec;
 
 global_asm!(include_str!("trampoline.s"));

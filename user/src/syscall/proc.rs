@@ -87,3 +87,19 @@ pub fn sys_semaphore_up(id: usize) -> isize {
 pub fn sys_semaphore_down(id: usize) -> isize {
     syscall(SYSCALL_SEMAPHORE_DOWN, [id, 0, 0])
 }
+
+pub fn sys_condvar_create() -> isize {
+    syscall(SYSCALL_CONDVAR_CREATE, [0; 3])
+}
+
+pub fn sys_condvar_wait(condvar_id: usize, lock_id: usize) -> isize {
+    syscall(SYSCALL_CONDVAR_WAIT, [condvar_id, lock_id, 0])
+}
+
+pub fn sys_condvar_notify_one(id: usize) -> isize {
+    syscall(SYSCALL_CONDVAR_NOTIFY_ONE, [id, 0, 0])
+}
+
+pub fn sys_condvar_notify_all(id: usize) -> isize {
+    syscall(SYSCALL_CONDVAR_NOTIFY_ALL, [id, 0, 0])
+}

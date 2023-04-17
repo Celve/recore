@@ -1,10 +1,10 @@
-use core::mem::size_of;
-
 use alloc::{
     string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
+
+use core::mem::size_of;
 use fosix::signal::{SignalAction, SignalFlags};
 use fs::{dir::Dir, file::File};
 use spin::mutex::{Mutex, MutexGuard};
@@ -17,7 +17,7 @@ use crate::{
         id::{GID_ALLOCATOR, PID_ALLOCATOR},
         manager::{INITPROC, PROC_MANAGER},
     },
-    sync::semaphore::Semaphore,
+    sync::{condvar::Condvar, semaphore::Semaphore},
     task::task::Task,
 };
 
@@ -48,6 +48,7 @@ pub struct ProcInner {
     base: VirAddr,
     lock_table: LockTable,
     sema_table: AllocTable<Arc<Semaphore>>,
+    condvar_table: AllocTable<Arc<Condvar>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -86,6 +87,7 @@ impl Proc {
                 base,
                 lock_table: LockTable::new(),
                 sema_table: AllocTable::new(),
+                condvar_table: AllocTable::new(),
             }),
         });
 
@@ -275,6 +277,7 @@ impl Proc {
                 base,
                 lock_table: LockTable::new(),
                 sema_table: AllocTable::new(),
+                condvar_table: AllocTable::new(),
             }),
         });
 
@@ -386,5 +389,13 @@ impl ProcInner {
 
     pub fn sema_table_mut(&mut self) -> &mut AllocTable<Arc<Semaphore>> {
         &mut self.sema_table
+    }
+
+    pub fn condvar_table(&self) -> &AllocTable<Arc<Condvar>> {
+        &self.condvar_table
+    }
+
+    pub fn condvar_table_mut(&mut self) -> &mut AllocTable<Arc<Condvar>> {
+        &mut self.condvar_table
     }
 }

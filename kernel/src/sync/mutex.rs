@@ -28,6 +28,10 @@ impl SpinMutex {
     pub fn unlock(&self) {
         self.locked.store(false, Ordering::Release);
     }
+
+    pub fn is_locked(&self) -> bool {
+        self.locked.load(Ordering::Acquire)
+    }
 }
 
 impl BlockMutex {
@@ -61,6 +65,10 @@ impl BlockMutex {
         if let Some(task) = task {
             task.wake_up();
         }
+    }
+
+    pub fn is_locked(&self) -> bool {
+        self.locked.load(Ordering::Acquire)
     }
 }
 

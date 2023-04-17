@@ -47,6 +47,10 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_SEMAPHORE_CREATE => sys_semaphore_create(args[0]),
         SYSCALL_SEMAPHORE_UP => sys_semaphore_up(args[0]),
         SYSCALL_SEMAPHORE_DOWN => sys_semaphore_down(args[0]),
+        SYSCALL_CONDVAR_CREATE => sys_condvar_create(),
+        SYSCALL_CONDVAR_WAIT => sys_condvar_wait(args[0], args[1]),
+        SYSCALL_CONDVAR_NOTIFY_ONE => sys_condvar_notify_one(args[0]),
+        SYSCALL_CONDVAR_NOTIFY_ALL => sys_condvar_notify_all(args[0]),
         _ => panic!("[kernel] Unknown syscall id: {}", id),
     }
 }

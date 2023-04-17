@@ -25,6 +25,13 @@ impl Lockable {
             Lockable::BlockMutex(mutex) => mutex.unlock(),
         }
     }
+
+    pub fn is_locked(&self) -> bool {
+        match self {
+            Lockable::SpinMutex(mutex) => mutex.is_locked(),
+            Lockable::BlockMutex(mutex) => mutex.is_locked(),
+        }
+    }
 }
 
 impl LockTable {

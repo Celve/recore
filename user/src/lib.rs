@@ -197,3 +197,19 @@ pub fn semaphore_up(id: usize) -> isize {
 pub fn semaphore_down(id: usize) -> isize {
     sys_semaphore_down(id)
 }
+
+pub fn condvar_create() -> isize {
+    sys_condvar_create()
+}
+
+pub fn condvar_wait(condvar_id: usize, lock_id: usize) -> isize {
+    sys_condvar_wait(condvar_id, lock_id)
+}
+
+pub fn condvar_notify_one(id: usize) -> isize {
+    sys_condvar_notify_one(id)
+}
+
+pub fn condvar_notify_all(id: usize) -> isize {
+    sys_condvar_notify_all(id)
+}

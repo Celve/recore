@@ -6,7 +6,7 @@ use fosix::{
 
 use crate::{
     proc::{manager::PROC_MANAGER, proc::ProcState},
-    sync::semaphore::Semaphore,
+    sync::{condvar::Condvar, semaphore::Semaphore},
     task::{
         exit_yield,
         manager::TASK_MANAGER,
@@ -217,6 +217,69 @@ pub fn sys_semaphore_up(id: usize) -> isize {
     };
     if let Some(sema) = sema {
         sema.up();
+        0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_condvar_create() -> isize {
+    let proc = fetch_curr_proc();
+    let mut proc_guard = proc.lock();
+    proc_guard
+        .condvar_table_mut()
+        .alloc(Arc::new(Condvar::new())) as isize
+}
+
+pub fn sys_condvar_wait(condvar_id: usize, lock_id: usize) -> isize {
+    let condvar = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.condvar_table().get(condvar_id)
+    };
+    let lock = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.lock_table().get(lock_id)
+    };
+    let task = fetch_curr_task();
+    if let (Some(condvar), Some(lock)) = (condvar, lock) {
+        if lock.is_locked() {
+            lock.unlock();
+            condvar.wait(&task);
+            suspend_yield();
+            lock.lock();
+            0
+        } else {
+            -1
+        }
+    } else {
+        -1
+    }
+}
+
+pub fn sys_condvar_notify_one(id: usize) -> isize {
+    let condvar = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.condvar_table().get(id)
+    };
+    if let Some(condvar) = condvar {
+        condvar.notify_one();
+        0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_condvar_notify_all(id: usize) -> isize {
+    let condvar = {
+        let proc = fetch_curr_proc();
+        let proc_guard = proc.lock();
+        proc_guard.condvar_table().get(id)
+    };
+    if let Some(condvar) = condvar {
+        condvar.notify_all();
         0
     } else {
         -1

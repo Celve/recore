@@ -16,6 +16,11 @@ pub struct TrapCtx {
     pub kernel_satp: usize,
 }
 
+/// The handle for trap context.
+///
+/// It holds a piece of area that is used to store the trap context.
+/// When the trap context handle is dropped, the area will be freed.
+/// Hence, it's necessary to keep trap context handle alive.
 pub struct TrapCtxHandle {
     tid: usize,
     area: Area,

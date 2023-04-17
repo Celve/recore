@@ -6,9 +6,11 @@ use crate::trap::set_user_stvec;
 
 global_asm!(include_str!("trampoline.s"));
 
+/// The function is a trampoline for `_restore()` inside `trampoline.s`.
+/// It would never return when the function is called.
+/// Hence, all stack frames inside the kernel stack is useless from this point.
 #[no_mangle]
 pub fn restore() -> ! {
-    // RECEIVE wrong SP when get into this function!
     let user_satp = fetch_curr_task().lock().page_table().to_satp();
     let trap_ctx_ptr = fetch_curr_task().lock().trap_ctx_ptr();
 

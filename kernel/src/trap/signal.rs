@@ -10,6 +10,7 @@ use crate::{
     },
 };
 
+/// The handler that handles all signals.
 pub fn signal_handler() {
     if fetch_curr_task().lock().sig_handling().is_none() {
         loop {
@@ -60,6 +61,7 @@ pub fn signal_handler() {
     }
 }
 
+/// The handler that handles all kernel signals, which should be delegated by the `signal_handler()`.
 fn kernel_signal_handler(sigid: usize) {
     println!(
         "kernel signal handler is now handling {} with pid {} and tid {}",
@@ -78,6 +80,7 @@ fn kernel_signal_handler(sigid: usize) {
     }
 }
 
+/// The handler that handles all user signals, which should be delegated by the `signal_handler()`.
 fn user_signal_handler(sigid: usize) {
     let handler = {
         let proc = fetch_curr_proc();

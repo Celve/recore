@@ -15,6 +15,10 @@ pub mod context;
 pub mod signal;
 pub mod trampoline;
 
+/// The function that handles traps from user mode.
+///
+/// When the trap happens, the sie register would be set to 0.
+/// Hence there is no supervisor mode interrupt or exception that could enter the trap handler again.
 #[no_mangle]
 pub fn trap_handler() -> ! {
     set_kernel_stvec();

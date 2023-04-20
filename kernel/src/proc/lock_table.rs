@@ -1,10 +1,10 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use crate::sync::mutex::{BlockMutex, SpinMutex};
+use crate::sync::lock::{BlockLock, SpinLock};
 
 pub enum Lockable {
-    SpinMutex(SpinMutex),
-    BlockMutex(BlockMutex),
+    SpinMutex(SpinLock),
+    BlockMutex(BlockLock),
 }
 
 pub struct LockTable {
@@ -41,9 +41,9 @@ impl LockTable {
 
     pub fn alloc(&mut self, blocked: bool) -> usize {
         let lock = Arc::new(if blocked {
-            Lockable::BlockMutex(BlockMutex::new())
+            Lockable::BlockMutex(BlockLock::new())
         } else {
-            Lockable::SpinMutex(SpinMutex::new())
+            Lockable::SpinMutex(SpinLock::new())
         });
         let pos = self.locks.iter().position(|mutex| mutex.is_none());
         if let Some(pos) = pos {

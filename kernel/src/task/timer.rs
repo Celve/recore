@@ -3,12 +3,12 @@ use alloc::{
     sync::{Arc, Weak},
 };
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use super::task::Task;
 
 pub struct Timer {
-    tasks: Mutex<BinaryHeap<TimerUnit>>,
+    tasks: Spin<BinaryHeap<TimerUnit>>,
 }
 
 pub struct TimerUnit {
@@ -23,7 +23,7 @@ lazy_static! {
 impl Timer {
     pub fn new() -> Self {
         Self {
-            tasks: Mutex::new(BinaryHeap::new()),
+            tasks: Spin::new(BinaryHeap::new()),
         }
     }
 }

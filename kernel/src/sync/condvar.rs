@@ -1,18 +1,18 @@
 use alloc::sync::Arc;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::task::task::Task;
 
 use super::waiting_queue::WaitingQueue;
 
 pub struct Condvar {
-    waitings: Mutex<WaitingQueue>,
+    waitings: Spin<WaitingQueue>,
 }
 
 impl Condvar {
     pub fn new() -> Self {
         Self {
-            waitings: Mutex::new(WaitingQueue::new()),
+            waitings: Spin::new(WaitingQueue::new()),
         }
     }
 

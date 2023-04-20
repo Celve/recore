@@ -1,11 +1,11 @@
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::task::processor::fetch_curr_task;
 
 use super::waiting_queue::WaitingQueue;
 
 pub struct Semaphore {
-    inner: Mutex<SemaphoreInner>,
+    inner: Spin<SemaphoreInner>,
 }
 
 pub struct SemaphoreInner {
@@ -16,7 +16,7 @@ pub struct SemaphoreInner {
 impl Semaphore {
     pub fn new(counter: usize) -> Semaphore {
         Self {
-            inner: Mutex::new(SemaphoreInner {
+            inner: Spin::new(SemaphoreInner {
                 counter,
                 queue: WaitingQueue::new(),
             }),

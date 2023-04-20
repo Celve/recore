@@ -10,7 +10,7 @@ pub struct WaitingQueue {
 }
 
 impl WaitingQueue {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             waitings: Vec::new(),
         }

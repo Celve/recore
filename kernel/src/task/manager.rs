@@ -5,17 +5,17 @@ use super::task::Task;
 use alloc::sync::{Arc, Weak};
 use lazy_static::lazy_static;
 use lru::LruCache;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 pub struct TaskManager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    tasks: Mutex<LruCache<(usize, usize), Weak<Task>>>,
+    tasks: Spin<LruCache<(usize, usize), Weak<Task>>>,
 }
 
 impl TaskManager {
     pub fn new() -> Self {
         Self {
-            tasks: Mutex::new(LruCache::new(NonZeroUsize::new(1024).unwrap())),
+            tasks: Spin::new(LruCache::new(NonZeroUsize::new(1024).unwrap())),
         }
     }
 

@@ -7,7 +7,7 @@ use alloc::{
 use core::mem::size_of;
 use fosix::signal::{SignalAction, SignalFlags};
 use fs::{dir::Dir, file::File};
-use spin::mutex::{Mutex, MutexGuard};
+use spin::{Spin, SpinGuard};
 
 use crate::{
     config::NUM_SIGNAL,
@@ -30,7 +30,7 @@ use super::{
 
 pub struct Proc {
     pid: Arc<Id>, // read only
-    inner: Mutex<ProcInner>,
+    inner: Spin<ProcInner>,
 }
 
 pub struct ProcInner {
@@ -72,7 +72,7 @@ impl Proc {
 
         let res = Arc::new(Self {
             pid: PID_ALLOCATOR.alloc(),
-            inner: Mutex::new(ProcInner {
+            inner: Spin::new(ProcInner {
                 tid_allocator: tid_allocator.clone(),
                 user_mem,
                 page_table: page_table.clone(),
@@ -108,7 +108,7 @@ impl Proc {
         Arc::downgrade(self)
     }
 
-    pub fn lock(&self) -> MutexGuard<ProcInner> {
+    pub fn lock(&self) -> SpinGuard<ProcInner> {
         self.inner.lock()
     }
 
@@ -257,12 +257,12 @@ impl Proc {
         let cwd = proc.cwd.clone();
         let fd_table = proc.fd_table().clone();
         let tid_allocator = Arc::new(IdAllocator::new());
-        assert_eq!(proc.lock_table.len(), 0); // the cloning of mutexes is not supported yet
-        assert_eq!(proc.sema_table.len(), 0); // the cloning of mutexes is not supported yet
+        assert_eq!(proc.lock_table.len(), 0); // the cloning of Spines is not supported yet
+        assert_eq!(proc.sema_table.len(), 0); // the cloning of Spines is not supported yet
 
         let forked = Arc::new(Self {
             pid: PID_ALLOCATOR.alloc(),
-            inner: Mutex::new(ProcInner {
+            inner: Spin::new(ProcInner {
                 tid_allocator: tid_allocator.clone(),
                 user_mem,
                 page_table: page_table.clone(),

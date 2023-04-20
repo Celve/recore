@@ -5,7 +5,7 @@ use core::{
 };
 
 use alloc::vec::Vec;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::config::PAGE_SIZE_BITS;
 
@@ -17,7 +17,7 @@ pub struct SlabAllocator {
 }
 
 pub struct LockedSlabHeap {
-    allocator: Mutex<SlabAllocator>,
+    allocator: Spin<SlabAllocator>,
 }
 
 impl SlabAllocator {
@@ -50,7 +50,7 @@ impl SlabAllocator {
 impl LockedSlabHeap {
     pub const fn empty() -> Self {
         Self {
-            allocator: Mutex::new(SlabAllocator::empty()),
+            allocator: Spin::new(SlabAllocator::empty()),
         }
     }
 

@@ -1,6 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::{
     proc::{manager::PROC_MANAGER, proc::Proc},
@@ -44,7 +44,7 @@ impl Processor {
 }
 
 lazy_static! {
-    static ref PROCESSOR: Mutex<Processor> = Mutex::new(Processor::new());
+    static ref PROCESSOR: Spin<Processor> = Spin::new(Processor::new());
 }
 
 /// Fetch the current task.

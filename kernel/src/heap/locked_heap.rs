@@ -1,22 +1,22 @@
 use core::alloc::GlobalAlloc;
 
 use allocator::buddy_allocator::BuddyAllocator;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::config::KERNEL_HEAP_GRANULARITY;
 
 use super::slab_allocator::SlabAllocator;
 
 pub struct LockedHeap {
-    pub slab_allocator: Mutex<SlabAllocator>,
-    pub buddy_allocator: Mutex<BuddyAllocator>,
+    pub slab_allocator: Spin<SlabAllocator>,
+    pub buddy_allocator: Spin<BuddyAllocator>,
 }
 
 impl LockedHeap {
     pub const fn empty() -> Self {
         Self {
-            slab_allocator: Mutex::new(SlabAllocator::empty()),
-            buddy_allocator: Mutex::new(BuddyAllocator::empty(KERNEL_HEAP_GRANULARITY)),
+            slab_allocator: Spin::new(SlabAllocator::empty()),
+            buddy_allocator: Spin::new(BuddyAllocator::empty(KERNEL_HEAP_GRANULARITY)),
         }
     }
 

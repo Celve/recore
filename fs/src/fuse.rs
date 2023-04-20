@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::{cache::CacheManager, disk::DiskManager};
 
@@ -11,9 +11,9 @@ use super::{
 };
 
 pub struct Fuse<D: DiskManager> {
-    bitmap_inode: Mutex<BitMap<D>>,
+    bitmap_inode: Spin<BitMap<D>>,
     area_inode_start_bid: usize,
-    bitmap_dnode: Mutex<BitMap<D>>,
+    bitmap_dnode: Spin<BitMap<D>>,
     area_dnode_start_bid: usize,
     disk_manager: Arc<D>,
     cache_manager: Arc<CacheManager<D>>,
@@ -69,9 +69,9 @@ impl<D: DiskManager> Fuse<D> {
             + super_block.num_dnode_bitmap_blks;
 
         Self {
-            bitmap_inode: Mutex::new(bitmap_inode),
+            bitmap_inode: Spin::new(bitmap_inode),
             area_inode_start_bid,
-            bitmap_dnode: Mutex::new(bitmap_dnode),
+            bitmap_dnode: Spin::new(bitmap_dnode),
             area_dnode_start_bid,
             disk_manager: cache_manager.disk_manager(),
             cache_manager,
@@ -105,9 +105,9 @@ impl<D: DiskManager> Fuse<D> {
             cache_manager.clone(),
         );
         Self {
-            bitmap_inode: Mutex::new(bitmap_inode),
+            bitmap_inode: Spin::new(bitmap_inode),
             area_inode_start_bid: 1 + super_block.num_inode_bitmap_blks,
-            bitmap_dnode: Mutex::new(bitmap_dnode),
+            bitmap_dnode: Spin::new(bitmap_dnode),
             area_dnode_start_bid: 1
                 + super_block.num_inode_bitmap_blks
                 + super_block.num_inode_area_blks

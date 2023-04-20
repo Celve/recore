@@ -2,7 +2,7 @@ use core::{mem::size_of, num::NonZeroUsize, slice};
 
 use alloc::{sync::Arc, vec::Vec};
 use lru::LruCache;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::{
     config::{BLK_SIZE, CACHE_SIZE},
@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub struct CacheManager<D: DiskManager> {
-    caches: Mutex<LruCache<usize, Arc<Mutex<Cache<D>>>>>,
+    caches: Spin<LruCache<usize, Arc<Spin<Cache<D>>>>>,
     disk_manager: Arc<D>,
 }
 
@@ -24,17 +24,17 @@ pub struct Cache<D: DiskManager> {
 impl<D: DiskManager> CacheManager<D> {
     pub fn new(disk_manager: Arc<D>) -> Self {
         Self {
-            caches: Mutex::new(LruCache::new(NonZeroUsize::new(CACHE_SIZE).unwrap())),
+            caches: Spin::new(LruCache::new(NonZeroUsize::new(CACHE_SIZE).unwrap())),
             disk_manager,
         }
     }
 
-    pub fn get(&self, bid: usize) -> Arc<Mutex<Cache<D>>> {
+    pub fn get(&self, bid: usize) -> Arc<Spin<Cache<D>>> {
         let mut caches = self.caches.lock();
         if !caches.contains(&bid) {
             caches.put(
                 bid,
-                Arc::new(Mutex::new(Cache::new(bid, self.disk_manager.clone()))),
+                Arc::new(Spin::new(Cache::new(bid, self.disk_manager.clone()))),
             );
         }
         caches.get(&bid).unwrap().clone()

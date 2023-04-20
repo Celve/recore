@@ -8,11 +8,11 @@ use alloc::{
 };
 use fosix::fs::OpenFlags;
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 pub struct ProcManager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    procs: Mutex<BTreeMap<usize, Weak<Proc>>>,
+    procs: Spin<BTreeMap<usize, Weak<Proc>>>,
 }
 
 impl ProcManager {
@@ -21,7 +21,7 @@ impl ProcManager {
         let pid = proc.pid();
         procs.insert(pid, proc.phantom());
         Self {
-            procs: Mutex::new(procs),
+            procs: Spin::new(procs),
         }
     }
 

@@ -1,8 +1,8 @@
-use spin::mutex::MutexGuard;
+use spin::SpinGuard;
 
 use alloc::sync::Arc;
 use fosix::fs::{FilePerm, FileStat, SeekFlag};
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::{disk::DiskManager, fuse::Fuse};
 
@@ -12,7 +12,7 @@ use super::{
 };
 
 pub struct File<D: DiskManager> {
-    inner: Arc<Mutex<FileInner<D>>>,
+    inner: Arc<Spin<FileInner<D>>>,
 }
 
 pub struct FileInner<D: DiskManager> {
@@ -39,11 +39,11 @@ impl<D: DiskManager> File<D> {
         fuse: Arc<Fuse<D>>,
     ) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(FileInner::new(myself, parent, perm, fuse))),
+            inner: Arc::new(Spin::new(FileInner::new(myself, parent, perm, fuse))),
         }
     }
 
-    pub fn lock(&self) -> MutexGuard<FileInner<D>> {
+    pub fn lock(&self) -> SpinGuard<FileInner<D>> {
         self.inner.lock()
     }
 }

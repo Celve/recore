@@ -1,6 +1,6 @@
 use alloc::collections::VecDeque;
 use bitflags::bitflags;
-use spin::mutex::Mutex;
+use spin::Spin;
 use volatile::{ReadOnly, Volatile};
 
 macro_rules! wait_for {
@@ -97,7 +97,7 @@ pub struct UartInner {
 }
 
 pub struct Uart {
-    inner: Mutex<UartInner>,
+    inner: Spin<UartInner>,
 }
 
 impl UartRaw {

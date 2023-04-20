@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use core::sync::atomic::{AtomicPtr, Ordering};
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::{config::UART_BASE_ADDRESS, drivers::uart::UartRaw, task::processor::fetch_curr_task};
 
@@ -166,7 +166,7 @@ lazy_static! {
     // static ref UART: SerialPort = unsafe { SerialPort::new(UART_BASE_ADDRESS) };
     static ref UART: UartRaw = unsafe { UartRaw::new(UART_BASE_ADDRESS) };
     static ref UART_TX: UartTx = UartTx;
-    static ref UART_RX: Mutex<UartRx> = Mutex::new(UartRx);
+    static ref UART_RX: Spin<UartRx> = Spin::new(UartRx);
 }
 
 pub fn send_to_uart(data: u8) {

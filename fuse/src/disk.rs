@@ -2,12 +2,12 @@ use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 
 use fs::disk::DiskManager;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use fs::config::BLK_SIZE;
 
 pub struct FileDev {
-    file: Mutex<File>,
+    file: Spin<File>,
 }
 
 impl DiskManager for FileDev {
@@ -39,7 +39,7 @@ impl DiskManager for FileDev {
 impl FileDev {
     pub fn new(file: File) -> Self {
         Self {
-            file: Mutex::new(file),
+            file: Spin::new(file),
         }
     }
 }

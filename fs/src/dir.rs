@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 use fosix::fs::{DirEntry, FileStat, OpenFlags};
-use spin::mutex::{Mutex, MutexGuard};
+use spin::{Spin, SpinGuard};
 
 use crate::{disk::DiskManager, fuse::Fuse};
 
@@ -12,7 +12,7 @@ use super::{
 };
 
 pub struct Dir<D: DiskManager> {
-    inner: Arc<Mutex<DirInner<D>>>,
+    inner: Arc<Spin<DirInner<D>>>,
 }
 
 pub struct DirInner<D: DiskManager> {
@@ -31,11 +31,11 @@ impl<D: DiskManager> Clone for Dir<D> {
 impl<D: DiskManager> Dir<D> {
     pub fn new(myself: InodePtr<D>, fuse: Arc<Fuse<D>>) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(DirInner::new(myself, fuse))),
+            inner: Arc::new(Spin::new(DirInner::new(myself, fuse))),
         }
     }
 
-    pub fn lock(&self) -> MutexGuard<DirInner<D>> {
+    pub fn lock(&self) -> SpinGuard<DirInner<D>> {
         self.inner.lock()
     }
 }

@@ -1,7 +1,7 @@
 use alloc::sync::{Arc, Weak};
 use fosix::signal::SignalFlags;
 use riscv::register::sstatus::{self, SPP};
-use spin::mutex::{Mutex, MutexGuard};
+use spin::{Spin, SpinGuard};
 
 use crate::{
     mm::{
@@ -25,7 +25,7 @@ use super::context::TaskContext;
 
 pub struct Task {
     proc: Weak<Proc>,
-    inner: Mutex<TaskInner>,
+    inner: Spin<TaskInner>,
 }
 
 pub struct TaskInner {
@@ -79,7 +79,7 @@ impl Task {
         );
 
         Self {
-            inner: Mutex::new(TaskInner {
+            inner: Spin::new(TaskInner {
                 tid,
                 gid,
                 page_table,
@@ -116,7 +116,7 @@ impl Task {
         trap_ctx.kernel_sp = kernel_stack.top().into();
 
         Self {
-            inner: Mutex::new(TaskInner {
+            inner: Spin::new(TaskInner {
                 tid,
                 gid,
                 page_table,
@@ -161,7 +161,7 @@ impl Task {
         task.page_table = page_table;
     }
 
-    pub fn lock(&self) -> MutexGuard<TaskInner> {
+    pub fn lock(&self) -> SpinGuard<TaskInner> {
         self.inner.lock()
     }
 

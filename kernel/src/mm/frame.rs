@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::config::{MEMORY_END, PAGE_SIZE};
 
@@ -107,7 +107,7 @@ impl FrameAllocator {
 }
 
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: Mutex<FrameAllocator> = Mutex::new(FrameAllocator::empty());
+    pub static ref FRAME_ALLOCATOR: Spin<FrameAllocator> = Spin::new(FrameAllocator::empty());
 }
 
 pub fn init_frame_allocator() {

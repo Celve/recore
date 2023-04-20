@@ -1,6 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 pub struct Id {
     id: usize,
@@ -8,7 +8,7 @@ pub struct Id {
 }
 
 pub struct IdAllocator {
-    inner: Mutex<IdAllocatorInner>,
+    inner: Spin<IdAllocatorInner>,
 }
 
 #[derive(Clone)]
@@ -48,7 +48,7 @@ impl IdAllocatorInner {
 impl IdAllocator {
     pub fn new() -> Self {
         Self {
-            inner: Mutex::new(IdAllocatorInner::new()),
+            inner: Spin::new(IdAllocatorInner::new()),
         }
     }
 
@@ -64,7 +64,7 @@ impl IdAllocator {
 impl Clone for IdAllocator {
     fn clone(&self) -> Self {
         Self {
-            inner: Mutex::new(self.inner.lock().clone()),
+            inner: Spin::new(self.inner.lock().clone()),
         }
     }
 }

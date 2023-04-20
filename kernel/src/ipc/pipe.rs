@@ -1,13 +1,13 @@
 use alloc::sync::Arc;
 use fosix::fs::FilePerm;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use crate::config::RING_BUFFER_SIZE;
 
 #[derive(Clone)]
 pub struct Pipe {
     perm: FilePerm,
-    buf: Arc<Mutex<RingBuffer>>,
+    buf: Arc<Spin<RingBuffer>>,
 }
 
 pub struct RingBuffer {
@@ -18,7 +18,7 @@ pub struct RingBuffer {
 
 impl Pipe {
     pub fn new() -> (Self, Self) {
-        let ring_buf = Arc::new(Mutex::new(RingBuffer::new()));
+        let ring_buf = Arc::new(Spin::new(RingBuffer::new()));
         let pipe_read = Self {
             perm: FilePerm::READABLE,
             buf: ring_buf.clone(),

@@ -1,80 +1,66 @@
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic::Ordering,
+};
 
-use spin::mutex::Mutex;
+use lazy_static::lazy_static;
 
-use crate::task::processor::fetch_curr_task;
+use super::lock::BlockLock;
 
-use super::waiting_queue::WaitingQueue;
-
-pub struct SpinMutex {
-    locked: AtomicBool, // actually, it doesn't need atomic
+pub struct Mutex<T> {
+    lock: BlockLock,
+    data: UnsafeCell<T>,
 }
 
-pub struct BlockMutex {
-    locked: AtomicBool, // actually, it doesn't need atomic
-    queue: Mutex<WaitingQueue>,
+pub struct MutexGuard<'a, T: 'a> {
+    lock: &'a BlockLock,
+    data: &'a mut T,
 }
 
-impl SpinMutex {
-    pub fn lock(&self) {
-        while self
-            .locked
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
-            .is_err()
-        {
-            fetch_curr_task().yield_now();
-        }
-    }
-
-    pub fn unlock(&self) {
-        self.locked.store(false, Ordering::Release);
-    }
-
-    pub fn is_locked(&self) -> bool {
-        self.locked.load(Ordering::Acquire)
-    }
-}
-
-impl BlockMutex {
-    pub fn lock(&self) {
-        while self
-            .locked
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
-            .is_err()
-        {
-            let task = fetch_curr_task();
-            self.queue.lock().push(&task);
-            task.suspend();
-        }
-    }
-
-    pub fn unlock(&self) {
-        self.locked.store(false, Ordering::Release);
-
-        let task = self.queue.lock().pop();
-        if let Some(task) = task {
-            task.wake_up();
-        }
-    }
-
-    pub fn is_locked(&self) -> bool {
-        self.locked.load(Ordering::Acquire)
-    }
-}
-
-impl SpinMutex {
-    pub fn new() -> Self {
+impl<T> Mutex<T> {
+    pub const fn new(data: T) -> Self {
         Self {
-            locked: AtomicBool::new(false),
+            lock: BlockLock::new(),
+            data: UnsafeCell::new(data),
         }
     }
 }
 
-impl BlockMutex {
-    pub fn new() -> Self {
-        Self {
-            locked: AtomicBool::new(false),
-            queue: Mutex::new(WaitingQueue::new()),
-        }
+unsafe impl<T: Send> Sync for Mutex<T> {}
+unsafe impl<T: Send> Send for Mutex<T> {}
+
+impl<T> Mutex<T> {
+    pub fn lock(&self) -> MutexGuard<T> {
+        self.lock.lock();
+        MutexGuard::new(&self.lock, unsafe { &mut *self.data.get() }) // bypass mutability check
+    }
+
+    // pub fn try_lock(&self) -> Option<MutexGuard<T>> {}
+}
+
+impl<'a, T: 'a> MutexGuard<'a, T> {
+    pub fn new(lock: &'a BlockLock, data: &'a mut T) -> Self {
+        Self { lock, data }
+    }
+}
+
+impl<T> Deref for MutexGuard<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.data
+    }
+}
+
+impl<T> DerefMut for MutexGuard<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.data
+    }
+}
+
+impl<T> Drop for MutexGuard<'_, T> {
+    fn drop(&mut self) {
+        self.lock.unlock();
     }
 }

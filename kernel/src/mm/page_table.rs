@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 
 use core::arch::asm;
 use core::cmp::{max, min};
@@ -58,7 +58,7 @@ pub struct PageTableEntry {
 /// RAII is used here. The frame collections control when to free those allocated frames used by page tables.
 pub struct PageTable {
     root: PhyPageNum,
-    frames: Mutex<Vec<Frame>>,
+    frames: Spin<Vec<Frame>>,
 }
 
 impl PageTable {
@@ -258,7 +258,7 @@ impl PageTable {
         );
         Self {
             root: frame.ppn(),
-            frames: Mutex::new(vec![frame]),
+            frames: Spin::new(vec![frame]),
         }
     }
 

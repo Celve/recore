@@ -1,21 +1,21 @@
 use core::alloc::GlobalAlloc;
 
-use spin::mutex::{Mutex, MutexGuard};
+use spin::{Spin, SpinGuard};
 
 use crate::buddy_allocator::BuddyAllocator;
 
 pub struct LockedBuddyHeap {
-    pub allocator: Mutex<BuddyAllocator>,
+    pub allocator: Spin<BuddyAllocator>,
 }
 
 impl LockedBuddyHeap {
     pub const fn empty(gran: usize) -> Self {
         Self {
-            allocator: Mutex::new(BuddyAllocator::empty(gran)),
+            allocator: Spin::new(BuddyAllocator::empty(gran)),
         }
     }
 
-    pub fn lock(&self) -> MutexGuard<BuddyAllocator> {
+    pub fn lock(&self) -> SpinGuard<BuddyAllocator> {
         self.allocator.lock()
     }
 

@@ -6,7 +6,7 @@ use fosix::{
 
 use crate::{
     proc::{manager::PROC_MANAGER, proc::ProcState},
-    sync::{condvar::Condvar, semaphore::Semaphore},
+    sync::{observable::Observable, semaphore::Semaphore},
     task::{
         manager::TASK_MANAGER,
         processor::{fetch_curr_proc, fetch_curr_task},
@@ -226,7 +226,7 @@ pub fn sys_condvar_create() -> isize {
     let mut proc_guard = proc.lock();
     proc_guard
         .condvar_table_mut()
-        .alloc(Arc::new(Condvar::new())) as isize
+        .alloc(Arc::new(Observable::new())) as isize
 }
 
 pub fn sys_condvar_wait(condvar_id: usize, lock_id: usize) -> isize {

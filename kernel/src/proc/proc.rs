@@ -17,7 +17,7 @@ use crate::{
         id::{GID_ALLOCATOR, PID_ALLOCATOR},
         manager::{INITPROC, PROC_MANAGER},
     },
-    sync::{condvar::Condvar, semaphore::Semaphore},
+    sync::{observable::Observable, semaphore::Semaphore},
     task::task::Task,
 };
 
@@ -48,7 +48,7 @@ pub struct ProcInner {
     base: VirAddr,
     lock_table: LockTable,
     sema_table: AllocTable<Arc<Semaphore>>,
-    condvar_table: AllocTable<Arc<Condvar>>,
+    condvar_table: AllocTable<Arc<Observable>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -391,11 +391,11 @@ impl ProcInner {
         &mut self.sema_table
     }
 
-    pub fn condvar_table(&self) -> &AllocTable<Arc<Condvar>> {
+    pub fn condvar_table(&self) -> &AllocTable<Arc<Observable>> {
         &self.condvar_table
     }
 
-    pub fn condvar_table_mut(&mut self) -> &mut AllocTable<Arc<Condvar>> {
+    pub fn condvar_table_mut(&mut self) -> &mut AllocTable<Arc<Observable>> {
         &mut self.condvar_table
     }
 }

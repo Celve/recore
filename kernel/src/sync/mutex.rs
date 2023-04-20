@@ -1,10 +1,7 @@
 use core::{
     cell::UnsafeCell,
     ops::{Deref, DerefMut},
-    sync::atomic::Ordering,
 };
-
-use lazy_static::lazy_static;
 
 use super::lock::BlockLock;
 
@@ -15,6 +12,7 @@ pub struct Mutex<T> {
 
 pub struct MutexGuard<'a, T: 'a> {
     lock: &'a BlockLock,
+    locked: bool,
     data: &'a mut T,
 }
 
@@ -41,7 +39,21 @@ impl<T> Mutex<T> {
 
 impl<'a, T: 'a> MutexGuard<'a, T> {
     pub fn new(lock: &'a BlockLock, data: &'a mut T) -> Self {
-        Self { lock, data }
+        Self {
+            lock,
+            locked: true,
+            data,
+        }
+    }
+
+    pub fn lock(&mut self) {
+        self.lock.lock();
+        self.locked = true;
+    }
+
+    pub fn unlock(&mut self) {
+        self.lock.unlock();
+        self.locked = false;
     }
 }
 
@@ -61,6 +73,8 @@ impl<T> DerefMut for MutexGuard<'_, T> {
 
 impl<T> Drop for MutexGuard<'_, T> {
     fn drop(&mut self) {
-        self.lock.unlock();
+        if self.locked {
+            self.lock.unlock();
+        }
     }
 }

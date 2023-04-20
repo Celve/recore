@@ -19,7 +19,7 @@ use fosix::{
     syscall::WaitFlags,
 };
 use lazy_static::lazy_static;
-use spin::mutex::Mutex;
+use spin::Spin;
 use user::{
     chdir, close, console, dup, exec, fork, mkdir, open, sigaction, sigreturn, waitpid, yield_now,
 };
@@ -70,7 +70,7 @@ impl Display for Path {
 }
 
 lazy_static! {
-    static ref JOBS: Arc<Mutex<BTreeMap<usize, ProcState>>> = Arc::new(Mutex::new(BTreeMap::new()));
+    static ref JOBS: Arc<Spin<BTreeMap<usize, ProcState>>> = Arc::new(Spin::new(BTreeMap::new()));
 }
 
 static FINISHED: AtomicBool = AtomicBool::new(false);

@@ -46,3 +46,6 @@ pub const RING_BUFFER_SIZE: usize = 128;
 pub const NUM_SIGNAL: usize = 32;
 
 pub const CLOCK_FREQ: usize = 12500000;
+
+pub const VIRT_PLIC: usize = 0xc00_0000;
+pub const VIRT_UART: usize = 0x10_000_000;

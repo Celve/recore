@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicPtr, Ordering};
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
-use crate::{config::UART_BASE_ADDRESS, task::suspend_yield};
+use crate::{config::UART_BASE_ADDRESS, drivers::uart::UartRaw, task::suspend_yield};
 
 const BS: u8 = 0x8;
 const DEL: u8 = 0x7F;
@@ -153,17 +153,18 @@ impl UartTx {
 }
 
 impl UartRx {
-    pub fn recv(&self) -> u8 {
-        UART.recv()
-    }
+    // pub fn recv(&self) -> u8 {
+    // UART.recv()
+    // }
 
     pub fn try_recv(&self) -> Option<u8> {
-        UART.try_recv()
+        UART.recv()
     }
 }
 
 lazy_static! {
-    static ref UART: SerialPort = unsafe { SerialPort::new(UART_BASE_ADDRESS) };
+    // static ref UART: SerialPort = unsafe { SerialPort::new(UART_BASE_ADDRESS) };
+    static ref UART: UartRaw = unsafe { UartRaw::new(UART_BASE_ADDRESS) };
     static ref UART_TX: UartTx = UartTx;
     static ref UART_RX: Mutex<UartRx> = Mutex::new(UartRx);
 }

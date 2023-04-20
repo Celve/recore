@@ -17,6 +17,7 @@ virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4e
 lru = "0.10.0"
 fosix = { path = "../fosix"}
 fs = { path = "../fs" }
+volatile = "0.3"
 
 [profile.release]
 # opt-level = 0

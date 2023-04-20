@@ -7,10 +7,7 @@ use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
 use fs::{dir::Dir, file::File};
 
-use crate::{
-    fs::{disk::BlkDev, FUSE},
-    task::processor::fetch_curr_proc,
-};
+use crate::{drivers::blockdev::BlkDev, fs::FUSE, task::processor::fetch_curr_proc};
 
 use self::{com::sys_pipe, file::*, proc::*, task::*};
 

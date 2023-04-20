@@ -11,7 +11,7 @@ use spin::{Spin, SpinGuard};
 
 use crate::{
     config::NUM_SIGNAL,
-    fs::disk::BlkDev,
+    drivers::blockdev::BlkDev,
     mm::{address::VirAddr, memory::MemSet, page_table::PageTable},
     proc::{
         id::{GID_ALLOCATOR, PID_ALLOCATOR},

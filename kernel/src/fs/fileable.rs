@@ -2,11 +2,12 @@ use fosix::fs::{FileStat, SeekFlag};
 use fs::{dir::Dir, file::File};
 
 use crate::{
+    drivers::blockdev::BlkDev,
     io::{stdin::Stdin, stdout::Stdout},
     ipc::pipe::Pipe,
 };
 
-use super::{disk::BlkDev, segment::Segment};
+use super::segment::Segment;
 
 #[derive(Clone)]
 pub enum Fileable {

@@ -3,6 +3,7 @@ use lazy_static::lazy_static;
 use spin::Spin;
 
 use crate::{
+    fs::FUSE,
     proc::{manager::PROC_MANAGER, proc::Proc},
     task::{task::TaskState, timer::TIMER},
     time::get_time,
@@ -101,6 +102,7 @@ pub fn switch() {
 pub fn run_tasks() {
     let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
     TASK_MANAGER.push(&task);
+    FUSE.disk_manager().enable_non_blocking();
     loop {
         switch();
     }

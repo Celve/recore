@@ -9,6 +9,7 @@ use crate::{
         plic::{TargetPriority, PLIC},
         uart::UART,
     },
+    fs::FUSE,
     syscall::syscall,
     task::processor::fetch_curr_task,
 };
@@ -41,12 +42,11 @@ pub fn trap_handler() -> ! {
             scause::Interrupt::SupervisorExternal => {
                 let id = PLIC.claim(0, TargetPriority::Supervisor);
                 match id {
-                    10 => {
-                        UART.handle_irq();
+                    1 => {
+                        FUSE.disk_manager().handle_irq();
                     }
-                    _ => {
-                        panic!("Unknown interrupt id");
-                    }
+                    10 => UART.handle_irq(),
+                    _ => panic!("Unknown interrupt id"),
                 }
                 PLIC.complete(0, TargetPriority::Supervisor, id);
             }

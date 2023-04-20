@@ -38,8 +38,8 @@ pub const DIR_ENTRY_NAME_LEN: usize = 28;
 pub const FUSE_INODE_NUM: usize = 1024;
 pub const FUSE_DNODE_NUM: usize = 4096;
 
-pub const VIRTIO_BASE_ADDRESS: usize = 0x1000_1000;
-pub const VIRTIO_MAP_SIZE: usize = 0x1000;
+pub const VIRTIO_ADDR: usize = 0x10_000_000;
+pub const VIRTIO_SIZE: usize = 0x9000;
 
 pub const RING_BUFFER_SIZE: usize = 128;
 

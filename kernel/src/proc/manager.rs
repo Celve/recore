@@ -1,9 +1,9 @@
-use super::{id::Id, proc::Proc};
+use super::proc::Proc;
 
 use crate::fs::FUSE;
 
 use alloc::{
-    collections::{BTreeMap, VecDeque},
+    collections::BTreeMap,
     sync::{Arc, Weak},
 };
 use fosix::fs::OpenFlags;

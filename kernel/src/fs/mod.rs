@@ -1,8 +1,7 @@
-pub mod disk;
 pub mod fileable;
 pub mod segment;
 
-use crate::fs::disk::BlkDev;
+use crate::drivers::blockdev::BlkDev;
 use alloc::sync::Arc;
 use fs::{cache::CacheManager, fuse::Fuse};
 use lazy_static::lazy_static;

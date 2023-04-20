@@ -3,11 +3,7 @@ use core::arch::asm;
 use fosix::syscall::SYSCALL_THREAD_CREATE;
 use riscv::register::{scause, sip, utvec::TrapMode};
 
-use crate::{
-    config::TRAMPOLINE_ADDR,
-    syscall::syscall,
-    task::{processor::fetch_curr_task, suspend_yield},
-};
+use crate::{config::TRAMPOLINE_ADDR, syscall::syscall, task::processor::fetch_curr_task};
 
 use self::{signal::signal_handler, trampoline::restore};
 
@@ -31,7 +27,7 @@ pub fn trap_handler() -> ! {
                 unsafe {
                     asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
                 }
-                suspend_yield();
+                fetch_curr_task().yield_now();
             }
             scause::Interrupt::SupervisorTimer => todo!(),
             scause::Interrupt::SupervisorExternal => {

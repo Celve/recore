@@ -1,10 +1,7 @@
-use alloc::{
-    sync::{Arc, Weak},
-    vec::Vec,
-};
+use alloc::sync::Arc;
 use spin::mutex::Mutex;
 
-use crate::task::{suspend_yield, task::Task};
+use crate::task::task::Task;
 
 use super::waiting_queue::WaitingQueue;
 
@@ -20,9 +17,8 @@ impl Condvar {
     }
 
     pub fn wait(&self, task: &Arc<Task>) {
-        task.stop();
         self.waitings.lock().push(&task);
-        suspend_yield();
+        task.suspend();
     }
 
     pub fn notify_one(&self) {

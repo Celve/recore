@@ -3,9 +3,7 @@ use fosix::signal::SignalFlags;
 use crate::{
     config::NUM_SIGNAL,
     task::{
-        exit_yield,
         processor::{fetch_curr_proc, fetch_curr_task},
-        suspend_yield,
         task::TaskState,
     },
 };
@@ -56,7 +54,7 @@ pub fn signal_handler() {
             }
 
             // for stop, it yields here
-            suspend_yield();
+            fetch_curr_task().suspend();
         }
     }
 }
@@ -71,9 +69,12 @@ fn kernel_signal_handler(sigid: usize) {
     );
     let sig = SignalFlags::from_bits(1 << sigid).unwrap();
     match sig {
-        SignalFlags::SIGKILL => exit_yield(-2), // yield immediately
-        SignalFlags::SIGSTOP => fetch_curr_task().stop(), // do not yield immediately
-        SignalFlags::SIGCONT => fetch_curr_task().cont(),
+        SignalFlags::SIGKILL => fetch_curr_task().exit(-2), // yield immediately
+        SignalFlags::SIGSTOP => *fetch_curr_task().lock().task_state_mut() = TaskState::Stopped, // do not yield immediately
+        SignalFlags::SIGCONT => {
+            // the task would be waken up in other process
+            assert!(fetch_curr_task().lock().task_state() == TaskState::Running)
+        }
         _ => {
             panic!("[kernel] Unhandled kernel signal.")
         }

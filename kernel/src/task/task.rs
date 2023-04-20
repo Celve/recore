@@ -13,7 +13,7 @@ use crate::{
         proc::Proc,
         stack::{KernelStack, UserStack},
     },
-    task::manager::TASK_MANAGER,
+    task::{manager::TASK_MANAGER, processor::fetch_idle_task_ctx_ptr},
     trap::{
         context::{TrapCtx, TrapCtxHandle},
         trampoline::restore,
@@ -32,7 +32,7 @@ pub struct TaskInner {
     tid: Arc<Id>,
     gid: Arc<Id>,
     page_table: Arc<PageTable>,
-    task_status: TaskState,
+    task_state: TaskState,
     task_ctx: TaskContext,
     trap_ctx_handle: TrapCtxHandle,
     trap_ctx_backup: Option<TrapCtx>,
@@ -83,7 +83,7 @@ impl Task {
                 tid,
                 gid,
                 page_table,
-                task_status: TaskState::Running,
+                task_state: TaskState::Running,
                 task_ctx,
                 trap_ctx_handle,
                 trap_ctx_backup: None,
@@ -120,7 +120,7 @@ impl Task {
                 tid,
                 gid,
                 page_table,
-                task_status: TaskState::Running,
+                task_state: TaskState::Running,
                 task_ctx,
                 trap_ctx_handle,
                 trap_ctx_backup,
@@ -177,23 +177,62 @@ impl Task {
 }
 
 impl Task {
-    /// Set the task state to stopped by locking it.
-    pub fn stop(&self) {
-        let mut task = self.lock();
-        task.task_status = TaskState::Stopped;
+    /// Suspend the task.
+    ///
+    /// When `suspend()` is called, the task would never be put into the task manager again.
+    /// There should be other structure that holds the task, and it should wake up the task when needed.
+    pub fn suspend(&self) {
+        self.lock().task_state = TaskState::Stopped;
+        self.schedule();
     }
 
-    /// Set the task state to continue by locking it.
-    pub fn cont(&self) {
-        let mut task = self.lock();
-        task.task_status = TaskState::Running;
+    /// Yield the task.
+    ///
+    /// It's not like the `suspend()', because it would be put into the task manager when called.
+    pub fn yield_now(self: &Arc<Self>) {
+        TASK_MANAGER.push(self);
+        self.schedule();
     }
 
+    /// Exit the task.
+    ///
+    /// It directly exits the task by setting the state and exit code.
+    /// It's illegal to put this task to the task manager again.
+    pub fn exit(&self, exit_code: isize) {
+        {
+            let mut task = self.lock();
+            task.task_state = TaskState::Zombie;
+            task.exit_code = exit_code;
+
+            // in case that it's the main thread
+            if task.tid() == 1 {
+                self.proc().exit(exit_code);
+            }
+        }
+        self.schedule()
+    }
+
+    /// Wake up the task.
+    ///
+    /// It's the companion method with `suspend()`.
+    /// When the `suspend()` is called, the caller is reponsible to maintain the task elsewhere.
+    /// Then the caller should wake up the task by calling this function, which would put the task into task manager again.
     pub fn wake_up(self: &Arc<Self>) {
-        self.lock().task_status = TaskState::Running;
+        self.lock().task_state = TaskState::Running;
         TASK_MANAGER.push(self);
     }
 
+    /// Schedule the task, namely giving back control to the processor's idle thread.
+    fn schedule(&self) {
+        let task_ctx = self.lock().task_ctx_ptr();
+        extern "C" {
+            fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
+        }
+        unsafe { _switch(task_ctx, fetch_idle_task_ctx_ptr()) }
+    }
+}
+
+impl Task {
     /// Append the task's signal flags by locking it.
     pub fn kill(self: &Arc<Self>, sig: SignalFlags) {
         let mut task = self.lock();
@@ -215,22 +254,15 @@ impl Task {
             TASK_MANAGER.push(self);
         }
     }
-
-    /// Set the task state to zombie by locking it with exit code set.
-    pub fn exit(&self, exit_code: isize) {
-        let mut task = self.lock();
-        task.task_status = TaskState::Zombie;
-        task.exit_code = exit_code;
-    }
 }
 
 impl TaskInner {
     pub fn task_state(&self) -> TaskState {
-        self.task_status
+        self.task_state
     }
 
     pub fn task_state_mut(&mut self) -> &mut TaskState {
-        &mut self.task_status
+        &mut self.task_state
     }
 
     pub fn task_ctx_ptr(&mut self) -> *mut TaskContext {

@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicPtr, Ordering};
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
 
-use crate::{config::UART_BASE_ADDRESS, drivers::uart::UartRaw, task::suspend_yield};
+use crate::{config::UART_BASE_ADDRESS, drivers::uart::UartRaw, task::processor::fetch_curr_task};
 
 const BS: u8 = 0x8;
 const DEL: u8 = 0x7F;
@@ -181,11 +181,11 @@ pub fn recv_from_uart() -> u8 {
                 if let Some(c) = uart_rx.try_recv() {
                     return c;
                 } else {
-                    suspend_yield();
+                    fetch_curr_task().yield_now();
                 }
             }
         } else {
-            suspend_yield();
+            fetch_curr_task().yield_now();
         }
     }
 }

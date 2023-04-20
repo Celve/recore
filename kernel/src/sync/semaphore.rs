@@ -1,6 +1,6 @@
 use spin::mutex::Mutex;
 
-use crate::task::{processor::fetch_curr_task, suspend_yield};
+use crate::task::processor::fetch_curr_task;
 
 use super::waiting_queue::WaitingQueue;
 
@@ -27,10 +27,8 @@ impl Semaphore {
         let sema = &self.inner;
         while sema.lock().counter == 0 {
             let task = fetch_curr_task();
-            task.stop();
-
             sema.lock().queue.push(&task);
-            suspend_yield();
+            task.suspend();
         }
         sema.lock().counter -= 1;
     }

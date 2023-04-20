@@ -3,29 +3,13 @@ use crate::task::{
     processor::{fetch_curr_task, fetch_idle_task_ctx_ptr},
 };
 
-use self::processor::fetch_curr_proc;
+use self::manager::TASK_MANAGER;
 
 pub mod context;
 pub mod manager;
 pub mod processor;
 pub mod task;
 pub mod timer;
-
-pub fn suspend_yield() {
-    schedule();
-}
-
-pub fn exit_yield(exit_code: isize) {
-    let task = fetch_curr_task();
-    task.exit(exit_code);
-
-    // if it's the main thread
-    if task.lock().tid() == 1 {
-        fetch_curr_proc().exit(exit_code);
-    }
-
-    schedule();
-}
 
 pub fn schedule() {
     let task_ctx = fetch_curr_task().lock().task_ctx_ptr();

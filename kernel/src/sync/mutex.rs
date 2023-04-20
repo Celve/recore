@@ -1,9 +1,8 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use alloc::{sync::Weak, vec::Vec};
 use spin::mutex::Mutex;
 
-use crate::task::{processor::fetch_curr_task, suspend_yield, task::Task};
+use crate::task::processor::fetch_curr_task;
 
 use super::waiting_queue::WaitingQueue;
 
@@ -23,7 +22,7 @@ impl SpinMutex {
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
             .is_err()
         {
-            suspend_yield();
+            fetch_curr_task().yield_now();
         }
     }
 
@@ -44,10 +43,8 @@ impl BlockMutex {
             .is_err()
         {
             let task = fetch_curr_task();
-            task.stop();
-
             self.queue.lock().push(&task);
-            suspend_yield();
+            task.suspend();
         }
     }
 

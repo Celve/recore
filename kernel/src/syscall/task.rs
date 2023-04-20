@@ -63,8 +63,7 @@ pub fn sys_sleep(time_ms: usize) -> isize {
     let curr_time = get_time();
     let target_time = curr_time + CLOCK_FREQ * time_ms / 1000;
     let task = fetch_curr_task();
-    task.stop();
-
     TIMER.subscribe(target_time, &task);
+    task.suspend();
     0
 }

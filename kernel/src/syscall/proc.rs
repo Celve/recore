@@ -8,22 +8,20 @@ use crate::{
     proc::{manager::PROC_MANAGER, proc::ProcState},
     sync::{condvar::Condvar, semaphore::Semaphore},
     task::{
-        exit_yield,
         manager::TASK_MANAGER,
         processor::{fetch_curr_proc, fetch_curr_task},
-        suspend_yield,
     },
 };
 
 use super::{open_file, parse_str};
 
 pub fn sys_exit(exit_code: isize) -> isize {
-    exit_yield(exit_code);
+    fetch_curr_task().exit(exit_code);
     0
 }
 
 pub fn sys_yield() -> isize {
-    suspend_yield();
+    fetch_curr_task().yield_now();
     0
 }
 
@@ -247,7 +245,6 @@ pub fn sys_condvar_wait(condvar_id: usize, lock_id: usize) -> isize {
         if lock.is_locked() {
             lock.unlock();
             condvar.wait(&task);
-            suspend_yield();
             lock.lock();
             0
         } else {

@@ -91,28 +91,6 @@ pub fn switch() {
             _switch(idle_task_ctx, task_ctx);
         }
 
-        // clear current task
-        let task = PROCESSOR.lock().curr_task_take();
-        if let Some(task) = task {
-            if task.lock().task_state() == TaskState::Running {
-                TASK_MANAGER.push(&task);
-            } else if task.lock().task_state() == TaskState::Zombie {
-                let proc = task.proc();
-                println!(
-                    "[kernel] Thread {} with pid {} has ended.",
-                    task.lock().tid(),
-                    proc.pid()
-                );
-            } else {
-                let proc = task.proc();
-                println!(
-                    "[kernel] Thread {} with pid {} has stopped.",
-                    task.lock().tid(),
-                    proc.pid()
-                );
-            }
-        }
-
         // check if timer is up
         TIMER.notify(get_time());
     } else {

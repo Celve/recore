@@ -1,12 +1,11 @@
-use super::uart::recv_from_uart;
+use crate::drivers::uart::UART;
 
 #[derive(Clone, Copy)]
 pub struct Stdin;
 
 impl Stdin {
     pub fn getchar(&self) -> u8 {
-        let result = recv_from_uart();
-        result
+        UART.read()
     }
 }
 

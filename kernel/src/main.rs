@@ -24,9 +24,11 @@ mod trap;
 
 use config::*;
 use core::arch::{asm, global_asm};
-use drivers::plic::{TargetPriority, PLIC};
+use drivers::{
+    plic::{TargetPriority, PLIC},
+    uart::UART,
+};
 use heap::init_heap;
-use io::uart::init_uart;
 use mm::{frame::init_frame_allocator, page_table::activate_page_table};
 use riscv::register::*;
 use task::processor::run_tasks;
@@ -117,7 +119,7 @@ extern "C" fn rust_main() {
         .iter()
         .for_each(|name| println!("{}", name));
 
-    // init_devices();
+    init_devices();
 
     println!("[kernel] Begin to run kernel tasks.");
     run_tasks();
@@ -133,6 +135,10 @@ fn init_bss() {
     }
 }
 
+fn init_uart() {
+    UART.init();
+}
+
 fn init_devices() {
     let hart_id = 0; // TODO: this should be fixed when SMP is enabled
 
@@ -140,9 +146,10 @@ fn init_devices() {
     PLIC.set_threshold(hart_id, TargetPriority::Machine, 1);
     PLIC.set_threshold(hart_id, TargetPriority::Supervisor, 0);
 
+    // currently, only notifications from uart are enabled
     // 8 stands for block, and 10 stands for uart
     // set priority and enable the interrupt for each src
-    for src_id in [8, 10] {
+    for src_id in [10] {
         PLIC.set_priority(src_id, 1);
         PLIC.enable(hart_id, TargetPriority::Supervisor, src_id);
     }

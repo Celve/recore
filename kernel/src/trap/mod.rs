@@ -3,7 +3,15 @@ use core::arch::asm;
 use fosix::syscall::SYSCALL_THREAD_CREATE;
 use riscv::register::{scause, sip, utvec::TrapMode};
 
-use crate::{config::TRAMPOLINE_ADDR, syscall::syscall, task::processor::fetch_curr_task};
+use crate::{
+    config::TRAMPOLINE_ADDR,
+    drivers::{
+        plic::{TargetPriority, PLIC},
+        uart::UART,
+    },
+    syscall::syscall,
+    task::processor::fetch_curr_task,
+};
 
 use self::{signal::signal_handler, trampoline::restore};
 
@@ -31,7 +39,16 @@ pub fn trap_handler() -> ! {
             }
             scause::Interrupt::SupervisorTimer => todo!(),
             scause::Interrupt::SupervisorExternal => {
-                println!("receive supervisor external interrupt");
+                let id = PLIC.claim(0, TargetPriority::Supervisor);
+                match id {
+                    10 => {
+                        UART.handle_irq();
+                    }
+                    _ => {
+                        panic!("Unknown interrupt id");
+                    }
+                }
+                PLIC.complete(0, TargetPriority::Supervisor, id);
             }
             scause::Interrupt::UserSoft => todo!(),
             scause::Interrupt::UserTimer => todo!(),

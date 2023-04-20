@@ -1,7 +1,13 @@
 use alloc::collections::VecDeque;
 use bitflags::bitflags;
+use lazy_static::lazy_static;
 use spin::Spin;
 use volatile::{ReadOnly, Volatile};
+
+use crate::{
+    config::VIRT_UART,
+    sync::{condvar::Condvar, mutex::Mutex},
+};
 
 macro_rules! wait_for {
     ($cond:expr) => {
@@ -92,12 +98,17 @@ pub struct UartRaw {
 }
 
 pub struct UartInner {
-    uart: UartRaw,
+    raw: UartRaw,
     read_buffer: VecDeque<u8>,
 }
 
 pub struct Uart {
-    inner: Spin<UartInner>,
+    inner: Mutex<UartInner>,
+    cond: Condvar,
+}
+
+lazy_static! {
+    pub static ref UART: Uart = Uart::new(VIRT_UART);
 }
 
 impl UartRaw {
@@ -143,12 +154,11 @@ impl UartRaw {
             .write(ModemControl::DATA_TERMINAL_READY | ModemControl::AUXILIARY_OUTPUT_2);
 
         // enable interrupts
-        read_port
-            .ier
-            .write(InterruptEnable::RX_AVAILABLE | InterruptEnable::TX_EMPTY);
+        read_port.ier.write(InterruptEnable::RX_AVAILABLE);
     }
 
     /// Send a byte on the serial port.
+    /// Spin when there is no space in the output buffer.
     pub fn send(&self, data: u8) {
         let write_port = self.write_port();
         let lsr = &write_port.lsr;
@@ -184,8 +194,44 @@ impl UartRaw {
 impl UartInner {
     pub fn new(base: usize) -> Self {
         Self {
-            uart: UartRaw::new(base),
+            raw: UartRaw::new(base),
             read_buffer: VecDeque::new(),
+        }
+    }
+}
+
+impl Uart {
+    pub fn new(base: usize) -> Self {
+        Self {
+            inner: Mutex::new(UartInner::new(base)),
+            cond: Condvar::new(),
+        }
+    }
+
+    pub fn init(&self) {
+        self.inner.lock().raw.init();
+    }
+
+    pub fn read(&self) -> u8 {
+        let mut inner = self.inner.lock();
+        while inner.read_buffer.is_empty() {
+            inner = self.cond.wait(inner);
+        }
+        inner.read_buffer.pop_front().unwrap()
+    }
+
+    pub fn write(&self, data: u8) {
+        let inner = self.inner.lock();
+        inner.raw.send(data);
+    }
+
+    pub fn handle_irq(&self) {
+        let mut inner = self.inner.lock();
+        while let Some(data) = inner.raw.recv() {
+            inner.read_buffer.push_back(data);
+        }
+        if inner.read_buffer.len() > 0 {
+            self.cond.notify_one(); // there would be at most one that is waiting
         }
     }
 }

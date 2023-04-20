@@ -19,7 +19,7 @@ use super::{
 };
 use crate::config::{
     CLINT, MEMORY_END, PAGE_SIZE, PPN_WIDTH, PTE_FLAG_WIDTH, TRAMPOLINE_ADDR, UART_BASE_ADDRESS,
-    UART_MAP_SIZE, VIRTIO_BASE_ADDRESS, VIRTIO_MAP_SIZE,
+    UART_MAP_SIZE, VIRTIO_BASE_ADDRESS, VIRTIO_MAP_SIZE, VIRT_PLIC_ADDR, VIRT_PLIC_SIZE,
 };
 use crate::fs::segment::Segment;
 use crate::mm::memory::KERNEL_MEMSET;
@@ -129,6 +129,12 @@ impl PageTable {
             MappingPermission::R | MappingPermission::W,
         ));
 
+        areas.push(self.new_identical_area(
+            VirAddr::from(VIRT_PLIC_ADDR).floor_to_vir_page_num(),
+            VirAddr::from(VIRT_PLIC_ADDR + VIRT_PLIC_SIZE).ceil_to_vir_page_num(),
+            MappingPermission::R | MappingPermission::W,
+        ));
+
         self.map_trampoline();
 
         MemSet::new(areas)
@@ -186,12 +192,7 @@ impl PageTable {
 
         self.map_trampoline();
 
-        // let trap_ctx_handle = self.new_trap_ctx(1);
-
-        // map user stack
         let base: VirAddr = (end_vpn + 1).into(); // for guard page
-                                                  // let user_stack = self.new_user_stack(base, 1);
-
         (
             base,
             (elf_file.header.pt2.entry_point() as usize).into(),

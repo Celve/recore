@@ -7,10 +7,11 @@ pub struct Condvar {
 }
 
 impl Condvar {
-    pub fn wait<T>(&self, mut guard: MutexGuard<T>) {
-        guard.unlock();
+    pub fn wait<'a, T>(&'a self, guard: MutexGuard<'a, T>) -> MutexGuard<T> {
+        let mutex = guard.mutex();
+        drop(guard);
         self.inner.wait(&fetch_curr_task());
-        guard.lock();
+        mutex.lock()
     }
 
     pub fn notify_one(&self) {

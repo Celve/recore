@@ -1,4 +1,5 @@
-use super::uart::send_to_uart;
+use crate::drivers::uart::UART;
+
 use core::fmt::{Arguments, Write};
 
 #[derive(Clone, Copy)]
@@ -6,7 +7,7 @@ pub struct Stdout;
 
 impl Stdout {
     pub fn putchar(&self, c: u8) {
-        send_to_uart(c);
+        UART.write(c);
     }
 
     pub fn print(&mut self, args: Arguments) {
@@ -22,10 +23,6 @@ impl Write for Stdout {
 }
 
 impl Stdout {
-    pub fn read(&mut self, buf: &mut [u8]) -> usize {
-        unimplemented!()
-    }
-
     pub fn write(&mut self, buf: &[u8]) -> usize {
         buf.iter().for_each(|b| self.putchar(*b));
         buf.len()

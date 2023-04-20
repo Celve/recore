@@ -12,7 +12,7 @@ pub struct Mutex<T> {
 
 pub struct MutexGuard<'a, T: 'a> {
     lock: &'a BlockLock,
-    locked: bool,
+    mutex: &'a Mutex<T>,
     data: &'a mut T,
 }
 
@@ -31,29 +31,23 @@ unsafe impl<T: Send> Send for Mutex<T> {}
 impl<T> Mutex<T> {
     pub fn lock(&self) -> MutexGuard<T> {
         self.lock.lock();
-        MutexGuard::new(&self.lock, unsafe { &mut *self.data.get() }) // bypass mutability check
+        MutexGuard::new(&self, unsafe { &mut *self.data.get() }) // bypass mutability check
     }
 
     // pub fn try_lock(&self) -> Option<MutexGuard<T>> {}
 }
 
 impl<'a, T: 'a> MutexGuard<'a, T> {
-    pub fn new(lock: &'a BlockLock, data: &'a mut T) -> Self {
+    pub fn new(mutex: &'a Mutex<T>, data: &'a mut T) -> Self {
         Self {
-            lock,
-            locked: true,
+            lock: &mutex.lock,
+            mutex,
             data,
         }
     }
 
-    pub fn lock(&mut self) {
-        self.lock.lock();
-        self.locked = true;
-    }
-
-    pub fn unlock(&mut self) {
-        self.lock.unlock();
-        self.locked = false;
+    pub fn mutex(&self) -> &'a Mutex<T> {
+        self.mutex
     }
 }
 
@@ -73,8 +67,6 @@ impl<T> DerefMut for MutexGuard<'_, T> {
 
 impl<T> Drop for MutexGuard<'_, T> {
     fn drop(&mut self) {
-        if self.locked {
-            self.lock.unlock();
-        }
+        self.lock.unlock();
     }
 }

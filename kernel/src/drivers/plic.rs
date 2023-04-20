@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::config::VIRT_PLIC;
+use crate::config::VIRT_PLIC_ADDR;
 
 pub struct Plic {
     base: usize,
@@ -12,7 +12,7 @@ pub enum TargetPriority {
 }
 
 lazy_static! {
-    pub static ref PLIC: Plic = Plic::new(VIRT_PLIC);
+    pub static ref PLIC: Plic = Plic::new(VIRT_PLIC_ADDR);
 }
 
 impl Plic {
@@ -57,10 +57,10 @@ impl Plic {
         unsafe { self.claim_ptr(hart_id, target_priority).read_volatile() as usize }
     }
 
-    pub fn complete(&self, hart_id: usize, target_priority: TargetPriority, completed: usize) {
+    pub fn complete(&self, hart_id: usize, target_priority: TargetPriority, src_id: usize) {
         unsafe {
             self.complete_ptr(hart_id, target_priority)
-                .write_volatile(completed as u32);
+                .write_volatile(src_id as u32);
         }
     }
 }

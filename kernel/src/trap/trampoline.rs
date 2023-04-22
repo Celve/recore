@@ -1,5 +1,7 @@
 use core::arch::{asm, global_asm};
 
+use riscv::register::sip;
+
 use crate::config::TRAMPOLINE_ADDR;
 use crate::task::processor::fetch_curr_task;
 use crate::trap::set_user_stvec;
@@ -17,6 +19,12 @@ pub fn restore() -> ! {
     extern "C" {
         fn _restore();
         fn _alltraps();
+    }
+
+    // acknowledge the software interrupt again, because the supervisor might run too long
+    let sip = sip::read().bits();
+    unsafe {
+        asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
     }
 
     set_user_stvec();

@@ -109,6 +109,7 @@ pub struct Uart {
 
 lazy_static! {
     pub static ref UART: Uart = Uart::new(VIRT_UART);
+    pub static ref UARTK: UartRaw = UartRaw::new(VIRT_UART);
 }
 
 impl UartRaw {
@@ -215,7 +216,7 @@ impl Uart {
     pub fn read(&self) -> u8 {
         let mut inner = self.inner.lock();
         while inner.read_buffer.is_empty() {
-            inner = self.cond.wait(inner);
+            inner = self.cond.wait_mutex(inner);
         }
         inner.read_buffer.pop_front().unwrap()
     }

@@ -1,6 +1,8 @@
+use crate::fs::FUSE;
+
 use super::proc::Proc;
 
-use crate::fs::FUSE;
+use fs::dir::Dir;
 
 use alloc::{
     collections::BTreeMap,

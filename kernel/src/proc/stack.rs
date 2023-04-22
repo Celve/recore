@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-use riscv::addr::page;
 
 use crate::{
     config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE_ADDR, USER_STACK_SIZE},

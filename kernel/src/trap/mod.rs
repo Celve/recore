@@ -1,7 +1,7 @@
 use core::arch::asm;
 
 use fosix::syscall::SYSCALL_THREAD_CREATE;
-use riscv::register::{scause, sip, utvec::TrapMode};
+use riscv::register::{satp, scause, sepc, sip, stval, utvec::TrapMode};
 
 use crate::{
     config::TRAMPOLINE_ADDR,
@@ -11,7 +11,7 @@ use crate::{
     },
     fs::FUSE,
     syscall::syscall,
-    task::processor::fetch_curr_task,
+    task::processor::{fetch_curr_task, hart_id},
 };
 
 use self::{signal::signal_handler, trampoline::restore};
@@ -36,19 +36,26 @@ pub fn trap_handler() -> ! {
                 unsafe {
                     asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
                 }
+
                 fetch_curr_task().yield_now();
             }
             scause::Interrupt::SupervisorTimer => todo!(),
             scause::Interrupt::SupervisorExternal => {
-                let id = PLIC.claim(0, TargetPriority::Supervisor);
-                match id {
-                    1 => {
-                        FUSE.disk_manager().handle_irq();
-                    }
-                    10 => UART.handle_irq(),
-                    _ => panic!("Unknown interrupt id"),
+                // acknowledge the external interrupt
+                let sip = sip::read().bits();
+                unsafe {
+                    asm! {"csrw sip, {sip}", sip = in(reg) sip ^ (1 << 9)};
                 }
-                PLIC.complete(0, TargetPriority::Supervisor, id);
+
+                let id = PLIC.claim(hart_id(), TargetPriority::Supervisor);
+                if id != 0 {
+                    match id {
+                        1 => FUSE.disk_manager().handle_irq(),
+                        10 => UART.handle_irq(),
+                        _ => panic!("Unknown interrupt id {}", id),
+                    }
+                    PLIC.complete(hart_id(), TargetPriority::Supervisor, id);
+                }
             }
             scause::Interrupt::UserSoft => todo!(),
             scause::Interrupt::UserTimer => todo!(),
@@ -109,8 +116,16 @@ pub fn trap_handler() -> ! {
 /// This is the trap handler for the supervisor mode.
 ///
 /// It should be aligned to 4.
+#[no_mangle]
 #[repr(align(4))]
 pub fn fail() {
+    println!(
+        "[kernel] scause: {}, stval: {:#x}, sepc: {:#x}, satp: {:#x}",
+        scause::read().bits(),
+        stval::read(),
+        sepc::read(),
+        satp::read().bits(),
+    );
     panic!("[kernel] Get into trap when in supervisor mode.");
 }
 

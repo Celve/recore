@@ -1,4 +1,5 @@
 #[repr(C)]
+#[derive(Default)]
 pub struct TaskContext {
     pub ra: usize,
     pub sp: usize,
@@ -6,14 +7,6 @@ pub struct TaskContext {
 }
 
 impl TaskContext {
-    pub fn empty() -> Self {
-        Self {
-            ra: 0,
-            sp: 0,
-            sr: [0; 12],
-        }
-    }
-
     pub fn new(ra: usize, sp: usize) -> Self {
         Self {
             ra,

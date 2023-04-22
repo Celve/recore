@@ -13,10 +13,11 @@ pub fn signal_handler() {
     if fetch_curr_task().lock().sig_handling().is_none() {
         loop {
             let sigs = {
-                let task = fetch_curr_task();
-                let task_guard = task.lock();
+                // always lock proc first
                 let proc = fetch_curr_proc();
                 let proc_guard = proc.lock();
+                let task = fetch_curr_task();
+                let task_guard = task.lock();
                 let sig = task_guard.sigs();
                 let sig_mask = task_guard.sig_mask();
 

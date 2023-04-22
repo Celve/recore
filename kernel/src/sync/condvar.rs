@@ -1,3 +1,5 @@
+use spin::SpinGuard;
+
 use crate::task::processor::fetch_curr_task;
 
 use super::{mutex::MutexGuard, observable::Observable};
@@ -7,11 +9,18 @@ pub struct Condvar {
 }
 
 impl Condvar {
-    pub fn wait<'a, T>(&'a self, guard: MutexGuard<'a, T>) -> MutexGuard<T> {
-        let mutex = guard.mutex();
+    pub fn wait_mutex<'a, T>(&'a self, guard: MutexGuard<'a, T>) -> MutexGuard<T> {
+        let lock = guard.mutex();
         drop(guard);
         self.inner.wait(&fetch_curr_task());
-        mutex.lock()
+        lock.lock()
+    }
+
+    pub fn wait_spin<'a, T>(&'a self, guard: SpinGuard<'a, T>) -> SpinGuard<T> {
+        let lock = guard.spin();
+        drop(guard);
+        self.inner.wait(&fetch_curr_task());
+        lock.lock()
     }
 
     pub fn notify_one(&self) {

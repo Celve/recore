@@ -32,10 +32,12 @@ impl<D: DiskManager> CacheManager<D> {
     pub fn get(&self, bid: usize) -> Arc<Spin<Cache<D>>> {
         let mut caches = self.caches.lock();
         if !caches.contains(&bid) {
-            caches.put(
-                bid,
-                Arc::new(Spin::new(Cache::new(bid, self.disk_manager.clone()))),
-            );
+            drop(caches);
+            let cache = Cache::new(bid, self.disk_manager.clone());
+            caches = self.caches.lock();
+            if !caches.contains(&bid) {
+                caches.put(bid, Arc::new(Spin::new(cache)));
+            }
         }
         caches.get(&bid).unwrap().clone()
     }

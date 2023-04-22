@@ -71,11 +71,6 @@ impl TrapCtx {
 
 impl TrapCtxHandle {
     pub fn new(tid: usize, page_table: &Arc<PageTable>) -> Self {
-        println!(
-            "{:#x} {:#x}",
-            TRAMPOLINE_ADDR - PAGE_SIZE * tid,
-            TRAMPOLINE_ADDR - PAGE_SIZE * (tid - 1)
-        );
         Self {
             tid,
             area: page_table.new_framed_area(

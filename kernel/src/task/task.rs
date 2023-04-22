@@ -16,6 +16,7 @@ use crate::{
     task::{manager::TASK_MANAGER, processor::fetch_idle_task_ctx_ptr},
     trap::{
         context::{TrapCtx, TrapCtxHandle},
+        fail,
         trampoline::restore,
         trap_handler,
     },
@@ -190,7 +191,6 @@ impl Task {
     ///
     /// It's not like the `suspend()', because it would be put into the task manager when called.
     pub fn yield_now(self: &Arc<Self>) {
-        TASK_MANAGER.push(self);
         self.schedule();
     }
 
@@ -199,6 +199,12 @@ impl Task {
     /// It directly exits the task by setting the state and exit code.
     /// It's illegal to put this task to the task manager again.
     pub fn exit(&self, exit_code: isize) {
+        println!(
+            "process {} thread {} exit with code {}",
+            self.proc().pid(),
+            self.lock().tid(),
+            exit_code
+        );
         {
             let mut task = self.lock();
             task.task_state = TaskState::Zombie;
@@ -227,6 +233,9 @@ impl Task {
         let task_ctx = self.lock().task_ctx_ptr();
         extern "C" {
             fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
+        }
+        if (task_ctx as usize) < 10 {
+            fail();
         }
         unsafe { _switch(task_ctx, fetch_idle_task_ctx_ptr()) }
     }
@@ -263,6 +272,10 @@ impl TaskInner {
 
     pub fn task_state_mut(&mut self) -> &mut TaskState {
         &mut self.task_state
+    }
+
+    pub fn task_ctx(&self) -> &TaskContext {
+        &self.task_ctx
     }
 
     pub fn task_ctx_ptr(&mut self) -> *mut TaskContext {
@@ -335,5 +348,15 @@ impl TaskInner {
 
     pub fn gid(&self) -> usize {
         self.gid.id()
+    }
+}
+
+impl Drop for Task {
+    fn drop(&mut self) {
+        println!(
+            "Process {} thread {} is dropped.",
+            self.proc().pid(),
+            self.lock().tid()
+        );
     }
 }

@@ -6,6 +6,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+#[derive(Default)]
 pub struct Spin<T> {
     lock: AtomicBool,
     data: UnsafeCell<T>,
@@ -13,6 +14,7 @@ pub struct Spin<T> {
 
 pub struct SpinGuard<'a, T: 'a> {
     lock: &'a AtomicBool,
+    spin: &'a Spin<T>,
     data: &'a mut T,
 }
 
@@ -35,7 +37,7 @@ impl<T> Spin<T> {
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
             .is_err()
         {}
-        SpinGuard::new(&self.lock, unsafe { &mut *self.data.get() }) // bypass mutability check
+        SpinGuard::new(&self, unsafe { &mut *self.data.get() }) // bypass mutability check
     }
 
     pub fn try_lock(&self) -> Option<SpinGuard<T>> {
@@ -44,7 +46,7 @@ impl<T> Spin<T> {
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
             .is_ok()
         {
-            Some(SpinGuard::new(&self.lock, unsafe { &mut *self.data.get() }))
+            Some(SpinGuard::new(&self, unsafe { &mut *self.data.get() }))
         } else {
             None
         }
@@ -52,8 +54,16 @@ impl<T> Spin<T> {
 }
 
 impl<'a, T: 'a> SpinGuard<'a, T> {
-    pub fn new(lock: &'a AtomicBool, data: &'a mut T) -> Self {
-        Self { lock, data }
+    pub fn new(spin: &'a Spin<T>, data: &'a mut T) -> Self {
+        Self {
+            lock: &spin.lock,
+            spin,
+            data,
+        }
+    }
+
+    pub fn spin(&self) -> &'a Spin<T> {
+        self.spin
     }
 }
 

@@ -1,16 +1,19 @@
+use core::arch::asm;
+
 use alloc::sync::{Arc, Weak};
 use lazy_static::lazy_static;
 use spin::Spin;
 
 use crate::{
-    fs::FUSE,
-    proc::{manager::PROC_MANAGER, proc::Proc},
+    config::CPUS,
+    proc::proc::Proc,
     task::{task::TaskState, timer::TIMER},
     time::get_time,
 };
 
 use super::{context::TaskContext, manager::TASK_MANAGER, task::Task};
 
+#[derive(Default)]
 pub struct Processor {
     /// The current task that the processor is exeucting.
     curr_task: Option<Weak<Task>>,
@@ -20,13 +23,6 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub fn new() -> Self {
-        Self {
-            curr_task: None,
-            idle_task_ctx: TaskContext::empty(),
-        }
-    }
-
     pub fn idle_task_ctx_ptr(&mut self) -> *mut TaskContext {
         &mut self.idle_task_ctx
     }
@@ -45,15 +41,28 @@ impl Processor {
 }
 
 lazy_static! {
-    static ref PROCESSOR: Spin<Processor> = Spin::new(Processor::new());
+    static ref PROCESSORS: [Spin<Processor>; CPUS] = Default::default();
+}
+
+pub fn hart_id() -> usize {
+    let mut hart_id: usize;
+    unsafe {
+        asm!(
+            "mv {hart_id}, tp",
+            hart_id = out(reg) hart_id,
+        );
+    }
+    hart_id
 }
 
 /// Fetch the current task.
 pub fn fetch_curr_task() -> Arc<Task> {
-    PROCESSOR
-        .lock()
-        .curr_task()
-        .expect("[kernel] There is no running task currently.")
+    let task = PROCESSORS[hart_id()].lock().curr_task();
+    if let Some(task) = task {
+        task
+    } else {
+        panic!("[kernel] Hart {} has no running task currently.", hart_id())
+    }
 }
 
 /// Fetch the current process.
@@ -63,7 +72,7 @@ pub fn fetch_curr_proc() -> Arc<Proc> {
 
 /// Fetch the idle task context pointer with processor locked.
 pub fn fetch_idle_task_ctx_ptr() -> *mut TaskContext {
-    PROCESSOR.lock().idle_task_ctx_ptr()
+    PROCESSORS[hart_id()].lock().idle_task_ctx_ptr()
 }
 
 /// Switch from idle task to the next task.
@@ -82,8 +91,13 @@ pub fn switch() {
         }
 
         let task_ctx = task.lock().task_ctx_ptr();
-        let idle_task_ctx = PROCESSOR.lock().idle_task_ctx_ptr();
-        *PROCESSOR.lock().curr_task_mut() = Some(task.phantom());
+        let idle_task_ctx = PROCESSORS[hart_id()].lock().idle_task_ctx_ptr();
+        *PROCESSORS[hart_id()].lock().curr_task_mut() = Some(task.phantom());
+        // println!("hart {} switch {}", hart_id(), task.proc().pid(),);
+        // {
+        // let task = task.lock();
+        // println!("next_ctx {} {}", task.task_ctx().ra, task.task_ctx().sp);
+        // }
 
         extern "C" {
             fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
@@ -92,17 +106,17 @@ pub fn switch() {
             _switch(idle_task_ctx, task_ctx);
         }
 
+        if task.lock().task_state() == TaskState::Running {
+            TASK_MANAGER.push(&task);
+        }
+
         // check if timer is up
         TIMER.notify(get_time());
-    } else {
-        panic!("[kernel] Shutdown.");
     }
 }
 
+#[no_mangle]
 pub fn run_tasks() {
-    let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
-    TASK_MANAGER.push(&task);
-    FUSE.disk_manager().enable_non_blocking();
     loop {
         switch();
     }

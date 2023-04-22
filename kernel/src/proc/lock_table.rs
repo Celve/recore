@@ -1,6 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use crate::sync::lock::{BlockLock, SpinLock};
+use crate::sync::basic::{BlockLock, SpinLock};
 
 pub enum Lockable {
     SpinMutex(SpinLock),

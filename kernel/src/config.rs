@@ -27,8 +27,6 @@ pub const KERNEL_STACK_SIZE: usize = 0x10000;
 pub const TIMER_INTERVAL: usize = 100_000;
 pub const CLINT: usize = 0x2000000;
 
-pub const NCPU: usize = 8;
-
 pub const CACHE_SIZE: usize = 512;
 pub const BLK_SIZE: usize = 512;
 pub const INODE_SIZE: usize = 32 * 4;
@@ -50,3 +48,5 @@ pub const CLOCK_FREQ: usize = 12500000;
 pub const VIRT_PLIC_ADDR: usize = 0xc00_0000;
 pub const VIRT_PLIC_SIZE: usize = 0x210_000;
 pub const VIRT_UART: usize = 0x10_000_000;
+
+pub const CPUS: usize = 4;

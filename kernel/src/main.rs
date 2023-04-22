@@ -23,15 +23,22 @@ mod time;
 mod trap;
 
 use config::*;
-use core::arch::{asm, global_asm};
+use core::{
+    arch::{asm, global_asm},
+    sync::atomic::{AtomicBool, Ordering},
+};
 use drivers::{
     plic::{TargetPriority, PLIC},
     uart::UART,
 };
 use heap::init_heap;
 use mm::{frame::init_frame_allocator, page_table::activate_page_table};
+use proc::manager::PROC_MANAGER;
 use riscv::register::*;
-use task::processor::run_tasks;
+use task::{
+    manager::TASK_MANAGER,
+    processor::{hart_id, run_tasks},
+};
 use time::init_timer;
 
 use crate::{fs::FUSE, trap::set_kernel_stvec};
@@ -39,7 +46,8 @@ use crate::{fs::FUSE, trap::set_kernel_stvec};
 global_asm!(include_str!("app.s"));
 
 #[link_section = ".bss.stack"]
-static mut BOOTLOADER_STACK_SPACE: [u8; BOOTLOADER_STACK_SIZE] = [0; BOOTLOADER_STACK_SIZE];
+static mut BOOTLOADER_STACK_SPACE: [[u8; BOOTLOADER_STACK_SIZE]; CPUS] =
+    [[0; BOOTLOADER_STACK_SIZE]; CPUS];
 
 #[naked]
 #[no_mangle]
@@ -48,6 +56,9 @@ unsafe extern "C" fn _start() {
     asm!(
         "la sp, {bootloader_stack}",
         "li t0, {bootloader_stack_size}",
+        "csrr t1, mhartid",
+        "addi t1, t1, 1",
+        "mul t0, t0, t1",
         "add sp, sp, t0",
         "j {rust_start}",
         bootloader_stack = sym BOOTLOADER_STACK_SPACE,
@@ -89,40 +100,62 @@ unsafe fn rust_start() -> ! {
     );
 }
 
+static INITED: AtomicBool = AtomicBool::new(false);
+
 #[no_mangle]
 extern "C" fn rust_main() {
+    if hart_id() == 0 {
+        set_kernel_stvec();
+        init_trap();
+        init_bss();
+        init_uart();
+        println!("[kernel] Section bss cleared.");
+        println!("[kernel] UART initialized.");
+
+        init_heap();
+        println!("[kernel] Heap initialized.");
+
+        init_frame_allocator();
+        println!("[kernel] Frame allocator initialized.");
+
+        activate_page_table(); // the kernel space is automatically init before activating page table because of the lazy_static!
+        println!("[kernel] Page table activated.");
+
+        // let root = FUSE.root();
+        // root.lock()
+        // .ls()
+        // .iter()
+        // .for_each(|name| println!("{}", name));
+
+        init_devices();
+        init_tasks();
+
+        println!(
+            "[kernel] Initialization done with satp {:#x}.",
+            satp::read().bits()
+        );
+        INITED.store(true, Ordering::Release);
+    } else {
+        while !INITED.load(Ordering::Acquire) {}
+        set_kernel_stvec();
+        init_trap();
+        activate_page_table();
+        init_devices();
+        println!(
+            "[kernel] Hart {} is running with satp {:#x}.",
+            hart_id(),
+            satp::read().bits()
+        );
+    }
+    run_tasks();
+}
+
+fn init_trap() {
     unsafe {
         sie::set_sext();
         sie::set_stimer();
         sie::set_ssoft();
     }
-
-    set_kernel_stvec();
-
-    init_bss();
-    init_uart();
-    println!("[kernel] Section bss cleared.");
-    println!("[kernel] UART initialized.");
-
-    init_heap();
-    println!("[kernel] Heap initialized.");
-
-    init_frame_allocator();
-    println!("[kernel] Frame allocator initialized.");
-
-    activate_page_table(); // the kernel space is automatically init before activating page table because of the lazy_static!
-    println!("[kernel] Page table activated.");
-
-    let root = FUSE.root();
-    root.lock()
-        .ls()
-        .iter()
-        .for_each(|name| println!("{}", name));
-
-    init_devices();
-
-    println!("[kernel] Begin to run kernel tasks.");
-    run_tasks();
 }
 
 fn init_bss() {
@@ -140,14 +173,14 @@ fn init_uart() {
 }
 
 fn init_devices() {
-    let hart_id = 0; // TODO: this should be fixed when SMP is enabled
+    let hart_id = hart_id();
 
     // set the threshold for each target respectively, to disable notifications for machine mode
     PLIC.set_threshold(hart_id, TargetPriority::Machine, 1);
     PLIC.set_threshold(hart_id, TargetPriority::Supervisor, 0);
 
     // currently, only notifications from uart are enabled
-    // 8 stands for block, and 10 stands for uart
+    // 1 stands for block, and 10 stands for uart
     // set priority and enable the interrupt for each src
     for src_id in [1, 10] {
         PLIC.set_priority(src_id, 1);
@@ -158,4 +191,10 @@ fn init_devices() {
     unsafe {
         sie::set_sext();
     }
+}
+
+fn init_tasks() {
+    let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
+    TASK_MANAGER.push(&task);
+    FUSE.disk_manager().enable_non_blocking();
 }

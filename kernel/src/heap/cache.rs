@@ -29,7 +29,7 @@ impl Cache {
                     .buddy_allocator
                     .lock()
                     .alloc(Layout::array::<u8>(1 << self.order).unwrap());
-                println!("[buddy] Allocate {:#x}.", ptr as usize);
+                // println!("[buddy] Allocate {:#x}.", ptr as usize);
                 let mut page = fetch_page(ptr as usize).unwrap();
                 *page.order_mut() = self.order;
                 page.free = LinkedList::new();
@@ -85,7 +85,7 @@ impl Cache {
                 page.prev_insert(None);
                 page.next_insert(None);
                 unsafe {
-                    println!("[buddy] Deallocate {:#x}.", page.pa());
+                    // println!("[buddy] Deallocate {:#x}.", page.pa());
                     HEAP.buddy_allocator.lock().dealloc(
                         page.pa() as *mut u8,
                         Layout::array::<u8>(1 << self.order).unwrap(),

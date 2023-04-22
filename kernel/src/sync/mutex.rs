@@ -3,7 +3,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use super::lock::BlockLock;
+use super::basic::BlockLock;
 
 pub struct Mutex<T> {
     lock: BlockLock,

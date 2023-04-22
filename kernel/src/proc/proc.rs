@@ -3,10 +3,10 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use fs::{dir::Dir, file::File};
 
 use core::mem::size_of;
 use fosix::signal::{SignalAction, SignalFlags};
-use fs::{dir::Dir, file::File};
 use spin::{Spin, SpinGuard};
 
 use crate::{
@@ -176,12 +176,6 @@ impl Proc {
                 .enumerate()
                 .for_each(|(i, byte)| **byte = src_bytes[i]);
         }
-
-        println!(
-            "page_table: {:#x} result: {:#x}",
-            page_table.to_satp(),
-            page_table.translate_any::<usize>(0x29ff0.into())
-        );
 
         // replace some
         *task.lock().trap_ctx_mut().a0_mut() = args.len();

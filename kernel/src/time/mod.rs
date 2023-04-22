@@ -1,6 +1,9 @@
 use core::arch::global_asm;
 
-use crate::config::{CLINT, NCPU, TIMER_INTERVAL};
+use crate::{
+    config::{CLINT, CPUS, TIMER_INTERVAL},
+    task::processor::hart_id,
+};
 use riscv::register::*;
 
 global_asm!(include_str!("trap.s"));
@@ -21,11 +24,11 @@ pub fn get_time() -> usize {
 
 #[link_section = ".bss.stack"]
 #[no_mangle]
-pub static mut TIMER_SCRATCH: [[usize; 5]; NCPU] = [[0; 5]; NCPU];
+pub static mut TIMER_SCRATCH: [[usize; 5]; CPUS] = [[0; 5]; CPUS];
 
 #[no_mangle]
 pub unsafe fn init_timer() {
-    let id = mhartid::read();
+    let id = hart_id();
 
     // setup timer
     set_timer(id, get_time() + TIMER_INTERVAL);
@@ -37,8 +40,6 @@ pub unsafe fn init_timer() {
     let scratch = &mut TIMER_SCRATCH[id];
     scratch[3] = CLINT + 0x4000 + 8 * id;
     scratch[4] = TIMER_INTERVAL;
-    // *scratch.add(3) = CLINT + 0x4000 + 8 * id;
-    // *scratch.add(4) = TIMER_INTERVAL;
 
     mscratch::write(scratch as *mut usize as usize);
 

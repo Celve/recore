@@ -23,7 +23,7 @@ use crate::config::{
 };
 use crate::fs::segment::Segment;
 use crate::mm::memory::KERNEL_MEMSET;
-use crate::proc::stack::{KernelStack, UserStack};
+use crate::proc::stack::UserStack;
 use crate::trap::context::TrapCtxHandle;
 
 bitflags! {

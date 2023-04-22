@@ -93,11 +93,6 @@ pub fn switch() {
         let task_ctx = task.lock().task_ctx_ptr();
         let idle_task_ctx = PROCESSORS[hart_id()].lock().idle_task_ctx_ptr();
         *PROCESSORS[hart_id()].lock().curr_task_mut() = Some(task.phantom());
-        // println!("hart {} switch {}", hart_id(), task.proc().pid(),);
-        // {
-        // let task = task.lock();
-        // println!("next_ctx {} {}", task.task_ctx().ra, task.task_ctx().sp);
-        // }
 
         extern "C" {
             fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);

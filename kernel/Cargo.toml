@@ -20,5 +20,5 @@ fs = { path = "../fs" }
 volatile = "0.3"
 
 [profile.release]
-opt-level = 0
+# opt-level = 0
 debug = true

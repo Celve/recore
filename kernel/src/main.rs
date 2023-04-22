@@ -182,7 +182,7 @@ fn init_devices() {
     // currently, only notifications from uart are enabled
     // 1 stands for block, and 10 stands for uart
     // set priority and enable the interrupt for each src
-    for src_id in [10] {
+    for src_id in [1, 10] {
         PLIC.set_priority(src_id, 1);
         PLIC.enable(hart_id, TargetPriority::Supervisor, src_id);
     }
@@ -196,5 +196,5 @@ fn init_devices() {
 fn init_tasks() {
     let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
     TASK_MANAGER.push(&task);
-    // FUSE.disk_manager().enable_non_blocking();
+    FUSE.disk_manager().enable_non_blocking();
 }

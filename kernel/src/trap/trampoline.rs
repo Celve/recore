@@ -22,10 +22,10 @@ pub fn restore() -> ! {
     }
 
     // acknowledge the software interrupt again, because the supervisor might run too long
-    let sip = sip::read().bits();
-    unsafe {
-        asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
-    }
+    // let sip = sip::read().bits();
+    // unsafe {
+    // asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
+    // }
 
     set_user_stvec();
 

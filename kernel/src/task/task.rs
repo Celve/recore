@@ -13,7 +13,8 @@ use crate::{
         proc::Proc,
         stack::{KernelStack, UserStack},
     },
-    task::{manager::TASK_MANAGER, processor::fetch_idle_task_ctx_ptr},
+    task::processor::fetch_idle_task_ctx_ptr,
+    time::get_time,
     trap::{
         context::{TrapCtx, TrapCtxHandle},
         fail,
@@ -22,7 +23,12 @@ use crate::{
     },
 };
 
-use super::context::TaskContext;
+use super::{
+    context::TaskContext,
+    processor::{hart_id, PROCESSORS},
+    scheduler::SchedEntity,
+    time::TaskTime,
+};
 
 pub struct Task {
     proc: Weak<Proc>,
@@ -43,6 +49,7 @@ pub struct TaskInner {
     sigs: SignalFlags,
     sig_mask: SignalFlags,
     sig_handling: Option<usize>,
+    task_time: TaskTime,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -61,7 +68,8 @@ impl Task {
         entry: VirAddr,
         proc: Weak<Proc>,
         page_table: Arc<PageTable>,
-    ) -> Self {
+        weight: usize,
+    ) -> Arc<Self> {
         let kernel_stack = KernelStack::new(gid.id());
         let task_ctx = TaskContext::new(restore as usize, kernel_stack.top().into());
         let trap_ctx_handle = page_table.new_trap_ctx(tid.id());
@@ -79,7 +87,7 @@ impl Task {
             KERNEL_PAGE_TABLE.to_satp(),
         );
 
-        Self {
+        Arc::new(Self {
             inner: Spin::new(TaskInner {
                 tid,
                 gid,
@@ -94,9 +102,10 @@ impl Task {
                 sigs: SignalFlags::empty(),
                 sig_mask: SignalFlags::empty(),
                 sig_handling: None,
+                task_time: TaskTime::new(weight),
             }),
             proc,
-        }
+        })
     }
 
     pub fn renew(
@@ -105,7 +114,8 @@ impl Task {
         gid: Arc<Id>,
         proc: Weak<Proc>,
         page_table: Arc<PageTable>,
-    ) -> Self {
+        weight: usize,
+    ) -> Arc<Self> {
         assert_eq!(self.lock().tid.id(), tid.id());
         let kernel_stack = KernelStack::new(gid.id());
         let task_ctx = TaskContext::new(restore as usize, kernel_stack.top().into());
@@ -116,7 +126,7 @@ impl Task {
         let trap_ctx = trap_ctx_handle.trap_ctx_mut();
         trap_ctx.kernel_sp = kernel_stack.top().into();
 
-        Self {
+        Arc::new(Self {
             inner: Spin::new(TaskInner {
                 tid,
                 gid,
@@ -131,9 +141,10 @@ impl Task {
                 sigs: SignalFlags::empty(), // FIX: inherit signal
                 sig_mask: SignalFlags::empty(),
                 sig_handling: None,
+                task_time: TaskTime::new(weight),
             }),
             proc,
-        }
+        })
     }
 
     pub fn exec(&self, tid: Arc<Id>, base: VirAddr, entry: VirAddr, page_table: Arc<PageTable>) {
@@ -190,7 +201,10 @@ impl Task {
     /// Yield the task.
     ///
     /// It's not like the `suspend()', because it would be put into the task manager when called.
+    ///
+    /// Warning: I now think this function should be moved outside, otherwise the reference count of Arc would never decrease, whcih leads to memory leak.
     pub fn yield_now(self: &Arc<Self>) {
+        self.lock().task_time_mut().runout();
         self.schedule();
     }
 
@@ -225,7 +239,7 @@ impl Task {
     /// Then the caller should wake up the task by calling this function, which would put the task into task manager again.
     pub fn wake_up(self: &Arc<Self>) {
         self.lock().task_state = TaskState::Running;
-        TASK_MANAGER.push(self);
+        PROCESSORS[hart_id()].lock().push(self);
     }
 
     /// Schedule the task, namely giving back control to the processor's idle thread.
@@ -260,8 +274,17 @@ impl Task {
                 self.proc().pid()
             );
             drop(task);
-            TASK_MANAGER.push(self);
+            PROCESSORS[hart_id()].lock().push(self);
         }
+    }
+
+    pub fn to_sched_entity(self: &Arc<Self>) -> SchedEntity {
+        let task = self.lock();
+        SchedEntity::new(
+            self.phantom(),
+            task.task_time.vruntime(),
+            task.task_time.weight(),
+        )
     }
 }
 
@@ -348,6 +371,14 @@ impl TaskInner {
 
     pub fn gid(&self) -> usize {
         self.gid.id()
+    }
+
+    pub fn task_time(&self) -> &TaskTime {
+        &self.task_time
+    }
+
+    pub fn task_time_mut(&mut self) -> &mut TaskTime {
+        &mut self.task_time
     }
 }
 

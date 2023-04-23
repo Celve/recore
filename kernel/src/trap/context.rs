@@ -37,7 +37,6 @@ impl TrapCtx {
     ) -> Self {
         let mut saved_regs: [usize; 32] = [0; 32];
         saved_regs[2] = user_sp;
-        println!("[trap] User's sp: {:#x}", user_sp);
         Self {
             saved_regs,
             user_sepc,

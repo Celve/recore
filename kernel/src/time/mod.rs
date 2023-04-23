@@ -1,7 +1,7 @@
 use core::arch::global_asm;
 
 use crate::{
-    config::{CLINT, CPUS, TIMER_INTERVAL},
+    config::{CLINT, CPUS, SCHED_PERIOD},
     task::processor::hart_id,
 };
 use riscv::register::*;
@@ -31,7 +31,7 @@ pub unsafe fn init_timer() {
     let id = hart_id();
 
     // setup timer
-    set_timer(id, get_time() + TIMER_INTERVAL);
+    set_timer(id, get_time() + SCHED_PERIOD);
 
     // prepare information in scratch[] for timervec
     // scratch[0..2] : space for timervec to save registers
@@ -39,7 +39,7 @@ pub unsafe fn init_timer() {
     // scratch[4] : desired interval (in cycles) between timer interrupts
     let scratch = &mut TIMER_SCRATCH[id];
     scratch[3] = CLINT + 0x4000 + 8 * id;
-    scratch[4] = TIMER_INTERVAL;
+    scratch[4] = SCHED_PERIOD;
 
     mscratch::write(scratch as *mut usize as usize);
 
@@ -54,4 +54,10 @@ pub unsafe fn init_timer() {
 
     // enable machine-mode timer interrupts
     mie::set_mtimer();
+}
+
+/// It is spinning until time is up.
+pub fn sleep(interval: usize) {
+    let limit = get_time() + interval;
+    while get_time() < limit {}
 }

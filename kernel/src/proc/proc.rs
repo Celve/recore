@@ -49,6 +49,7 @@ pub struct ProcInner {
     lock_table: LockTable,
     sema_table: AllocTable<Arc<Semaphore>>,
     condvar_table: AllocTable<Arc<Observable>>,
+    niceness: isize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -59,7 +60,7 @@ pub enum ProcState {
 
 impl Proc {
     /// Create a new task from elf data.
-    pub fn from_elf(file: File<BlkDev>, parent: Option<Weak<Proc>>) -> Arc<Self> {
+    pub fn from_elf(file: File<BlkDev>, parent: Option<Weak<Proc>>, niceness: isize) -> Arc<Self> {
         let file_size = file.lock().size();
         let mut elf_data = vec![0u8; file_size];
         assert_eq!(file.lock().read_at(&mut elf_data, 0), file_size);
@@ -88,17 +89,19 @@ impl Proc {
                 lock_table: LockTable::new(),
                 sema_table: AllocTable::new(),
                 condvar_table: AllocTable::new(),
+                niceness,
             }),
         });
 
-        let task = Arc::new(Task::new(
+        let task = Task::new(
             tid_allocator.alloc(),
             GID_ALLOCATOR.alloc(),
             base,
             user_sepc,
             Arc::downgrade(&res),
             page_table,
-        ));
+            res.lock().weight(),
+        );
         res.lock().tasks.push(task);
 
         res
@@ -192,14 +195,15 @@ impl Proc {
     /// Create a new thread that starts from `entry` with `arg` as its argument.
     pub fn new_task(self: &Arc<Self>, entry: VirAddr, arg: usize) -> Arc<Task> {
         let mut proc = self.lock();
-        let task = Arc::new(Task::new(
+        let task = Task::new(
             proc.tid_allocator.alloc(),
             GID_ALLOCATOR.alloc(),
             proc.base,
             entry,
             Arc::downgrade(self),
             proc.page_table.clone(),
-        ));
+            proc.weight(),
+        );
         *task.lock().trap_ctx_mut().a0_mut() = arg;
         proc.tasks.push(task.clone());
         task
@@ -251,6 +255,8 @@ impl Proc {
         let cwd = proc.cwd.clone();
         let fd_table = proc.fd_table().clone();
         let tid_allocator = Arc::new(IdAllocator::new());
+        let parent = proc.parent.clone();
+        let niceness = proc.niceness;
         assert_eq!(proc.lock_table.len(), 0); // the cloning of Spines is not supported yet
         assert_eq!(proc.sema_table.len(), 0); // the cloning of Spines is not supported yet
 
@@ -261,7 +267,7 @@ impl Proc {
                 user_mem,
                 page_table: page_table.clone(),
                 proc_staus: ProcState::Running,
-                parent: proc.parent.clone(),
+                parent,
                 children: Vec::new(),
                 tasks: Vec::new(),
                 exit_code: 0,
@@ -272,6 +278,7 @@ impl Proc {
                 lock_table: LockTable::new(),
                 sema_table: AllocTable::new(),
                 condvar_table: AllocTable::new(),
+                niceness,
             }),
         });
 
@@ -279,12 +286,13 @@ impl Proc {
             .tasks
             .iter()
             .map(|task| {
-                Arc::new(task.renew(
+                task.renew(
                     tid_allocator.alloc(),
                     GID_ALLOCATOR.alloc(),
                     Arc::downgrade(&forked),
                     page_table.clone(),
-                ))
+                    forked.lock().weight(),
+                )
             })
             .collect();
         forked.inner.lock().tasks = tasks;
@@ -391,5 +399,9 @@ impl ProcInner {
 
     pub fn condvar_table_mut(&mut self) -> &mut AllocTable<Arc<Observable>> {
         &mut self.condvar_table
+    }
+
+    pub fn weight(&self) -> usize {
+        1024 / (1 << self.niceness)
     }
 }

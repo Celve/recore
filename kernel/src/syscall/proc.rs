@@ -7,10 +7,7 @@ use fosix::{
 use crate::{
     proc::{manager::PROC_MANAGER, proc::ProcState},
     sync::{observable::Observable, semaphore::Semaphore},
-    task::{
-        manager::TASK_MANAGER,
-        processor::{fetch_curr_proc, fetch_curr_task},
-    },
+    task::processor::{fetch_curr_proc, fetch_curr_task, hart_id, PROCESSORS},
 };
 
 use super::{open_file, parse_str};
@@ -21,7 +18,7 @@ pub fn sys_exit(exit_code: isize) -> isize {
 }
 
 pub fn sys_yield() -> isize {
-    fetch_curr_task().yield_now();
+    fetch_curr_task().lock().task_time_mut().runout();
     0
 }
 
@@ -31,7 +28,7 @@ pub fn sys_fork() -> isize {
     let task = proc.lock().main_task();
     *task.lock().trap_ctx_mut().a0_mut() = 0;
     PROC_MANAGER.push(&proc);
-    TASK_MANAGER.push(&task);
+    PROCESSORS[hart_id()].lock().push(&task);
     println!("[kernel] Fork a new process with pid {}.", pid);
     pid as isize
 }

@@ -1,6 +1,5 @@
 use core::arch::asm;
 
-use fosix::syscall::SYSCALL_THREAD_CREATE;
 use riscv::register::{satp, scause, sepc, sip, stval, utvec::TrapMode};
 
 use crate::{
@@ -11,7 +10,8 @@ use crate::{
     },
     fs::FUSE,
     syscall::syscall,
-    task::processor::{fetch_curr_task, hart_id},
+    task::processor::{fetch_curr_proc, fetch_curr_task, hart_id},
+    time::get_time,
 };
 
 use self::{signal::signal_handler, trampoline::restore};
@@ -26,6 +26,10 @@ pub mod trampoline;
 /// Hence there is no supervisor mode interrupt or exception that could enter the trap handler again.
 #[no_mangle]
 pub fn trap_handler() -> ! {
+    // Yielding should be done after all the traps are handled.
+    // Because the scause is not maintained.
+    fetch_curr_task().lock().task_time_mut().trap();
+
     set_kernel_stvec();
     let trap = scause::read().cause();
     match trap {
@@ -55,6 +59,9 @@ pub fn trap_handler() -> ! {
                         _ => panic!("Unknown interrupt id {}", id),
                     }
                     PLIC.complete(hart_id(), TargetPriority::Supervisor, id);
+
+                    // let that task to be handled
+                    fetch_curr_task().yield_now();
                 }
             }
             scause::Interrupt::UserSoft => todo!(),
@@ -86,9 +93,6 @@ pub fn trap_handler() -> ! {
                     let task = fetch_curr_task();
                     let mut task_guard = task.lock();
                     *task_guard.trap_ctx_mut().a0_mut() = result as usize;
-                    if id == SYSCALL_THREAD_CREATE {
-                        println!("user_pc: {:#x}", task_guard.trap_ctx().user_sepc);
-                    }
                 }
             }
             scause::Exception::InstructionMisaligned => todo!(),

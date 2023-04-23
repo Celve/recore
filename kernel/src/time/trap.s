@@ -15,7 +15,7 @@ _timertrap:
     ld t1, 4*8(sp) # timer interval      
     ld t2, 0(t0) # current time
     add t2, t2, t1 # new time
-    sd t2, 0(t0) # set new time
+    sd t2, 0(t0) # set newtime
 
     # setup timer interrupt for supervisor 
     li t0, 2

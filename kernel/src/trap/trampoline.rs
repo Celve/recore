@@ -1,12 +1,23 @@
 use core::arch::{asm, global_asm};
 
-use riscv::register::sip;
-
-use crate::config::TRAMPOLINE_ADDR;
-use crate::task::processor::fetch_curr_task;
+use crate::config::{MIN_AVG_TIME_SLICE, MIN_EXEC_TIME_SLICE, TRAMPOLINE_ADDR};
+use crate::task::processor::{fetch_curr_proc, fetch_curr_task};
+use crate::time::get_time;
 use crate::trap::set_user_stvec;
 
 global_asm!(include_str!("trampoline.s"));
+
+fn should_yield() -> bool {
+    let task = fetch_curr_task();
+    let task_guard = task.lock();
+    let task_time = task_guard.task_time();
+    if task_time.remaining() < MIN_EXEC_TIME_SLICE {
+        // if the remaining time is less or there is a blocked task wake up
+        true
+    } else {
+        false
+    }
+}
 
 /// The function is a trampoline for `_restore()` inside `trampoline.s`.
 /// It would never return when the function is called.
@@ -21,13 +32,18 @@ pub fn restore() -> ! {
         fn _alltraps();
     }
 
-    // acknowledge the software interrupt again, because the supervisor might run too long
-    // let sip = sip::read().bits();
-    // unsafe {
-    // asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
-    // }
+    // yield
+    if should_yield() {
+        if fetch_curr_proc().pid() == 8 {
+            println!("yield");
+        }
+        fetch_curr_task().yield_now();
+    }
 
     set_user_stvec();
+
+    // set the timer
+    fetch_curr_task().lock().task_time_mut().restore();
 
     unsafe {
         asm! {

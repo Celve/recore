@@ -8,7 +8,8 @@ use virtio_drivers::{BlkResp, Hal, RespStatus, VirtIOBlk, VirtIOHeader};
 
 use crate::{
     mm::{frame::Frame, page_table::KERNEL_PAGE_TABLE},
-    sync::{condvar::Condvar, mutex::Mutex},
+    sync::condvar::Condvar,
+    time::get_time,
 };
 
 pub struct BlkDev {

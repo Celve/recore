@@ -51,7 +51,8 @@ impl ProcManager {
 lazy_static! {
     pub static ref INITPROC: Arc<Proc> = Proc::from_elf(
         FUSE.root().lock().open("initproc", OpenFlags::RDONLY).unwrap(),
-        None
+        None,
+        0,
     );
 
     /// Manager only loads the initproc at the beginning.

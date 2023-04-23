@@ -35,13 +35,10 @@ use heap::init_heap;
 use mm::{frame::init_frame_allocator, page_table::activate_page_table};
 use proc::manager::PROC_MANAGER;
 use riscv::register::*;
-use task::{
-    manager::TASK_MANAGER,
-    processor::{hart_id, run_tasks},
-};
+use task::processor::{hart_id, run_tasks, PROCESSORS};
 use time::init_timer;
 
-use crate::{fs::FUSE, trap::set_kernel_stvec};
+use crate::{fs::FUSE, time::get_time, trap::set_kernel_stvec};
 
 global_asm!(include_str!("app.s"));
 
@@ -121,18 +118,12 @@ extern "C" fn rust_main() {
         activate_page_table(); // the kernel space is automatically init before activating page table because of the lazy_static!
         println!("[kernel] Page table activated.");
 
-        // let root = FUSE.root();
-        // root.lock()
-        // .ls()
-        // .iter()
-        // .for_each(|name| println!("{}", name));
-
         init_devices();
         init_tasks();
 
         println!(
             "[kernel] Initialization done with satp {:#x}.",
-            satp::read().bits()
+            satp::read().bits(),
         );
         INITED.store(true, Ordering::Release);
     } else {
@@ -182,7 +173,7 @@ fn init_devices() {
     // currently, only notifications from uart are enabled
     // 1 stands for block, and 10 stands for uart
     // set priority and enable the interrupt for each src
-    for src_id in [10] {
+    for src_id in [1, 10] {
         PLIC.set_priority(src_id, 1);
         PLIC.enable(hart_id, TargetPriority::Supervisor, src_id);
     }
@@ -195,6 +186,6 @@ fn init_devices() {
 
 fn init_tasks() {
     let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
-    TASK_MANAGER.push(&task);
-    // FUSE.disk_manager().enable_non_blocking();
+    PROCESSORS[hart_id()].lock().push(&task);
+    FUSE.disk_manager().enable_non_blocking();
 }

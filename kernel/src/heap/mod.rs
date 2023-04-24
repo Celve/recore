@@ -3,12 +3,10 @@ mod locked_heap;
 mod page;
 pub mod slab_allocator;
 
-use allocator::heap::LockedBuddyHeap;
-
-use crate::config::{KERNEL_HEAP_GRANULARITY, KERNEL_HEAP_SIZE, PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::config::{KERNEL_HEAP_SIZE, PAGE_SIZE, PAGE_SIZE_BITS};
 use page::Page;
 
-use self::{locked_heap::LockedHeap, page::PagePtr, slab_allocator::LockedSlabHeap};
+use self::{locked_heap::LockedHeap, page::PagePtr};
 
 #[link_section = ".data.heap"]
 static mut KERNEL_HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];

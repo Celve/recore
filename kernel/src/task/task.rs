@@ -13,11 +13,8 @@ use crate::{
         proc::Proc,
         stack::{KernelStack, UserStack},
     },
-    task::processor::fetch_idle_task_ctx_ptr,
-    time::get_time,
     trap::{
         context::{TrapCtx, TrapCtxHandle},
-        fail,
         trampoline::restore,
         trap_handler,
     },

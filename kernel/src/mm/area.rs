@@ -1,7 +1,6 @@
 use core::cmp::min;
 
 use alloc::{sync::Arc, vec::Vec};
-use riscv::addr::page;
 
 use crate::config::PAGE_SIZE;
 

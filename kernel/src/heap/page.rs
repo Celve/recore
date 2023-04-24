@@ -2,7 +2,7 @@ use core::ops::{Deref, DerefMut};
 
 use allocator::linked_list::LinkedList;
 
-use crate::config::{MEMORY_END, PAGE_SIZE};
+use crate::config::PAGE_SIZE;
 
 #[derive(Clone, Copy)]
 pub struct Page {

@@ -26,27 +26,102 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub fn idle_task_ctx_ptr(&mut self) -> *mut TaskContext {
+    fn glob_curr_task() -> Option<Arc<Task>> {
+        PROCESSORS[hart_id()].lock().local_curr_task()
+    }
+
+    pub fn curr_task() -> Arc<Task> {
+        Processor::glob_curr_task().unwrap()
+    }
+
+    fn glob_curr_proc() -> Option<Arc<Proc>> {
+        PROCESSORS[hart_id()]
+            .lock()
+            .local_curr_task()
+            .map(|task| task.proc())
+    }
+
+    pub fn curr_proc() -> Arc<Proc> {
+        Processor::glob_curr_proc().unwrap()
+    }
+
+    pub fn idle_task_ctx_ptr() -> *mut TaskContext {
+        PROCESSORS[hart_id()].lock().local_idle_task_ctx_ptr()
+    }
+
+    /// Yield the task.
+    ///
+    /// It's not like the `suspend()', because it would be put into the task manager when called.
+    pub fn yield_now() {
+        {
+            let task = Processor::curr_task();
+            task.lock().task_time_mut().runout();
+        }
+        Processor::schedule();
+    }
+
+    /// Suspend the task.
+    ///
+    /// When `suspend()` is called, the task would never be put into the task manager again.
+    /// There should be other structure that holds the task, and it should wake up the task when needed.
+    pub fn suspend() {
+        {
+            let task = Processor::curr_task();
+            *task.lock().task_state_mut() = TaskState::Stopped;
+        }
+        Processor::schedule();
+    }
+
+    /// Exit the task.
+    ///
+    /// It directly exits the task by setting the state and exit code.
+    /// It's illegal to put this task to the task manager again.
+    pub fn exit(exit_code: isize) {
+        {
+            let task = Processor::curr_task();
+            println!(
+                "process {} thread {} exit with code {}",
+                task.proc().pid(),
+                task.lock().tid(),
+                exit_code
+            );
+            task.exit(exit_code);
+        }
+        Processor::schedule();
+    }
+
+    /// Schedule the task, namely giving back control to the processor's idle thread.
+    fn schedule() {
+        let task_ctx = Processor::curr_task().lock().task_ctx_ptr();
+        extern "C" {
+            fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
+        }
+        unsafe { _switch(task_ctx, Processor::idle_task_ctx_ptr()) }
+    }
+}
+
+impl Processor {
+    pub fn local_idle_task_ctx_ptr(&mut self) -> *mut TaskContext {
         &mut self.idle_task_ctx
     }
 
-    pub fn curr_task(&self) -> Option<Arc<Task>> {
+    pub fn local_curr_task(&self) -> Option<Arc<Task>> {
         self.curr_task.clone().and_then(|task| task.upgrade())
     }
 
-    pub fn curr_task_take(&mut self) -> Option<Arc<Task>> {
+    pub fn local_curr_task_take(&mut self) -> Option<Arc<Task>> {
         self.curr_task.take().and_then(|task| task.upgrade())
     }
 
-    pub fn curr_task_mut(&mut self) -> &mut Option<Weak<Task>> {
+    pub fn local_curr_task_mut(&mut self) -> &mut Option<Weak<Task>> {
         &mut self.curr_task
     }
 
-    pub fn scheduler(&self) -> &Scheduler {
+    pub fn local_scheduler(&self) -> &Scheduler {
         &self.scheduler
     }
 
-    pub fn scheduler_mut(&mut self) -> &mut Scheduler {
+    pub fn local_scheduler_mut(&mut self) -> &mut Scheduler {
         &mut self.scheduler
     }
 }
@@ -72,26 +147,6 @@ pub fn hart_id() -> usize {
     hart_id
 }
 
-/// Fetch the current task.
-pub fn fetch_curr_task() -> Arc<Task> {
-    let task = PROCESSORS[hart_id()].lock().curr_task();
-    if let Some(task) = task {
-        task
-    } else {
-        panic!("[kernel] Hart {} has no running task currently.", hart_id())
-    }
-}
-
-/// Fetch the current process.
-pub fn fetch_curr_proc() -> Arc<Proc> {
-    fetch_curr_task().proc()
-}
-
-/// Fetch the idle task context pointer with processor locked.
-pub fn fetch_idle_task_ctx_ptr() -> *mut TaskContext {
-    PROCESSORS[hart_id()].lock().idle_task_ctx_ptr()
-}
-
 /// Switch from idle task to the next task.
 ///
 /// When the next task yields, it will get into this function again.
@@ -108,8 +163,8 @@ pub fn switch() {
         let task_ctx = task.lock().task_ctx_ptr();
         let idle_task_ctx = {
             let mut processor = PROCESSORS[hart_id()].lock();
-            *processor.curr_task_mut() = Some(task.phantom());
-            processor.idle_task_ctx_ptr()
+            *processor.local_curr_task_mut() = Some(task.phantom());
+            processor.local_idle_task_ctx_ptr()
         };
 
         extern "C" {

@@ -1,9 +1,9 @@
 use core::mem::size_of;
 
-use crate::{fs::fileable::Fileable, ipc::pipe::Pipe, task::processor::fetch_curr_proc};
+use crate::{fs::fileable::Fileable, ipc::pipe::Pipe, task::processor::Processor};
 
 pub fn sys_pipe(pipe_ptr: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     let fd_table = proc_guard.fd_table_mut();
 

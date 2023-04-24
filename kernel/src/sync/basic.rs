@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use spin::Spin;
 
-use crate::task::processor::fetch_curr_task;
+use crate::task::processor::Processor;
 
 use super::waiting_queue::WaitingQueue;
 
@@ -22,7 +22,7 @@ impl SpinLock {
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
             .is_err()
         {
-            fetch_curr_task().yield_now();
+            Processor::yield_now();
         }
     }
 
@@ -42,9 +42,11 @@ impl BlockLock {
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
             .is_err()
         {
-            let task = fetch_curr_task();
-            self.queue.lock().push(&task);
-            task.suspend();
+            {
+                let task = Processor::curr_task();
+                self.queue.lock().push(&task);
+            }
+            Processor::suspend();
         }
     }
 

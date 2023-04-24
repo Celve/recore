@@ -7,23 +7,23 @@ use fosix::{
 use crate::{
     proc::{manager::PROC_MANAGER, proc::ProcState},
     sync::{observable::Observable, semaphore::Semaphore},
-    task::processor::{fetch_curr_proc, fetch_curr_task, hart_id, PROCESSORS},
+    task::processor::{hart_id, Processor, PROCESSORS},
 };
 
 use super::{open_file, parse_str};
 
 pub fn sys_exit(exit_code: isize) -> isize {
-    fetch_curr_task().exit(exit_code);
+    Processor::exit(exit_code);
     0
 }
 
 pub fn sys_yield() -> isize {
-    fetch_curr_task().lock().task_time_mut().runout();
+    Processor::curr_task().lock().task_time_mut().runout();
     0
 }
 
 pub fn sys_fork() -> isize {
-    let proc = fetch_curr_proc().fork();
+    let proc = Processor::curr_proc().fork();
     let pid = proc.pid();
     let task = proc.lock().main_task();
     *task.lock().trap_ctx_mut().a0_mut() = 0;
@@ -36,7 +36,7 @@ pub fn sys_fork() -> isize {
 pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
     println!("[kernel] Try exec a new program.");
     let name = parse_str(path);
-    let cwd = fetch_curr_proc().lock().cwd();
+    let cwd = Processor::curr_proc().lock().cwd();
     let file = open_file(cwd, &name, OpenFlags::RDONLY);
     if let Some(file) = file {
         println!("[kernel] Exec a new program.");
@@ -45,7 +45,7 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
         let mut args = Vec::new();
         loop {
             let arg = {
-                let page_table = fetch_curr_proc().lock().page_table();
+                let page_table = Processor::curr_proc().lock().page_table();
                 page_table.translate_any::<usize>((args_ptr as usize).into())
             };
             if *arg == 0 {
@@ -57,7 +57,7 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
             args_ptr = unsafe { args_ptr.add(1) };
         }
 
-        fetch_curr_proc().exec(file, &args);
+        Processor::curr_proc().exec(file, &args);
         args.len() as isize // otherwise it would be overrided
     } else {
         println!("[kernel] Fail to exec {}.", name);
@@ -66,11 +66,11 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
 }
 
 pub fn sys_getpid() -> isize {
-    fetch_curr_proc().pid() as isize
+    Processor::curr_proc().pid() as isize
 }
 
 pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
 
     // find satisfied children
@@ -98,7 +98,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
 
 #[no_mangle]
 pub fn sys_sigreturn() -> isize {
-    let task = fetch_curr_task();
+    let task = Processor::curr_task();
     let mut task_guard = task.lock();
     task_guard.sig_handling_mut().take();
     *task_guard.trap_ctx_mut() = task_guard.trap_ctx_backup_mut().take().unwrap();
@@ -125,7 +125,7 @@ pub fn sys_sigaction(sig_id: usize, new_action_ptr: usize, old_action_ptr: usize
         return -1;
     }
 
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     let page_table = proc_guard.page_table();
     let new_action = page_table.translate_any::<SignalAction>(new_action_ptr.into());
@@ -137,7 +137,7 @@ pub fn sys_sigaction(sig_id: usize, new_action_ptr: usize, old_action_ptr: usize
 }
 
 pub fn sys_sigprocmask(mask: u32) -> isize {
-    let task = fetch_curr_task();
+    let task = Processor::curr_task();
     let mut task_guard = task.lock();
     if let Some(mask) = SignalFlags::from_bits(mask) {
         let old_mask = task_guard.sig_mask();
@@ -149,14 +149,14 @@ pub fn sys_sigprocmask(mask: u32) -> isize {
 }
 
 pub fn sys_mutex_create(blocked: bool) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     proc_guard.lock_table_mut().alloc(blocked) as isize
 }
 
 pub fn sys_mutex_lock(id: usize) -> isize {
     let lock = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.lock_table().get(id)
     };
@@ -170,7 +170,7 @@ pub fn sys_mutex_lock(id: usize) -> isize {
 
 pub fn sys_mutex_unlock(id: usize) -> isize {
     let lock = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.lock_table().get(id)
     };
@@ -183,7 +183,7 @@ pub fn sys_mutex_unlock(id: usize) -> isize {
 }
 
 pub fn sys_semaphore_create(counter: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     proc_guard
         .sema_table_mut()
@@ -192,7 +192,7 @@ pub fn sys_semaphore_create(counter: usize) -> isize {
 
 pub fn sys_semaphore_down(id: usize) -> isize {
     let sema = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.sema_table().get(id)
     };
@@ -206,7 +206,7 @@ pub fn sys_semaphore_down(id: usize) -> isize {
 
 pub fn sys_semaphore_up(id: usize) -> isize {
     let sema = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.sema_table().get(id)
     };
@@ -219,7 +219,7 @@ pub fn sys_semaphore_up(id: usize) -> isize {
 }
 
 pub fn sys_condvar_create() -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     proc_guard
         .condvar_table_mut()
@@ -228,16 +228,16 @@ pub fn sys_condvar_create() -> isize {
 
 pub fn sys_condvar_wait(condvar_id: usize, lock_id: usize) -> isize {
     let condvar = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.condvar_table().get(condvar_id)
     };
     let lock = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.lock_table().get(lock_id)
     };
-    let task = fetch_curr_task();
+    let task = Processor::curr_task();
     if let (Some(condvar), Some(lock)) = (condvar, lock) {
         if lock.is_locked() {
             lock.unlock();
@@ -254,7 +254,7 @@ pub fn sys_condvar_wait(condvar_id: usize, lock_id: usize) -> isize {
 
 pub fn sys_condvar_notify_one(id: usize) -> isize {
     let condvar = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.condvar_table().get(id)
     };
@@ -268,7 +268,7 @@ pub fn sys_condvar_notify_one(id: usize) -> isize {
 
 pub fn sys_condvar_notify_all(id: usize) -> isize {
     let condvar = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.condvar_table().get(id)
     };

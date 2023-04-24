@@ -39,13 +39,13 @@ pub struct TaskInner {
     tid: Arc<Id>,
     gid: Arc<Id>,
     page_table: Arc<PageTable>,
-    task_state: TaskState,
+    pub task_state: TaskState,
     task_ctx: TaskContext,
     trap_ctx_handle: TrapCtxHandle,
     trap_ctx_backup: Option<TrapCtx>,
     user_stack: UserStack,
     kernel_stack: KernelStack,
-    exit_code: isize,
+    pub exit_code: isize,
     sigs: SignalFlags,
     sig_mask: SignalFlags,
     sig_handling: Option<usize>,
@@ -186,51 +186,6 @@ impl Task {
     pub fn phantom(self: &Arc<Self>) -> Weak<Self> {
         Arc::downgrade(self)
     }
-}
-
-impl Task {
-    /// Suspend the task.
-    ///
-    /// When `suspend()` is called, the task would never be put into the task manager again.
-    /// There should be other structure that holds the task, and it should wake up the task when needed.
-    pub fn suspend(&self) {
-        self.lock().task_state = TaskState::Stopped;
-        self.schedule();
-    }
-
-    /// Yield the task.
-    ///
-    /// It's not like the `suspend()', because it would be put into the task manager when called.
-    ///
-    /// Warning: I now think this function should be moved outside, otherwise the reference count of Arc would never decrease, whcih leads to memory leak.
-    pub fn yield_now(self: &Arc<Self>) {
-        self.lock().task_time_mut().runout();
-        self.schedule();
-    }
-
-    /// Exit the task.
-    ///
-    /// It directly exits the task by setting the state and exit code.
-    /// It's illegal to put this task to the task manager again.
-    pub fn exit(&self, exit_code: isize) {
-        println!(
-            "process {} thread {} exit with code {}",
-            self.proc().pid(),
-            self.lock().tid(),
-            exit_code
-        );
-        {
-            let mut task = self.lock();
-            task.task_state = TaskState::Zombie;
-            task.exit_code = exit_code;
-
-            // in case that it's the main thread
-            if task.tid() == 1 {
-                self.proc().exit(exit_code);
-            }
-        }
-        self.schedule()
-    }
 
     /// Wake up the task.
     ///
@@ -242,16 +197,15 @@ impl Task {
         PROCESSORS[hart_id()].lock().push(self);
     }
 
-    /// Schedule the task, namely giving back control to the processor's idle thread.
-    fn schedule(&self) {
-        let task_ctx = self.lock().task_ctx_ptr();
-        extern "C" {
-            fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
+    pub fn exit(&self, exit_code: isize) {
+        let mut guard = self.lock();
+        guard.task_state = TaskState::Zombie;
+        guard.exit_code = exit_code;
+
+        // in case that it's the main thread
+        if guard.tid() == 1 {
+            self.proc().exit(exit_code);
         }
-        if (task_ctx as usize) < 10 {
-            fail();
-        }
-        unsafe { _switch(task_ctx, fetch_idle_task_ctx_ptr()) }
     }
 }
 

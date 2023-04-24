@@ -1,6 +1,6 @@
 use spin::Spin;
 
-use crate::task::processor::fetch_curr_task;
+use crate::task::processor::Processor;
 
 use super::waiting_queue::WaitingQueue;
 
@@ -26,9 +26,11 @@ impl Semaphore {
     pub fn down(&self) {
         let sema = &self.inner;
         while sema.lock().counter == 0 {
-            let task = fetch_curr_task();
-            sema.lock().queue.push(&task);
-            task.suspend();
+            {
+                let task = Processor::curr_task();
+                sema.lock().queue.push(&task);
+            }
+            Processor::suspend();
         }
         sema.lock().counter -= 1;
     }

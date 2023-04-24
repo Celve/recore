@@ -2,13 +2,13 @@ use core::mem::size_of;
 
 use fosix::fs::{DirEntry, FileStat, OpenFlags, SeekFlag};
 
-use crate::{fs::fileable::Fileable, task::processor::fetch_curr_proc};
+use crate::{fs::fileable::Fileable, task::processor::Processor};
 
 use super::{create_dir, open_dir, open_file, parse_str};
 
 pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
     let (mut fileable, mut seg) = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         let page_table = proc_guard.page_table();
         let fd_table = proc_guard.fd_table();
@@ -24,7 +24,7 @@ pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
 
 pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
     let (mut fileable, seg) = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         let page_table = proc_guard.page_table();
         let fd_table = proc_guard.fd_table();
@@ -40,7 +40,7 @@ pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
 
 pub fn sys_open(path: usize, flags: u32) -> isize {
     let flags = OpenFlags::from_bits(flags).unwrap();
-    let cwd = fetch_curr_proc().lock().cwd();
+    let cwd = Processor::curr_proc().lock().cwd();
     let fileable = if flags.contains(OpenFlags::DIR) {
         let path = &parse_str(path);
         let dir = open_dir(cwd, path);
@@ -55,11 +55,11 @@ pub fn sys_open(path: usize, flags: u32) -> isize {
         }
         Fileable::File(file.unwrap())
     };
-    fetch_curr_proc().lock().fd_table_mut().alloc(fileable) as isize
+    Processor::curr_proc().lock().fd_table_mut().alloc(fileable) as isize
 }
 
 pub fn sys_close(fd: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     let fd_table = proc_guard.fd_table_mut();
     if fd > fd_table.len() {
@@ -75,7 +75,7 @@ pub fn sys_close(fd: usize) -> isize {
 pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
     let path = parse_str(path);
     let dir = create_dir(
-        fetch_curr_proc()
+        Processor::curr_proc()
             .lock()
             .fd_table()
             .get(dfd)
@@ -93,9 +93,9 @@ pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
 
 pub fn sys_chdir(path: usize) -> isize {
     let path = parse_str(path);
-    let dir = open_dir(fetch_curr_proc().lock().cwd(), &path);
+    let dir = open_dir(Processor::curr_proc().lock().cwd(), &path);
     if let Some(dir) = dir {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let mut proc_guard = proc.lock();
         *proc_guard.cwd_mut() = dir;
         0
@@ -105,7 +105,7 @@ pub fn sys_chdir(path: usize) -> isize {
 }
 
 pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let proc_guard = proc.lock();
     let mut dst_bytes = proc_guard
         .page_table()
@@ -133,7 +133,7 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let proc_guard = proc.lock();
     let mut dst_bytes = proc_guard
         .page_table()
@@ -152,7 +152,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     let fd_table = proc_guard.fd_table_mut();
     let mut fileable = fd_table.get(fd).unwrap();
@@ -161,7 +161,7 @@ pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
 }
 
 pub fn sys_dup(fd: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     let fd_table = proc_guard.fd_table_mut();
     let fileable = fd_table.get(fd);

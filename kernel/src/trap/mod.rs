@@ -10,8 +10,7 @@ use crate::{
     },
     fs::FUSE,
     syscall::syscall,
-    task::processor::{fetch_curr_proc, fetch_curr_task, hart_id},
-    time::get_time,
+    task::processor::{hart_id, Processor},
 };
 
 use self::{signal::signal_handler, trampoline::restore};
@@ -28,7 +27,7 @@ pub mod trampoline;
 pub fn trap_handler() -> ! {
     // Yielding should be done after all the traps are handled.
     // Because the scause is not maintained.
-    fetch_curr_task().lock().task_time_mut().trap();
+    Processor::curr_task().lock().task_time_mut().trap();
 
     set_kernel_stvec();
     let trap = scause::read().cause();
@@ -41,7 +40,7 @@ pub fn trap_handler() -> ! {
                     asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
                 }
 
-                fetch_curr_task().yield_now();
+                Processor::yield_now();
             }
             scause::Interrupt::SupervisorTimer => todo!(),
             scause::Interrupt::SupervisorExternal => {
@@ -61,7 +60,7 @@ pub fn trap_handler() -> ! {
                     PLIC.complete(hart_id(), TargetPriority::Supervisor, id);
 
                     // let that task to be handled
-                    fetch_curr_task().yield_now();
+                    Processor::yield_now();
                 }
             }
             scause::Interrupt::UserSoft => todo!(),
@@ -75,7 +74,7 @@ pub fn trap_handler() -> ! {
         scause::Trap::Exception(excp) => match excp {
             scause::Exception::UserEnvCall => {
                 let (id, args) = {
-                    let task = fetch_curr_task();
+                    let task = Processor::curr_task();
                     let mut task_guard = task.lock();
                     let trap_ctx = task_guard.trap_ctx_mut();
                     trap_ctx.user_sepc += 4; // it must be added here
@@ -90,7 +89,7 @@ pub fn trap_handler() -> ! {
                 };
                 let result = syscall(id, args);
                 {
-                    let task = fetch_curr_task();
+                    let task = Processor::curr_task();
                     let mut task_guard = task.lock();
                     *task_guard.trap_ctx_mut().a0_mut() = result as usize;
                 }

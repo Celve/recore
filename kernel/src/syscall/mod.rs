@@ -7,7 +7,7 @@ use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
 use fs::{dir::Dir, file::File};
 
-use crate::{drivers::blockdev::BlkDev, fs::FUSE, task::processor::fetch_curr_proc};
+use crate::{drivers::blockdev::BlkDev, fs::FUSE, task::processor::Processor};
 
 use self::{com::sys_pipe, file::*, proc::*, task::*};
 
@@ -107,7 +107,7 @@ fn create_dir(cwd: Dir<BlkDev>, path: &str) -> Option<Dir<BlkDev>> {
 }
 
 fn parse_str(path: usize) -> String {
-    fetch_curr_proc()
+    Processor::curr_proc()
         .lock()
         .page_table()
         .translate_str(path.into())

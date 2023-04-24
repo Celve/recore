@@ -2,21 +2,18 @@ use fosix::signal::SignalFlags;
 
 use crate::{
     config::NUM_SIGNAL,
-    task::{
-        processor::{fetch_curr_proc, fetch_curr_task},
-        task::TaskState,
-    },
+    task::{processor::Processor, task::TaskState},
 };
 
 /// The handler that handles all signals.
 pub fn signal_handler() {
-    if fetch_curr_task().lock().sig_handling().is_none() {
+    if Processor::curr_task().lock().sig_handling().is_none() {
         loop {
             let sigs = {
                 // always lock proc first
-                let proc = fetch_curr_proc();
+                let proc = Processor::curr_proc();
                 let proc_guard = proc.lock();
-                let task = fetch_curr_task();
+                let task = Processor::curr_task();
                 let task_guard = task.lock();
                 let sig = task_guard.sigs();
                 let sig_mask = task_guard.sig_mask();
@@ -32,7 +29,7 @@ pub fn signal_handler() {
                 let sig = SignalFlags::from_bits(1 << i).unwrap();
                 if sigs.contains(sig) {
                     println!("[kernel] Receive signal {}", i);
-                    *fetch_curr_task().lock().sigs_mut() ^= sig;
+                    *Processor::curr_task().lock().sigs_mut() ^= sig;
                     if sig == SignalFlags::SIGKILL
                         || sig == SignalFlags::SIGSTOP
                         || sig == SignalFlags::SIGCONT
@@ -49,13 +46,13 @@ pub fn signal_handler() {
                 }
             }
 
-            let status = fetch_curr_task().lock().task_state();
+            let status = Processor::curr_task().lock().task_state();
             if status != TaskState::Stopped {
                 break;
             }
 
             // for stop, it yields here
-            fetch_curr_task().suspend();
+            Processor::suspend();
         }
     }
 }
@@ -65,16 +62,18 @@ fn kernel_signal_handler(sigid: usize) {
     println!(
         "kernel signal handler is now handling {} with pid {} and tid {}",
         sigid,
-        fetch_curr_proc().pid(),
-        fetch_curr_task().lock().tid()
+        Processor::curr_proc().pid(),
+        Processor::curr_task().lock().tid()
     );
     let sig = SignalFlags::from_bits(1 << sigid).unwrap();
     match sig {
-        SignalFlags::SIGKILL => fetch_curr_task().exit(-2), // yield immediately
-        SignalFlags::SIGSTOP => *fetch_curr_task().lock().task_state_mut() = TaskState::Stopped, // do not yield immediately
+        SignalFlags::SIGKILL => Processor::exit(-2), // yield immediately
+        SignalFlags::SIGSTOP => {
+            *Processor::curr_task().lock().task_state_mut() = TaskState::Stopped
+        } // do not yield immediately
         SignalFlags::SIGCONT => {
             // the task would be waken up in other process
-            assert!(fetch_curr_task().lock().task_state() == TaskState::Running)
+            assert!(Processor::curr_task().lock().task_state() == TaskState::Running)
         }
         _ => {
             panic!("[kernel] Unhandled kernel signal.")
@@ -85,13 +84,13 @@ fn kernel_signal_handler(sigid: usize) {
 /// The handler that handles all user signals, which should be delegated by the `signal_handler()`.
 fn user_signal_handler(sigid: usize) {
     let handler = {
-        let proc = fetch_curr_proc();
+        let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         proc_guard.sig_actions()[sigid].handler()
     };
 
     if handler != 0 {
-        let task = fetch_curr_task();
+        let task = Processor::curr_task();
         let mut task_guard = task.lock();
 
         assert!(task_guard.trap_ctx_backup().is_none());

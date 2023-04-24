@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use spin::Spin;
 
-use crate::task::task::Task;
+use crate::task::{processor::Processor, task::Task};
 
 use super::waiting_queue::WaitingQueue;
 
@@ -18,7 +18,8 @@ impl Observable {
 
     pub fn wait(&self, task: &Arc<Task>) {
         self.waitings.lock().push(&task);
-        task.suspend();
+        drop(task);
+        Processor::suspend();
     }
 
     pub fn notify_one(&self) {

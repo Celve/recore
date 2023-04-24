@@ -1,7 +1,7 @@
 use crate::{
     config::CLOCK_FREQ,
     task::{
-        processor::{fetch_curr_proc, fetch_curr_task, hart_id, PROCESSORS},
+        processor::{hart_id, Processor, PROCESSORS},
         task::TaskState,
         timer::TIMER,
     },
@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let task = proc.new_task(entry.into(), arg);
 
     PROCESSORS[hart_id()].lock().push(&task);
@@ -23,12 +23,12 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
 }
 
 pub fn sys_gettid() -> isize {
-    let tid = fetch_curr_proc().lock().main_task().lock().tid();
+    let tid = Processor::curr_proc().lock().main_task().lock().tid();
     tid as isize
 }
 
 pub fn sys_waittid(tid: isize, exit_code_ptr: usize) -> isize {
-    let proc = fetch_curr_proc();
+    let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
 
     // find satisfied children
@@ -61,8 +61,8 @@ pub fn sys_waittid(tid: isize, exit_code_ptr: usize) -> isize {
 pub fn sys_sleep(time_ms: usize) -> isize {
     let curr_time = get_time();
     let target_time = curr_time + CLOCK_FREQ * time_ms / 1000;
-    let task = fetch_curr_task();
+    let task = Processor::curr_task();
     TIMER.subscribe(target_time, &task);
-    task.suspend();
+    Processor::suspend();
     0
 }

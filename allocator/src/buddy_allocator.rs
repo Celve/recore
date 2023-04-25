@@ -1,11 +1,17 @@
 use super::linked_list::LinkedList;
 use alloc::alloc::Layout;
+use core::alloc::GlobalAlloc;
 use core::cmp::{max, min};
 use core::mem::size_of;
+use spin::{Spin, SpinGuard};
 
 const BUDDY_ALLOCATOR_LEVEL: usize = 32;
 
 pub struct BuddyAllocator {
+    pub allocator: Spin<BuddyAllocatorInner>,
+}
+
+pub struct BuddyAllocatorInner {
     /// This array maintains lists of free spaces in different levels.
     /// Its index corresponds to the power of size.
     free_lists: [LinkedList; BUDDY_ALLOCATOR_LEVEL],
@@ -20,6 +26,32 @@ pub struct BuddyAllocator {
 }
 
 impl BuddyAllocator {
+    pub const fn empty(gran: usize) -> Self {
+        Self {
+            allocator: Spin::new(BuddyAllocatorInner::empty(gran)),
+        }
+    }
+
+    pub fn lock(&self) -> SpinGuard<BuddyAllocatorInner> {
+        self.allocator.lock()
+    }
+
+    pub unsafe fn add_segment(&self, start: usize, end: usize) {
+        self.allocator.lock().add_segment(start, end);
+    }
+}
+
+unsafe impl GlobalAlloc for BuddyAllocator {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        self.allocator.lock().alloc(layout)
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+        self.allocator.lock().dealloc(ptr, layout);
+    }
+}
+
+impl BuddyAllocatorInner {
     pub const fn empty(gran: usize) -> Self {
         Self {
             free_lists: [LinkedList::new(); BUDDY_ALLOCATOR_LEVEL],

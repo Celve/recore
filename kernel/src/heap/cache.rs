@@ -1,4 +1,4 @@
-use core::alloc::Layout;
+use core::alloc::{GlobalAlloc, Layout};
 
 use allocator::linked_list::LinkedList;
 
@@ -25,10 +25,11 @@ impl Cache {
                 page.next_insert(None);
                 Some(page)
             } else {
-                let ptr = HEAP
-                    .buddy_allocator
-                    .lock()
-                    .alloc(Layout::array::<u8>(1 << self.order).unwrap());
+                let ptr = unsafe {
+                    HEAP.buddy_allocator
+                        .lock()
+                        .alloc(Layout::array::<u8>(1 << self.order).unwrap())
+                };
                 // println!("[buddy] Allocate {:#x}.", ptr as usize);
                 let mut page = fetch_page(ptr as usize).unwrap();
                 *page.order_mut() = self.order;

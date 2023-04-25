@@ -6,7 +6,7 @@ pub mod slab_allocator;
 use crate::config::{KERNEL_HEAP_SIZE, PAGE_SIZE, PAGE_SIZE_BITS};
 use page::Page;
 
-use self::{locked_heap::LockedHeap, page::PagePtr};
+use self::{locked_heap::Heap, page::PagePtr};
 
 #[link_section = ".data.heap"]
 static mut KERNEL_HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
@@ -14,10 +14,7 @@ static mut MEM_MAP: [Page; KERNEL_HEAP_SIZE / PAGE_SIZE] =
     [Page::empty(); KERNEL_HEAP_SIZE / PAGE_SIZE];
 
 #[global_allocator]
-static HEAP: LockedHeap = LockedHeap::empty();
-// static SLAB_ALLOCATOR: LockedSlabHeap = LockedSlabHeap::empty();
-
-// static BUDDY_ALLOCATOR: LockedBuddyHeap = LockedBuddyHeap::empty(KERNEL_HEAP_GRANULARITY);
+static HEAP: Heap = Heap::default();
 
 pub fn init_heap() {
     unsafe {

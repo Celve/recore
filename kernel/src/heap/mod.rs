@@ -1,12 +1,12 @@
 mod cache;
-mod locked_heap;
+mod heap;
 mod page;
 pub mod slab_allocator;
 
 use crate::config::{KERNEL_HEAP_SIZE, PAGE_SIZE, PAGE_SIZE_BITS};
 use page::Page;
 
-use self::{locked_heap::Heap, page::PagePtr};
+use self::{heap::Heap, page::PagePtr};
 
 #[link_section = ".data.heap"]
 static mut KERNEL_HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];

@@ -63,7 +63,7 @@ impl Processor {
             let task = Processor::curr_task();
             task.lock().task_time_mut().runout();
         }
-        Processor::schedule();
+        Processor::switch();
     }
 
     /// Suspend the task.
@@ -75,7 +75,7 @@ impl Processor {
             let task = Processor::curr_task();
             *task.lock().task_state_mut() = TaskState::Stopped;
         }
-        Processor::schedule();
+        Processor::switch();
     }
 
     /// Exit the task.
@@ -93,11 +93,11 @@ impl Processor {
             );
             task.exit(exit_code);
         }
-        Processor::schedule();
+        Processor::switch();
     }
 
     /// Schedule the task, namely giving back control to the processor's idle thread.
-    fn schedule() {
+    fn switch() {
         let task_ctx = Processor::curr_task().lock().task_ctx_ptr();
         extern "C" {
             fn _switch(curr_ctx: *mut TaskContext, next_ctx: *const TaskContext);
@@ -108,7 +108,7 @@ impl Processor {
     /// The entry point of processor.
     pub fn run_tasks() {
         loop {
-            Processor::switch();
+            Processor::schedule();
         }
     }
 
@@ -126,7 +126,7 @@ impl Processor {
     /// Switch from idle task to the next task.
     ///
     /// When the next task yields, it will get into this function again.
-    pub fn switch() {
+    pub fn schedule() {
         let task = PROCESSORS[Processor::hart_id()].lock().scheduler.pop();
         if let Some((task, time)) = task {
             if task.lock().task_state() == TaskState::Ready {

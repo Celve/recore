@@ -10,7 +10,7 @@ use crate::{
     },
     fs::FUSE,
     syscall::syscall,
-    task::processor::{hart_id, Processor},
+    task::processor::Processor,
 };
 
 use self::{signal::signal_handler, trampoline::restore};
@@ -50,14 +50,14 @@ pub fn trap_handler() -> ! {
                     asm! {"csrw sip, {sip}", sip = in(reg) sip ^ (1 << 9)};
                 }
 
-                let id = PLIC.claim(hart_id(), TargetPriority::Supervisor);
+                let id = PLIC.claim(Processor::hart_id(), TargetPriority::Supervisor);
                 if id != 0 {
                     match id {
                         1 => FUSE.disk_manager().handle_irq(),
                         10 => UART.handle_irq(),
                         _ => panic!("Unknown interrupt id {}", id),
                     }
-                    PLIC.complete(hart_id(), TargetPriority::Supervisor, id);
+                    PLIC.complete(Processor::hart_id(), TargetPriority::Supervisor, id);
 
                     // let that task to be handled
                     Processor::yield_now();

@@ -7,7 +7,7 @@ use fosix::{
 use crate::{
     proc::{manager::PROC_MANAGER, proc::ProcState},
     sync::{observable::Observable, semaphore::Semaphore},
-    task::processor::{hart_id, Processor, PROCESSORS},
+    task::processor::{Processor, PROCESSORS},
 };
 
 use super::{open_file, parse_str};
@@ -28,7 +28,7 @@ pub fn sys_fork() -> isize {
     let task = proc.lock().main_task();
     *task.lock().trap_ctx_mut().a0_mut() = 0;
     PROC_MANAGER.push(&proc);
-    PROCESSORS[hart_id()].lock().push(&task);
+    PROCESSORS[Processor::hart_id()].lock().push(&task);
     println!("[kernel] Fork a new process with pid {}.", pid);
     pid as isize
 }

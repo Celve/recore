@@ -35,10 +35,10 @@ use heap::init_heap;
 use mm::{frame::init_frame_allocator, page_table::activate_page_table};
 use proc::manager::PROC_MANAGER;
 use riscv::register::*;
-use task::processor::{hart_id, run_tasks, PROCESSORS};
+use task::processor::{Processor, PROCESSORS};
 use time::init_timer;
 
-use crate::{fs::FUSE, time::get_time, trap::set_kernel_stvec};
+use crate::{fs::FUSE, trap::set_kernel_stvec};
 
 global_asm!(include_str!("app.s"));
 
@@ -101,7 +101,7 @@ static INITED: AtomicBool = AtomicBool::new(false);
 
 #[no_mangle]
 extern "C" fn rust_main() {
-    if hart_id() == 0 {
+    if Processor::hart_id() == 0 {
         set_kernel_stvec();
         init_trap();
         init_bss();
@@ -134,11 +134,11 @@ extern "C" fn rust_main() {
         init_devices();
         println!(
             "[kernel] Hart {} is running with satp {:#x}.",
-            hart_id(),
+            Processor::hart_id(),
             satp::read().bits()
         );
     }
-    run_tasks();
+    Processor::run_tasks();
 }
 
 fn init_trap() {
@@ -164,7 +164,7 @@ fn init_uart() {
 }
 
 fn init_devices() {
-    let hart_id = hart_id();
+    let hart_id = Processor::hart_id();
 
     // set the threshold for each target respectively, to disable notifications for machine mode
     PLIC.set_threshold(hart_id, TargetPriority::Machine, 1);
@@ -186,6 +186,6 @@ fn init_devices() {
 
 fn init_tasks() {
     let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
-    PROCESSORS[hart_id()].lock().push(&task);
+    PROCESSORS[Processor::hart_id()].lock().push(&task);
     FUSE.disk_manager().enable_non_blocking();
 }

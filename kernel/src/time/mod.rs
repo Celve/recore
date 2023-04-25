@@ -2,7 +2,7 @@ use core::arch::global_asm;
 
 use crate::{
     config::{CLINT, CPUS, SCHED_PERIOD},
-    task::processor::hart_id,
+    task::processor::Processor,
 };
 use riscv::register::*;
 
@@ -28,7 +28,7 @@ pub static mut TIMER_SCRATCH: [[usize; 5]; CPUS] = [[0; 5]; CPUS];
 
 #[no_mangle]
 pub unsafe fn init_timer() {
-    let id = hart_id();
+    let id = Processor::hart_id();
 
     // setup timer
     set_timer(id, get_time() + SCHED_PERIOD);

@@ -22,7 +22,7 @@ use crate::{
 
 use super::{
     context::TaskContext,
-    processor::{hart_id, PROCESSORS},
+    processor::{Processor, PROCESSORS},
     scheduler::SchedEntity,
     time::TaskTime,
 };
@@ -191,7 +191,7 @@ impl Task {
     /// Then the caller should wake up the task by calling this function, which would put the task into task manager again.
     pub fn wake_up(self: &Arc<Self>) {
         self.lock().task_state = TaskState::Running;
-        PROCESSORS[hart_id()].lock().push(self);
+        PROCESSORS[Processor::hart_id()].lock().push(self);
     }
 
     pub fn exit(&self, exit_code: isize) {
@@ -225,7 +225,7 @@ impl Task {
                 self.proc().pid()
             );
             drop(task);
-            PROCESSORS[hart_id()].lock().push(self);
+            PROCESSORS[Processor::hart_id()].lock().push(self);
         }
     }
 

@@ -1,7 +1,7 @@
 use crate::{
     config::CLOCK_FREQ,
     task::{
-        processor::{hart_id, Processor, PROCESSORS},
+        processor::{Processor, PROCESSORS},
         task::TaskState,
         timer::TIMER,
     },
@@ -12,7 +12,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     let proc = Processor::curr_proc();
     let task = proc.new_task(entry.into(), arg);
 
-    PROCESSORS[hart_id()].lock().push(&task);
+    PROCESSORS[Processor::hart_id()].lock().push(&task);
 
     let tid = task.lock().tid();
     println!(

@@ -40,8 +40,6 @@ use time::init_timer;
 
 use crate::{fs::FUSE, trap::set_kernel_stvec};
 
-global_asm!(include_str!("app.s"));
-
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [[u8; BOOTLOADER_STACK_SIZE]; CPUS] =
     [[0; BOOTLOADER_STACK_SIZE]; CPUS];

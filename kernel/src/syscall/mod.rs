@@ -1,4 +1,5 @@
 mod com;
+mod debug;
 mod dev;
 mod file;
 mod proc;
@@ -10,7 +11,7 @@ use fs::{dir::Dir, file::File};
 
 use crate::{drivers::blockdev::BlkDev, fs::FUSE, task::processor::Processor};
 
-use self::{com::sys_pipe, dev::sys_shutdown, file::*, proc::*, task::*};
+use self::{com::*, debug::*, dev::*, file::*, proc::*, task::*};
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
@@ -32,6 +33,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_SIGACTION => sys_sigaction(args[0], args[1], args[2]),
         SYSCALL_SIGPROCMASK => sys_sigprocmask(args[0] as u32),
         SYSCALL_SIGRETURN => sys_sigreturn(),
+        SYSCALL_TIME => sys_time(),
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_FORK => sys_fork(),
         SYSCALL_EXEC => sys_exec(args[0], args[1] as *const usize),
@@ -50,6 +52,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_CONDVAR_NOTIFY_ONE => sys_condvar_notify_one(args[0]),
         SYSCALL_CONDVAR_NOTIFY_ALL => sys_condvar_notify_all(args[0]),
         SYSCALL_SHUTDOWN => sys_shutdown(args[0]),
+        SYSCALL_PROCDUMP => sys_procdump(),
         _ => panic!("[kernel] Unknown syscall id: {}", id),
     }
 }

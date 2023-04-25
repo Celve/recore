@@ -55,6 +55,10 @@ impl Processor {
             .local_idle_task_ctx_ptr()
     }
 
+    pub fn curr_processor() -> &'static Spin<Processor> {
+        &PROCESSORS[Processor::hart_id()]
+    }
+
     /// Yield the task.
     ///
     /// It's not like the `suspend()', because it would be put into the task manager when called.
@@ -127,7 +131,7 @@ impl Processor {
     ///
     /// When the next task yields, it will get into this function again.
     pub fn schedule() {
-        let task = PROCESSORS[Processor::hart_id()].lock().scheduler.pop();
+        let task = Processor::curr_processor().lock().pop();
         if let Some((task, time)) = task {
             if task.lock().task_state() == TaskState::Ready {
                 *task.lock().task_state_mut() = TaskState::Running;
@@ -152,27 +156,47 @@ impl Processor {
 
             let mut processor = PROCESSORS[Processor::hart_id()].lock();
             if task.lock().task_state() == TaskState::Running {
-                processor.scheduler.push(&task);
+                processor.push(&task);
             }
 
             // check if timer is up
             TIMER.notify(get_time());
         } else {
             // try to steal task from other processor
-            let mut curr = PROCESSORS[Processor::hart_id()].lock();
+            let mut curr = Processor::curr_processor().lock();
             for id in 0..CPUS {
                 if id != Processor::hart_id() {
-                    let mut other = PROCESSORS[id].lock();
-                    if let Some((task, _)) = other.scheduler.pop() {
-                        curr.scheduler.push(&task);
-                        break;
+                    let other = PROCESSORS[id].try_lock();
+                    if let Some(mut other) = other {
+                        if let Some((task, _)) = other.scheduler.pop() {
+                            curr.push(&task);
+                            break;
+                        }
                     }
                 }
             }
 
             if curr.scheduler.len() == 0 {
+                drop(curr);
                 sleep(SCHED_PERIOD);
             }
+        }
+    }
+
+    pub fn procdump() {
+        println!("[kernel] Processor dump: ");
+        for id in 0..CPUS {
+            let processor = PROCESSORS[id].lock();
+            println!("\tHart {}: ", id);
+            if let Some(task) = processor.local_curr_task() {
+                println!("\t\tRunning: {}", task.proc().pid());
+            }
+            processor.scheduler.iter().for_each(|sched_entity| {
+                let task = sched_entity.task().upgrade();
+                if let Some(task) = task {
+                    println!("\t\tWaiting: {} ", task.proc().pid());
+                }
+            })
         }
     }
 }
@@ -206,5 +230,13 @@ impl Processor {
 impl Processor {
     pub fn push(&mut self, task: &Arc<Task>) {
         self.scheduler.push(task);
+    }
+
+    pub fn pop(&mut self) -> Option<(Arc<Task>, usize)> {
+        self.scheduler.pop()
+    }
+
+    pub fn load(&self) -> usize {
+        self.scheduler.load()
     }
 }

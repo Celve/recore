@@ -13,12 +13,14 @@ pub struct Scheduler {
     tasks: BinaryHeap<SchedEntity>,
     period: usize,
     sum: usize,
+    load: usize,
 }
 
 pub struct SchedEntity {
     task: Weak<Task>,
     vruntime: usize,
     weight: usize,
+    load: usize,
 }
 
 impl Scheduler {
@@ -30,27 +32,33 @@ impl Scheduler {
             .calibrate(self.calibration().saturating_sub(1));
         let sched_entity = task.to_sched_entity();
         self.sum += sched_entity.weight;
+        self.load += sched_entity.load;
         self.tasks.push(sched_entity);
         self.period = max(self.tasks.len() * MIN_AVG_TIME_SLICE, SCHED_PERIOD);
     }
 
     pub fn pop(&mut self) -> Option<(Arc<Task>, usize)> {
-        while let Some(item) = self.tasks.pop() {
+        while let Some(sched_entity) = self.tasks.pop() {
             self.period = max(self.tasks.len() * MIN_AVG_TIME_SLICE, SCHED_PERIOD);
-            self.sum -= item.weight;
-            if let Some(task) = item.task.upgrade() {
-                return Some((task, self.period * item.weight / (self.sum + item.weight)));
+            self.sum -= sched_entity.weight;
+            self.load -= sched_entity.load;
+            if let Some(task) = sched_entity.task.upgrade() {
+                return Some((
+                    task,
+                    self.period * sched_entity.weight / (self.sum + sched_entity.weight),
+                ));
             }
         }
         None
     }
 
     pub fn peek(&mut self) -> Option<Arc<Task>> {
-        while let Some(item) = self.tasks.peek() {
-            if let Some(task) = item.task.upgrade() {
+        while let Some(sched_entity) = self.tasks.peek() {
+            if let Some(task) = sched_entity.task.upgrade() {
                 return Some(task);
             }
-            self.sum -= item.weight;
+            self.sum -= sched_entity.weight;
+            self.load -= sched_entity.load;
             self.tasks.pop();
             self.period = max(self.tasks.len() * MIN_AVG_TIME_SLICE, SCHED_PERIOD);
         }
@@ -65,8 +73,16 @@ impl Scheduler {
         }
     }
 
+    pub fn load(&self) -> usize {
+        self.load
+    }
+
     pub fn len(&self) -> usize {
         self.tasks.len()
+    }
+
+    pub fn iter(&self) -> alloc::collections::binary_heap::Iter<SchedEntity> {
+        self.tasks.iter()
     }
 }
 
@@ -75,17 +91,19 @@ impl Default for Scheduler {
         Self {
             tasks: Default::default(),
             period: SCHED_PERIOD,
-            sum: Default::default(),
+            sum: 0,
+            load: 0,
         }
     }
 }
 
 impl SchedEntity {
-    pub fn new(task: Weak<Task>, vruntime: usize, weight: usize) -> SchedEntity {
+    pub fn new(task: Weak<Task>, vruntime: usize, weight: usize, load: usize) -> SchedEntity {
         SchedEntity {
             task,
             vruntime,
             weight,
+            load,
         }
     }
 
@@ -99,6 +117,10 @@ impl SchedEntity {
 
     pub fn vruntime_mut(&mut self) -> &mut usize {
         &mut self.vruntime
+    }
+
+    pub fn task(&self) -> Weak<Task> {
+        self.task.clone()
     }
 }
 

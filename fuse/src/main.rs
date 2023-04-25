@@ -8,13 +8,13 @@ use std::{
 
 use clap::{App, Arg};
 use fosix::fs::OpenFlags;
-use fs::{
-    cache::{self, CacheManager},
-    fuse::Fuse,
-    superblock::SuperBlock,
-};
+use fs::{cache::CacheManager, fuse::Fuse, superblock::SuperBlock};
 
 use crate::disk::FileDev;
+
+const NUM_INODE: usize = 8192;
+const NUM_DNODE: usize = 65536;
+const FILE_LEN: usize = 1 + NUM_INODE / 4096 + NUM_DNODE / 4096 + NUM_INODE / 4 + NUM_DNODE;
 
 fn main() {
     let matches = App::new("Fuse packer")
@@ -42,12 +42,12 @@ fn main() {
             .truncate(true)
             .open(format!("{}", "fs.img"))
             .unwrap();
-        f.set_len(33802 * 512).unwrap();
+        f.set_len(FILE_LEN as u64 * 512).unwrap();
         f
     }));
 
     let fuse = Arc::new(Fuse::new(
-        SuperBlock::new(4096, 32768),
+        SuperBlock::new(NUM_INODE, NUM_DNODE),
         Arc::new(CacheManager::new(disk_manager)),
     ));
 

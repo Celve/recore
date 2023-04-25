@@ -15,7 +15,13 @@ use fosix::{
     signal::{SignalAction, SignalFlags},
     syscall::WaitFlags,
 };
-use syscall::{dev::sys_shutdown, file::*, proc::*, task::*};
+use syscall::{
+    debug::sys_procdump,
+    dev::{sys_shutdown, sys_time},
+    file::*,
+    proc::*,
+    task::*,
+};
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
@@ -216,4 +222,12 @@ pub fn condvar_notify_all(id: usize) -> isize {
 
 pub fn shutdown(exit_code: usize) -> ! {
     sys_shutdown(exit_code)
+}
+
+pub fn procdump() -> isize {
+    sys_procdump()
+}
+
+pub fn time() -> isize {
+    sys_time()
 }

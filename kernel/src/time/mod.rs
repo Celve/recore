@@ -15,10 +15,11 @@ pub fn set_timer(id: usize, time: usize) {
     }
 }
 
+// The function uses read_volatile, otherwise the compiler would over-optimize it.
 pub fn get_time() -> usize {
     unsafe {
         let time = (CLINT + 0xbff8) as *const usize;
-        *time
+        time.read_volatile()
     }
 }
 
@@ -59,5 +60,7 @@ pub unsafe fn init_timer() {
 /// It is spinning until time is up.
 pub fn sleep(interval: usize) {
     let limit = get_time() + interval;
+    // the implementation of `get_time()` should use read_volatile, otherwise the compiler would over-optimize it.
+    // It sees it as a loop invariant.
     while get_time() < limit {}
 }

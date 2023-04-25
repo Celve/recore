@@ -25,6 +25,8 @@ pub const USER_STACK_SIZE: usize = 0x10000;
 pub const KERNEL_STACK_SIZE: usize = 0x10000;
 
 pub const SCHED_PERIOD: usize = 1000_000;
+pub const PELT_PERIOD: usize = 10 * SCHED_PERIOD; // the only requirement is that it should be larger than SCHED_PERIOD
+pub const PELT_ATTENUATION: usize = 10;
 pub const MIN_AVG_TIME_SLICE: usize = SCHED_PERIOD / 8;
 pub const MIN_EXEC_TIME_SLICE: usize = SCHED_PERIOD / 1000;
 pub const CLINT: usize = 0x2000000;

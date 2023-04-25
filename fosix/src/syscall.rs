@@ -18,6 +18,7 @@ pub const SYSCALL_KILL: usize = 129;
 pub const SYSCALL_SIGACTION: usize = 134;
 pub const SYSCALL_SIGPROCMASK: usize = 135;
 pub const SYSCALL_SIGRETURN: usize = 139;
+pub const SYSCALL_TIME: usize = 169;
 pub const SYSCALL_GETPID: usize = 172;
 pub const SYSCALL_FORK: usize = 220;
 pub const SYSCALL_EXEC: usize = 221;
@@ -36,6 +37,7 @@ pub const SYSCALL_CONDVAR_WAIT: usize = 1031;
 pub const SYSCALL_CONDVAR_NOTIFY_ONE: usize = 1032;
 pub const SYSCALL_CONDVAR_NOTIFY_ALL: usize = 1033;
 pub const SYSCALL_SHUTDOWN: usize = 1100;
+pub const SYSCALL_PROCDUMP: usize = 1101;
 
 bitflags! {
     pub struct WaitFlags: u8 {

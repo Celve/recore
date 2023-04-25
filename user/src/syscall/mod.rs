@@ -1,3 +1,4 @@
+pub mod debug;
 pub mod dev;
 pub mod file;
 pub mod proc;

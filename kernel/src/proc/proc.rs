@@ -402,6 +402,11 @@ impl ProcInner {
     }
 
     pub fn weight(&self) -> usize {
-        1024 / (1 << self.niceness)
+        if self.niceness < 0 {
+            let positive = (-self.niceness) as u32;
+            1024 * 5_usize.pow(positive) / 4_usize.pow(positive)
+        } else {
+            1024 * 4_usize.pow(self.niceness as u32) / 5_usize.pow(self.niceness as u32)
+        }
     }
 }

@@ -52,6 +52,7 @@ impl Scheduler {
             }
             self.sum -= item.weight;
             self.tasks.pop();
+            self.period = max(self.tasks.len() * MIN_AVG_TIME_SLICE, SCHED_PERIOD);
         }
         None
     }

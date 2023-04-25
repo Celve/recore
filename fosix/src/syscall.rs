@@ -35,6 +35,7 @@ pub const SYSCALL_CONDVAR_CREATE: usize = 1030;
 pub const SYSCALL_CONDVAR_WAIT: usize = 1031;
 pub const SYSCALL_CONDVAR_NOTIFY_ONE: usize = 1032;
 pub const SYSCALL_CONDVAR_NOTIFY_ALL: usize = 1033;
+pub const SYSCALL_SHUTDOWN: usize = 1100;
 
 bitflags! {
     pub struct WaitFlags: u8 {

@@ -50,5 +50,7 @@ pub const CLOCK_FREQ: usize = 12500000;
 pub const VIRT_PLIC_ADDR: usize = 0xc00_0000;
 pub const VIRT_PLIC_SIZE: usize = 0x210_000;
 pub const VIRT_UART: usize = 0x10_000_000;
+pub const VIRT_TEST: usize = 0x100000;
+pub const VIRT_TEST_SIZE: usize = 0x2000;
 
 pub const CPUS: usize = 4;

@@ -1,4 +1,5 @@
 mod com;
+mod dev;
 mod file;
 mod proc;
 mod task;
@@ -9,7 +10,7 @@ use fs::{dir::Dir, file::File};
 
 use crate::{drivers::blockdev::BlkDev, fs::FUSE, task::processor::Processor};
 
-use self::{com::sys_pipe, file::*, proc::*, task::*};
+use self::{com::sys_pipe, dev::sys_shutdown, file::*, proc::*, task::*};
 
 pub fn syscall(id: usize, args: [usize; 3]) -> isize {
     match id {
@@ -48,6 +49,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_CONDVAR_WAIT => sys_condvar_wait(args[0], args[1]),
         SYSCALL_CONDVAR_NOTIFY_ONE => sys_condvar_notify_one(args[0]),
         SYSCALL_CONDVAR_NOTIFY_ALL => sys_condvar_notify_all(args[0]),
+        SYSCALL_SHUTDOWN => sys_shutdown(args[0]),
         _ => panic!("[kernel] Unknown syscall id: {}", id),
     }
 }

@@ -1,7 +1,5 @@
 use fosix::syscall::{SYSCALL_GETTID, SYSCALL_SLEEP, SYSCALL_THREAD_CREATE, SYSCALL_WAITTID};
 
-use crate::println;
-
 use super::syscall;
 
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {

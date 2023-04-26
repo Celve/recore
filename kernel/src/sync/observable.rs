@@ -25,14 +25,14 @@ impl Observable {
     pub fn notify_one(&self) {
         let task = self.waitings.lock().pop();
         if let Some(task) = task {
-            task.wake_up();
+            task.wakeup();
         }
     }
 
     pub fn notify_all(&self) {
         let mut waitings = self.waitings.lock();
         while let Some(task) = waitings.pop() {
-            task.wake_up();
+            task.wakeup();
         }
     }
 }

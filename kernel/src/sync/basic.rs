@@ -55,7 +55,7 @@ impl BlockLock {
 
         let task = self.queue.lock().pop();
         if let Some(task) = task {
-            task.wake_up();
+            task.wakeup();
         }
     }
 

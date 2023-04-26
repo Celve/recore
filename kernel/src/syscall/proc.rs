@@ -28,7 +28,7 @@ pub fn sys_fork() -> isize {
     let task = proc.lock().main_task();
     *task.lock().trap_ctx_mut().a0_mut() = 0;
     PROC_MANAGER.push(&proc);
-    PROCESSORS[Processor::hart_id()].lock().push(&task);
+    PROCESSORS[Processor::hart_id()].lock().push_normal(&task);
     println!("[kernel] Fork a new process with pid {}.", pid);
     pid as isize
 }

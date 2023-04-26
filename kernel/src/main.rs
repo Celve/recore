@@ -184,6 +184,6 @@ fn init_devices() {
 
 fn init_tasks() {
     let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
-    PROCESSORS[Processor::hart_id()].lock().push(&task);
+    PROCESSORS[Processor::hart_id()].lock().push_normal(&task);
     FUSE.disk_manager().enable_non_blocking();
 }

@@ -6,7 +6,7 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../fuse/fs.img
 APPS := ../user/src/bin/*
-CPUS := 2
+CPUS := 4
 
 # KERNEL ENTRY
 KERNEL_ENTRY_PA := 0x80000000

@@ -12,7 +12,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     let proc = Processor::curr_proc();
     let task = proc.new_task(entry.into(), arg);
 
-    PROCESSORS[Processor::hart_id()].lock().push(&task);
+    PROCESSORS[Processor::hart_id()].lock().push_normal(&task);
 
     let tid = task.lock().tid();
     println!(

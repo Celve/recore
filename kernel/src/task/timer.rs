@@ -44,7 +44,7 @@ impl Timer {
                 break;
             }
             if let Some(task) = timer_unit.task.upgrade() {
-                task.wake_up();
+                task.wakeup();
             }
             top = self.tasks.lock().pop();
         }

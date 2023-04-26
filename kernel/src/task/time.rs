@@ -43,6 +43,10 @@ impl TaskTime {
         self.vruntime = max(self.vruntime, vruntime);
     }
 
+    pub fn clear(&mut self) {
+        self.vruntime = 0;
+    }
+
     pub fn trap(&mut self) {
         let now = get_time();
         let runtime = now - self.last_restore;

@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use spin::Spin;
 
 use crate::{
-    config::{CPUS, SCHED_PERIOD},
+    config::{CPUS, PELT_PERIOD, SCHED_PERIOD},
     proc::proc::Proc,
     task::{task::TaskState, timer::TIMER},
     time::{get_time, sleep},
@@ -23,6 +23,9 @@ pub struct Processor {
 
     /// A special task context that is used for thread switching.
     idle_task_ctx: TaskContext,
+
+    /// PELT tag
+    pelt_period: usize,
 }
 
 lazy_static! {
@@ -156,7 +159,7 @@ impl Processor {
 
             let mut processor = PROCESSORS[Processor::hart_id()].lock();
             if task.lock().task_state() == TaskState::Running {
-                processor.push(&task);
+                processor.push_normal(&task);
             }
 
             // check if timer is up
@@ -169,7 +172,7 @@ impl Processor {
                     let other = PROCESSORS[id].try_lock();
                     if let Some(mut other) = other {
                         if let Some((task, _)) = other.scheduler.pop() {
-                            curr.push(&task);
+                            curr.push_normal(&task);
                             break;
                         }
                     }
@@ -179,6 +182,47 @@ impl Processor {
             if curr.scheduler.len() == 0 {
                 drop(curr);
                 sleep(SCHED_PERIOD);
+            }
+        }
+
+        {
+            let mut processor = Processor::curr_processor().lock();
+            let now = pelt_period(get_time());
+            if processor.pelt_period != now {
+                processor.pelt_period = now;
+                if now % CPUS == Processor::hart_id() {
+                    drop(processor);
+                    Processor::balance();
+                }
+            }
+        }
+    }
+
+    /// The function is used to balance the load of all processors. It adapts an `O(n)` algorithm.
+    ///
+    /// Its basic idea is steal. A processor try to steal tasks from another processor to make the two balanced.
+    pub fn balance() {
+        let curr_hart = Processor::hart_id();
+        let next_hart = (curr_hart + (get_time() % (CPUS - 1)) + 1) % CPUS;
+
+        let (mut recv, mut send) = if curr_hart < next_hart {
+            let curr_processor = PROCESSORS[curr_hart].lock();
+            let next_processor = PROCESSORS[next_hart].lock();
+            (curr_processor, next_processor)
+        } else {
+            let next_processor = PROCESSORS[next_hart].lock();
+            let curr_processor = PROCESSORS[curr_hart].lock();
+            (curr_processor, next_processor)
+        };
+
+        // really naive implementation
+        while let Some((task, _)) = send.pop() {
+            if task.lock().task_time().load() + recv.load() <= send.load() {
+                task.lock().task_time_mut().clear(); // to make it the first
+                recv.push_normal(&task);
+            } else {
+                send.push_normal(&task);
+                break;
             }
         }
     }
@@ -228,10 +272,14 @@ impl Processor {
 }
 
 impl Processor {
-    pub fn push(&mut self, task: &Arc<Task>) {
-        self.scheduler.push(task);
+    pub fn push_realtime(&mut self, task: &Arc<Task>) {
+        self.scheduler.push(task, true);
     }
 
+    pub fn push_normal(&mut self, task: &Arc<Task>) {
+        self.scheduler.push(task, false);
+    }
+    /// Return the task and its vruntime.
     pub fn pop(&mut self) -> Option<(Arc<Task>, usize)> {
         self.scheduler.pop()
     }
@@ -239,4 +287,8 @@ impl Processor {
     pub fn load(&self) -> usize {
         self.scheduler.load()
     }
+}
+
+fn pelt_period(now: usize) -> usize {
+    now / PELT_PERIOD
 }

@@ -40,7 +40,7 @@ impl Semaphore {
         if sema.lock().counter == 0 {
             let task = sema.lock().queue.pop();
             if let Some(task) = task {
-                task.wake_up();
+                task.wakeup();
             }
         }
         sema.lock().counter += 1;

@@ -13,6 +13,7 @@ use crate::{
         proc::Proc,
         stack::{KernelStack, UserStack},
     },
+    time::get_time,
     trap::{
         context::{TrapCtx, TrapCtxHandle},
         trampoline::restore,
@@ -184,14 +185,14 @@ impl Task {
         Arc::downgrade(self)
     }
 
-    /// Wake up the task.
+    /// Restart the task.
     ///
     /// It's the companion method with `suspend()`.
     /// When the `suspend()` is called, the caller is reponsible to maintain the task elsewhere.
     /// Then the caller should wake up the task by calling this function, which would put the task into task manager again.
-    pub fn wake_up(self: &Arc<Self>) {
+    pub fn wakeup(self: &Arc<Self>) {
         self.lock().task_state = TaskState::Running;
-        PROCESSORS[Processor::hart_id()].lock().push(self);
+        Processor::curr_processor().lock().push_realtime(self);
     }
 
     pub fn exit(&self, exit_code: isize) {
@@ -225,7 +226,7 @@ impl Task {
                 self.proc().pid()
             );
             drop(task);
-            PROCESSORS[Processor::hart_id()].lock().push(self);
+            PROCESSORS[Processor::hart_id()].lock().push_normal(self);
         }
     }
 

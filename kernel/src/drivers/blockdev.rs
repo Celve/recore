@@ -9,6 +9,7 @@ use virtio_drivers::{BlkResp, Hal, RespStatus, VirtIOBlk, VirtIOHeader};
 use crate::{
     mm::{frame::Frame, page_table::KERNEL_PAGE_TABLE},
     sync::condvar::Condvar,
+    task::processor::Processor,
     time::get_time,
 };
 

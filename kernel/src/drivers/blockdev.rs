@@ -3,18 +3,15 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use alloc::{collections::BTreeMap, vec::Vec};
 use fs::disk::DiskManager;
 use lazy_static::lazy_static;
-use spin::Spin;
 use virtio_drivers::{BlkResp, Hal, RespStatus, VirtIOBlk, VirtIOHeader};
 
 use crate::{
     mm::{frame::Frame, page_table::KERNEL_PAGE_TABLE},
-    sync::condvar::Condvar,
-    task::processor::Processor,
-    time::get_time,
+    sync::{condvar::Condvar, mcs::Mcs},
 };
 
 pub struct BlkDev {
-    blk: Spin<VirtIOBlk<'static, VirIoHal>>,
+    blk: Mcs<VirtIOBlk<'static, VirIoHal>>,
     non_blocking: AtomicBool,
     condvars: Vec<Condvar>,
 }
@@ -22,7 +19,7 @@ pub struct BlkDev {
 pub struct VirIoHal;
 
 lazy_static! {
-    pub static ref VIRT_IO_FRAMES: Spin<BTreeMap<usize, Vec<Frame>>> = Spin::new(BTreeMap::new());
+    pub static ref VIRT_IO_FRAMES: Mcs<BTreeMap<usize, Vec<Frame>>> = Mcs::new(BTreeMap::new());
 }
 
 impl DiskManager for BlkDev {
@@ -37,7 +34,7 @@ impl DiskManager for BlkDev {
             let mut resp = BlkResp::default();
             let token = unsafe { guard.read_block_nb(bid, buf, &mut resp).unwrap() };
             let condvar = &self.condvars[token as usize];
-            condvar.wait_spin(guard); // suspend until read is done
+            condvar.wait_mcs(guard); // suspend until read is done
             assert_eq!(resp.status(), RespStatus::Ok);
         }
     }
@@ -53,7 +50,7 @@ impl DiskManager for BlkDev {
             let mut resp = BlkResp::default();
             let token = unsafe { guard.write_block_nb(bid, buf, &mut resp).unwrap() };
             let condvar = &self.condvars[token as usize];
-            condvar.wait_spin(guard); // suspend until read is done
+            condvar.wait_mcs(guard); // suspend until read is done
             assert_eq!(resp.status(), RespStatus::Ok);
         }
     }
@@ -81,7 +78,7 @@ impl BlkDev {
         (0..num_channel).for_each(|_| condvars.push(Condvar::new()));
 
         Self {
-            blk: Spin::new(blk),
+            blk: Mcs::new(blk),
             non_blocking: AtomicBool::new(false),
             condvars,
         }

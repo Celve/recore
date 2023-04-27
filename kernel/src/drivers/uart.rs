@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicU8, Ordering};
+
 use alloc::collections::VecDeque;
 use bitflags::bitflags;
 use lazy_static::lazy_static;
@@ -23,7 +25,7 @@ const DEL: u8 = 0x7F;
 /// Read port when DLAB = 0.
 pub struct ReadPort {
     /// receive buffer
-    rbr: Volatile<u8>,
+    rbr: AtomicU8,
     /// interrupt enable
     ier: Volatile<InterruptEnable>,
     /// interrupt identification
@@ -33,7 +35,7 @@ pub struct ReadPort {
     /// modem control
     mcr: Volatile<ModemControl>,
     /// line status
-    lsr: ReadOnly<LineStatus>,
+    lsr: AtomicU8,
     /// modem status
     msr: ReadOnly<u8>,
     // scratch
@@ -43,7 +45,7 @@ pub struct ReadPort {
 /// Write port when DLAB = 0.
 pub struct WritePort {
     /// transmitter holding
-    thr: Volatile<u8>,
+    thr: AtomicU8,
     /// interrupt enable
     ier: Volatile<InterruptEnable>,
     /// FIFO control
@@ -53,7 +55,7 @@ pub struct WritePort {
     /// modem control
     mcr: Volatile<ModemControl>,
     /// line status
-    lsr: ReadOnly<LineStatus>,
+    lsr: AtomicU8,
     /// not used
     _padding: ReadOnly<u8>,
     // scratch
@@ -136,7 +138,7 @@ impl UartRaw {
         read_port.lcr.write(LineControl::DLAB_ENABLE);
 
         // set maximum speed of 38.4K for LSB
-        read_port.rbr.write(0x03);
+        read_port.rbr.store(0x03, Ordering::Release);
 
         // set maximum speed of 38.4K for MSB
         read_port.ier.write(InterruptEnable::empty()); // namely 0
@@ -166,16 +168,16 @@ impl UartRaw {
         let thr = &mut write_port.thr;
         match data {
             BS | DEL => {
-                wait_for!(lsr.read().contains(LineStatus::OUTPUT_EMPTY));
-                thr.write(BS);
-                wait_for!(lsr.read().contains(LineStatus::OUTPUT_EMPTY));
-                thr.write(b' ');
-                wait_for!(lsr.read().contains(LineStatus::OUTPUT_EMPTY));
-                thr.write(BS);
+                wait_for!((lsr.load(Ordering::Acquire) & LineStatus::OUTPUT_EMPTY.bits()) != 0);
+                thr.store(BS, Ordering::Release);
+                wait_for!((lsr.load(Ordering::Acquire) & LineStatus::OUTPUT_EMPTY.bits()) != 0);
+                thr.store(b' ', Ordering::Release);
+                wait_for!((lsr.load(Ordering::Acquire) & LineStatus::OUTPUT_EMPTY.bits()) != 0);
+                thr.store(BS, Ordering::Release);
             }
             _ => {
-                wait_for!(lsr.read().contains(LineStatus::OUTPUT_EMPTY));
-                thr.write(data);
+                wait_for!((lsr.load(Ordering::Acquire) & LineStatus::OUTPUT_EMPTY.bits()) != 0);
+                thr.store(data, Ordering::Release);
             }
         }
     }
@@ -184,8 +186,8 @@ impl UartRaw {
         let read_port = self.read_port();
         let lsr = &read_port.lsr;
         let rbr = &read_port.rbr;
-        if lsr.read().contains(LineStatus::INPUT_AVAILABLE) {
-            Some(rbr.read())
+        if lsr.load(Ordering::Acquire) & LineStatus::INPUT_AVAILABLE.bits() != 0 {
+            Some(rbr.load(Ordering::Acquire))
         } else {
             None
         }

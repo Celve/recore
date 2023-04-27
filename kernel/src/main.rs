@@ -38,7 +38,7 @@ use riscv::register::*;
 use task::processor::{Processor, PROCESSORS};
 use time::init_timer;
 
-use crate::{fs::FUSE, trap::set_kernel_stvec};
+use crate::{fs::FUSE, time::get_time, trap::set_kernel_stvec};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [[u8; BOOTLOADER_STACK_SIZE]; CPUS] =
@@ -120,8 +120,9 @@ extern "C" fn rust_main() {
         init_tasks();
 
         println!(
-            "[kernel] Initialization done with satp {:#x}.",
+            "[kernel] Initialization done with satp {:#x} in time {}.",
             satp::read().bits(),
+            get_time(),
         );
         INITED.store(true, Ordering::Release);
     } else {

@@ -1,8 +1,6 @@
-use crate::fs::FUSE;
+use crate::{fs::FUSE, sync::mcs::Mcs};
 
 use super::proc::Proc;
-
-use fs::dir::Dir;
 
 use alloc::{
     collections::BTreeMap,
@@ -10,11 +8,10 @@ use alloc::{
 };
 use fosix::fs::OpenFlags;
 use lazy_static::lazy_static;
-use spin::Spin;
 
 pub struct ProcManager {
     /// The first task in the task deque is the next task, while the last task in the task deque is the current task.
-    procs: Spin<BTreeMap<usize, Weak<Proc>>>,
+    procs: Mcs<BTreeMap<usize, Weak<Proc>>>,
 }
 
 impl ProcManager {
@@ -23,7 +20,7 @@ impl ProcManager {
         let pid = proc.pid();
         procs.insert(pid, proc.phantom());
         Self {
-            procs: Spin::new(procs),
+            procs: Mcs::new(procs),
         }
     }
 

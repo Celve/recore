@@ -7,6 +7,7 @@ use spin::Spin;
 use crate::{
     config::{CPUS, PELT_PERIOD, SCHED_PERIOD},
     proc::proc::Proc,
+    sync::mcs::Mcs,
     task::{task::TaskState, timer::TIMER},
     time::{get_time, sleep},
 };
@@ -29,7 +30,7 @@ pub struct Processor {
 }
 
 lazy_static! {
-    pub static ref PROCESSORS: [Spin<Processor>; CPUS] = Default::default();
+    pub static ref PROCESSORS: [Mcs<Processor>; CPUS] = Default::default();
 }
 
 impl Processor {
@@ -58,7 +59,7 @@ impl Processor {
             .local_idle_task_ctx_ptr()
     }
 
-    pub fn curr_processor() -> &'static Spin<Processor> {
+    pub fn curr_processor() -> &'static Mcs<Processor> {
         &PROCESSORS[Processor::hart_id()]
     }
 

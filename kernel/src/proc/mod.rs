@@ -1,7 +1,6 @@
 pub mod alloc_table;
 pub mod fd_table;
 pub mod id;
-pub mod loader;
 pub mod lock_table;
 pub mod manager;
 pub mod proc;

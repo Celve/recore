@@ -135,7 +135,7 @@ impl Processor {
     /// When the next task yields, it will get into this function again.
     pub fn schedule() {
         let task = Processor::curr_processor().lock().pop();
-        if let Some((task, time)) = task {
+        if let Some((task, time, _)) = task {
             if task.lock().task_state() == TaskState::Ready {
                 *task.lock().task_state_mut() = TaskState::Running;
             }
@@ -165,35 +165,39 @@ impl Processor {
             // check if timer is up
             TIMER.notify(get_time());
         } else {
-            // try to steal task from other processor
-            let mut curr = Processor::curr_processor().lock();
-            for id in 0..CPUS {
-                if id != Processor::hart_id() {
-                    let other = PROCESSORS[id].try_lock();
-                    if let Some(mut other) = other {
-                        if let Some((task, _)) = other.scheduler.pop() {
-                            curr.push_normal(&task);
-                            break;
-                        }
-                    }
-                }
-            }
+            // // try to steal task from other processor
+            // let mut curr = Processor::curr_processor().lock();
+            // for id in 0..CPUS {
+            //     if id != Processor::hart_id() {
+            //         let other = PROCESSORS[id].try_lock();
+            //         if let Some(mut other) = other {
+            //             if let Some((task, _, is_realtime)) = other.pop() {
+            //                 curr.push(&task, is_realtime);
+            //                 println!(
+            //                     "[kernel] Balance: move task {} from {} to {}",
+            //                     task.proc().pid(),
+            //                     id,
+            //                     Processor::hart_id()
+            //                 );
+            //                 break;
+            //             }
+            //         }
+            //     }
+            // }
 
-            if curr.scheduler.len() == 0 {
-                drop(curr);
-                sleep(SCHED_PERIOD);
-            }
+            // if curr.scheduler.len() == 0 {
+            //     drop(curr);
+            //     sleep(SCHED_PERIOD);
+            // }
         }
 
-        {
-            let mut processor = Processor::curr_processor().lock();
-            let now = pelt_period(get_time());
-            if processor.pelt_period != now {
-                processor.pelt_period = now;
-                if now % CPUS == Processor::hart_id() {
-                    drop(processor);
-                    Processor::balance();
-                }
+        let mut processor = Processor::curr_processor().lock();
+        let now = pelt_period(get_time());
+        if processor.pelt_period != now {
+            processor.pelt_period = now;
+            if now % CPUS == Processor::hart_id() {
+                drop(processor);
+                Processor::balance();
             }
         }
     }
@@ -216,12 +220,12 @@ impl Processor {
         };
 
         // really naive implementation
-        while let Some((task, _)) = send.pop() {
-            if task.lock().task_time().load() + recv.load() <= send.load() {
+        while let Some((task, _, is_realtime)) = send.pop() {
+            if task.lock().task_time().history_load() + recv.load() <= send.load() {
                 task.lock().task_time_mut().clear(); // to make it the first
-                recv.push_normal(&task);
+                recv.push(&task, is_realtime);
             } else {
-                send.push_normal(&task);
+                send.push(&task, is_realtime);
                 break;
             }
         }
@@ -233,12 +237,24 @@ impl Processor {
             let processor = PROCESSORS[id].lock();
             println!("\tHart {}: ", id);
             if let Some(task) = processor.local_curr_task() {
-                println!("\t\tRunning: {}", task.proc().pid());
+                let task_guard = task.lock();
+                println!(
+                    "\t\tRunning: pid {} vruntime {} load {}",
+                    task.proc().pid(),
+                    task_guard.task_time().vruntime(),
+                    task_guard.task_time().history_load()
+                );
             }
             processor.scheduler.iter().for_each(|sched_entity| {
                 let task = sched_entity.task().upgrade();
                 if let Some(task) = task {
-                    println!("\t\tWaiting: {} ", task.proc().pid());
+                    let task_guard = task.lock();
+                    println!(
+                        "\t\tWaiting: pid {} vruntime {} load {}",
+                        task.proc().pid(),
+                        task_guard.task_time().vruntime(),
+                        task_guard.task_time().history_load()
+                    );
                 }
             })
         }
@@ -279,8 +295,17 @@ impl Processor {
     pub fn push_normal(&mut self, task: &Arc<Task>) {
         self.scheduler.push(task, false);
     }
+
+    pub fn push(&mut self, task: &Arc<Task>, is_realtime: bool) {
+        if is_realtime {
+            self.push_realtime(task);
+        } else {
+            self.push_normal(task);
+        }
+    }
+
     /// Return the task and its vruntime.
-    pub fn pop(&mut self) -> Option<(Arc<Task>, usize)> {
+    pub fn pop(&mut self) -> Option<(Arc<Task>, usize, bool)> {
         self.scheduler.pop()
     }
 

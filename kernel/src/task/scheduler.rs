@@ -50,7 +50,7 @@ impl Scheduler {
         self.period = max(self.normal.len() * MIN_AVG_TIME_SLICE, SCHED_PERIOD);
     }
 
-    fn pop_spec(&mut self, is_realtime: bool) -> Option<(Arc<Task>, usize)> {
+    fn pop_spec(&mut self, is_realtime: bool) -> Option<(Arc<Task>, usize, bool)> {
         while let Some(sched_entity) = if is_realtime {
             self.realtime.pop()
         } else {
@@ -63,13 +63,15 @@ impl Scheduler {
                 return Some((
                     task,
                     self.period * sched_entity.weight / (self.sum + sched_entity.weight),
+                    is_realtime,
                 ));
             }
         }
         None
     }
 
-    pub fn pop(&mut self) -> Option<(Arc<Task>, usize)> {
+    /// Pop a task from the scheduler. Return the task, its time supposed to run, and whether it is a realtime task.
+    pub fn pop(&mut self) -> Option<(Arc<Task>, usize, bool)> {
         let realtime_task = self.pop_spec(true);
         if realtime_task.is_some() {
             realtime_task

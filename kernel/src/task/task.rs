@@ -236,7 +236,7 @@ impl Task {
             self.phantom(),
             task.task_time.vruntime(),
             task.task_time.weight(),
-            task.task_time.load(),
+            task.task_time.history_load(),
         )
     }
 }

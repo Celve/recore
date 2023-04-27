@@ -1,7 +1,7 @@
 use core::cmp::max;
 
 use crate::{
-    config::{PELT_ATTENUATION, PELT_PERIOD},
+    config::{MIN_EXEC_TIME_SLICE, PELT_ATTENUATION, PELT_PERIOD},
     time::get_time,
 };
 
@@ -14,7 +14,8 @@ pub struct TaskTime {
 
     // PELT related
     period: usize,
-    load: usize,
+    history_load: usize,
+    running_load: usize,
 }
 
 impl TaskTime {
@@ -26,13 +27,16 @@ impl TaskTime {
             remaining: 0,
             last_restore: now,
             period: now / PELT_PERIOD,
-            load: 0,
+            history_load: 0,
+            running_load: 0,
         }
     }
 
     pub fn runout(&mut self) {
         self.vruntime += (self.remaining + self.weight - 1) / self.weight;
         self.remaining = 0;
+        self.running_load = self.running_load.saturating_sub(MIN_EXEC_TIME_SLICE);
+        // with some cost
     }
 
     pub fn setup(&mut self, rest_time: usize) {
@@ -54,12 +58,14 @@ impl TaskTime {
         self.vruntime += (runtime + self.weight - 1) / self.weight;
 
         if pelt_period(now) == pelt_period(self.last_restore) {
-            self.load += runtime;
+            self.running_load += runtime;
         } else {
             if pelt_period(now) != pelt_period(self.last_restore) + 1 {
                 println!("[kernel] One task might run for too long");
             }
-            self.load = now % PELT_PERIOD + self.load / PELT_ATTENUATION;
+            self.history_load = self.history_load / PELT_ATTENUATION
+                + (self.running_load + PELT_PERIOD * pelt_period(now) - self.last_restore);
+            self.running_load = now % PELT_PERIOD;
             self.period = pelt_period(now);
         }
     }
@@ -80,8 +86,8 @@ impl TaskTime {
         self.weight
     }
 
-    pub fn load(&self) -> usize {
-        self.load
+    pub fn history_load(&self) -> usize {
+        self.history_load
     }
 }
 

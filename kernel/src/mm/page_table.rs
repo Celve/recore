@@ -179,8 +179,8 @@ impl PageTable {
                 if ph_flags.is_execute() {
                     map_perm |= MappingPermission::X;
                 }
-                println!(
-                    "[mem] Start va is {:#x} and end va is {:#x}",
+                infoln!(
+                    "Allocated [{:#x}, {:#x}) for user.",
                     usize::from(start_va),
                     usize::from(end_va)
                 );
@@ -260,10 +260,7 @@ impl PageTable {
 impl PageTable {
     pub fn new() -> Self {
         let frame = Frame::new();
-        println!(
-            "[page_table] Root of page table is {:#x}.",
-            usize::from(frame.ppn())
-        );
+        infoln!("Created a new page table {}.", usize::from(frame.ppn()));
         Self {
             root: frame.ppn(),
             frames: Spin::new(vec![frame]),
@@ -277,11 +274,6 @@ impl PageTable {
     }
 
     pub fn map_area(&self, area: &Area) {
-        println!(
-            "[mem] Map area [{:#x}, {:#x})",
-            usize::from(area.range().start),
-            usize::from(area.range().end),
-        );
         let flags = area.map_perm().into();
         area.range()
             .iter()
@@ -292,7 +284,6 @@ impl PageTable {
     }
 
     pub fn unmap(&self, vpn: VirPageNum) {
-        // TODO: some frames in page table might never be used again, hence deallocation is meaningful
         let pte = self
             .find_pte(vpn)
             .expect("[page_table] Unmap a non-exist page table entry.");
@@ -300,11 +291,6 @@ impl PageTable {
     }
 
     pub fn unmap_area(&self, area: &Area) {
-        println!(
-            "[mem] Unmap area [{:#x}, {:#x})",
-            usize::from(area.range().start),
-            usize::from(area.range().end),
-        );
         area.range().iter().for_each(|vpn| self.unmap(vpn));
     }
 

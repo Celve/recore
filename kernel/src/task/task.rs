@@ -199,6 +199,12 @@ impl Task {
         let mut guard = self.lock();
         guard.task_state = TaskState::Zombie;
         guard.exit_code = exit_code;
+        infoln!(
+            "Process {} thread {} exits with code {}.",
+            self.proc().pid(),
+            guard.tid(),
+            exit_code
+        );
 
         // in case that it's the main thread
         if guard.tid() == 1 {
@@ -213,18 +219,15 @@ impl Task {
         let mut task = self.lock();
         task.sigs |= sig;
 
-        println!(
-            "[kernel] Thread {} in process {} receives signal {}",
-            task.tid(),
+        infoln!(
+            "Process {} thread {} receives signal {}.",
             self.proc.upgrade().unwrap().pid(),
+            task.tid(),
             sig.bits()
         );
 
         if sig.contains(SignalFlags::SIGCONT) && task.task_state() == TaskState::Stopped {
-            println!(
-                "[kernel] Process {} Thread 1 is continued.",
-                self.proc().pid()
-            );
+            infoln!("Process {} thread 1 is continued.", self.proc().pid());
             drop(task);
             PROCESSORS[Processor::hart_id()].lock().push_normal(self);
         }
@@ -332,15 +335,5 @@ impl TaskInner {
 
     pub fn task_time_mut(&mut self) -> &mut TaskTime {
         &mut self.task_time
-    }
-}
-
-impl Drop for Task {
-    fn drop(&mut self) {
-        println!(
-            "Process {} thread {} is dropped.",
-            self.proc().pid(),
-            self.lock().tid()
-        );
     }
 }

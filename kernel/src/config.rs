@@ -1,5 +1,7 @@
 use core::mem::size_of;
 
+use crate::io::log::LogLevel;
+
 pub const BOOTLOADER_STACK_SIZE: usize = 0x10000;
 pub const UART_BASE_ADDRESS: usize = 0x10_000_000;
 pub const UART_MAP_SIZE: usize = 0x6;
@@ -56,3 +58,5 @@ pub const VIRT_TEST: usize = 0x100000;
 pub const VIRT_TEST_SIZE: usize = 0x2000;
 
 pub const CPUS: usize = 4;
+
+pub const LOG_LEVEL: LogLevel = LogLevel::Warn;

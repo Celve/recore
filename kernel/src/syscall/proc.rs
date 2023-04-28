@@ -29,17 +29,20 @@ pub fn sys_fork() -> isize {
     *task.lock().trap_ctx_mut().a0_mut() = 0;
     PROC_MANAGER.push(&proc);
     PROCESSORS[Processor::hart_id()].lock().push_normal(&task);
-    println!("[kernel] Fork a new process with pid {}.", pid);
+    infoln!("Fork a new process {}.", pid);
     pid as isize
 }
 
 pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
-    println!("[kernel] Try exec a new program.");
     let name = parse_str(path);
     let cwd = Processor::curr_proc().lock().cwd();
     let file = open_file(cwd, &name, OpenFlags::RDONLY);
     if let Some(file) = file {
-        println!("[kernel] Exec a new program.");
+        infoln!(
+            "Process {} executes {}.",
+            Processor::curr_proc().pid(),
+            name
+        );
 
         // parse args
         let mut args = Vec::new();
@@ -60,7 +63,11 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
         Processor::curr_proc().exec(file, &args);
         args.len() as isize // otherwise it would be overrided
     } else {
-        println!("[kernel] Fail to exec {}.", name);
+        warnln!(
+            "Process {} fails to execute {}.",
+            Processor::curr_proc().pid(),
+            name
+        );
         -1
     }
 }

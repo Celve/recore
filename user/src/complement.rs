@@ -13,7 +13,7 @@ fn panic_handler(panic_info: &PanicInfo) -> ! {
             err
         );
     } else {
-        println!("Panicked: {}", err);
+        println!("[user] Panicked: {}", err);
     }
     loop {}
 }

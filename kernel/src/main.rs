@@ -24,7 +24,7 @@ mod trap;
 
 use config::*;
 use core::{
-    arch::{asm, global_asm},
+    arch::asm,
     sync::atomic::{AtomicBool, Ordering},
 };
 use drivers::{
@@ -63,9 +63,9 @@ unsafe extern "C" fn _start() {
     );
 }
 
-/// An entry for rust program that transfers mmode to smode.
+/// An entry for rust program that transfers state from mmode to smode.
 ///
-/// We spare a little bit of kernel stack to use as its stack, which would never be recovered.
+/// The stack it used is the bootloader stack, which is still in used afterwards for scheduler.
 unsafe fn rust_start() -> ! {
     mstatus::set_mpp(riscv::register::mstatus::MPP::Supervisor);
     mepc::write(rust_main as usize);
@@ -104,25 +104,25 @@ extern "C" fn rust_main() {
         init_trap();
         init_bss();
         init_uart();
-        println!("[kernel] Section bss cleared.");
-        println!("[kernel] UART initialized.");
+        infoln!("Cleared .bss section.");
+        infoln!("Initialized UART.");
 
         init_heap();
-        println!("[kernel] Heap initialized.");
+        infoln!("Initialized buddy allocator and slab allocator.");
 
         init_frame_allocator();
-        println!("[kernel] Frame allocator initialized.");
+        infoln!("Initialized frame allocator.");
 
         activate_page_table(); // the kernel space is automatically init before activating page table because of the lazy_static!
-        println!("[kernel] Page table activated.");
+        infoln!("Activated page table with satp {}.", satp::read().bits());
 
         init_devices();
         init_tasks();
 
-        println!(
-            "[kernel] Initialization done with satp {:#x} in time {}.",
-            satp::read().bits(),
-            get_time(),
+        infoln!(
+            "Hart {} begins to run tasks in {}.",
+            Processor::hart_id(),
+            get_time()
         );
         INITED.store(true, Ordering::Release);
     } else {
@@ -131,10 +131,10 @@ extern "C" fn rust_main() {
         init_trap();
         activate_page_table();
         init_devices();
-        println!(
-            "[kernel] Hart {} is running with satp {:#x}.",
+        infoln!(
+            "Hart {} begins to run tasks in {}.",
             Processor::hart_id(),
-            satp::read().bits()
+            get_time()
         );
     }
     Processor::run_tasks();

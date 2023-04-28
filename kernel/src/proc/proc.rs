@@ -69,8 +69,6 @@ impl Proc {
         let (base, user_sepc, user_mem) = page_table.new_user(&elf_data);
         let tid_allocator = Arc::new(IdAllocator::new());
 
-        println!("[trap] User's sepc is {:#x}", usize::from(user_sepc));
-
         let res = Arc::new(Self {
             pid: PID_ALLOCATOR.alloc(),
             inner: Spin::new(ProcInner {
@@ -225,7 +223,7 @@ impl Proc {
         }
         let parent = proc.parent().unwrap();
         parent.kill(SignalFlags::SIGCHLD);
-        println!("[kernel] Process {} has ended.", pid);
+        infoln!("Process {} has ended.", pid);
     }
 
     pub fn kill(&self, sig: SignalFlags) {
@@ -233,11 +231,7 @@ impl Proc {
         let task = &proc.tasks[0];
         task.kill(sig);
 
-        println!(
-            "[kernel] Process {} receives signal {}",
-            self.pid(),
-            sig.bits()
-        );
+        infoln!("Process {} receives signal {}.", self.pid(), sig.bits());
     }
 }
 

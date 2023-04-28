@@ -93,12 +93,6 @@ impl Processor {
     pub fn exit(exit_code: isize) {
         {
             let task = Processor::curr_task();
-            println!(
-                "process {} thread {} exit with code {}",
-                task.proc().pid(),
-                task.lock().tid(),
-                exit_code
-            );
             task.exit(exit_code);
         }
         Processor::switch();
@@ -166,30 +160,7 @@ impl Processor {
             // check if timer is up
             TIMER.notify(get_time());
         } else {
-            // // try to steal task from other processor
-            // let mut curr = Processor::curr_processor().lock();
-            // for id in 0..CPUS {
-            //     if id != Processor::hart_id() {
-            //         let other = PROCESSORS[id].try_lock();
-            //         if let Some(mut other) = other {
-            //             if let Some((task, _, is_realtime)) = other.pop() {
-            //                 curr.push(&task, is_realtime);
-            //                 println!(
-            //                     "[kernel] Balance: move task {} from {} to {}",
-            //                     task.proc().pid(),
-            //                     id,
-            //                     Processor::hart_id()
-            //                 );
-            //                 break;
-            //             }
-            //         }
-            //     }
-            // }
-
-            // if curr.scheduler.len() == 0 {
-            //     drop(curr);
-            //     sleep(SCHED_PERIOD);
-            // }
+            // TODO: try to implement steal with balance
         }
 
         let mut processor = Processor::curr_processor().lock();
@@ -233,7 +204,7 @@ impl Processor {
     }
 
     pub fn procdump() {
-        println!("[kernel] Processor dump: ");
+        println!("Processor dump: ");
         for id in 0..CPUS {
             let processor = PROCESSORS[id].lock();
             println!("\tHart {}: ", id);

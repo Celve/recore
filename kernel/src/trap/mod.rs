@@ -122,14 +122,14 @@ pub fn trap_handler() -> ! {
 #[no_mangle]
 #[repr(align(4))]
 pub fn fail() {
-    println!(
-        "[kernel] scause: {}, stval: {:#x}, sepc: {:#x}, satp: {:#x}",
+    fatalln!(
+        "Fail with scause {}, stval {:#x}, sepc {:#x}, and satp {:#x}.",
         scause::read().bits(),
         stval::read(),
         sepc::read(),
         satp::read().bits(),
     );
-    panic!("[kernel] Get into trap when in supervisor mode.");
+    panic!("Get into trap when in supervisor mode.");
 }
 
 /// Set the trap handler to the `fail` function when trap occurs in the supervisor mode.

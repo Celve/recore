@@ -28,7 +28,11 @@ pub fn signal_handler() {
             for i in 0..NUM_SIGNAL {
                 let sig = SignalFlags::from_bits(1 << i).unwrap();
                 if sigs.contains(sig) {
-                    println!("[kernel] Receive signal {}", i);
+                    infoln!(
+                        "Process {} receives signal {}",
+                        Processor::curr_proc().pid(),
+                        i
+                    );
                     *Processor::curr_task().lock().sigs_mut() ^= sig;
                     if sig == SignalFlags::SIGKILL
                         || sig == SignalFlags::SIGSTOP
@@ -59,12 +63,6 @@ pub fn signal_handler() {
 
 /// The handler that handles all kernel signals, which should be delegated by the `signal_handler()`.
 fn kernel_signal_handler(sigid: usize) {
-    println!(
-        "kernel signal handler is now handling {} with pid {} and tid {}",
-        sigid,
-        Processor::curr_proc().pid(),
-        Processor::curr_task().lock().tid()
-    );
     let sig = SignalFlags::from_bits(1 << sigid).unwrap();
     match sig {
         SignalFlags::SIGKILL => Processor::exit(-2), // yield immediately
@@ -76,7 +74,7 @@ fn kernel_signal_handler(sigid: usize) {
             assert!(Processor::curr_task().lock().task_state() == TaskState::Running)
         }
         _ => {
-            panic!("[kernel] Unhandled kernel signal.")
+            panic!("Unhandled kernel signal.")
         }
     }
 }

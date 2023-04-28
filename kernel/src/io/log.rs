@@ -3,15 +3,10 @@ use core::fmt::{Arguments, Write};
 use lazy_static::lazy_static;
 use spin::Spin;
 
-use crate::{config::VIRT_UART, drivers::uart::UartRaw};
-
-const FATAL: &str = "\x1b[31m";
-const WARN: &str = "\x1b[93m";
-const INFO: &str = "\x1b[34m";
-const DEBUG: &str = "\x1b[32m";
-const TRACE: &str = "\x1b[90m";
-const END: &str = "\x1b[0m";
-const NEWLINE: &str = "\n";
+use crate::{
+    config::{LOG_LEVEL, VIRT_UART},
+    drivers::uart::UartRaw,
+};
 
 /// A manager that provides interface for the log system.
 ///
@@ -19,29 +14,36 @@ const NEWLINE: &str = "\n";
 ///
 /// The spin lock is used because the mcs is depending on the cache manager. However, the demand for log is always high.
 pub struct LogManager {
-    uart: Spin<UartRaw>,
+    uart: UartRaw,
+    level: LogLevel,
 }
 
-lazy_static! {
-    pub static ref LOG_MANAGER: LogManager = LogManager::new();
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub enum LogLevel {
+    Fatal,
+    Warn,
+    Info,
+    Debug,
+    Trace,
 }
 
 impl LogManager {
     pub fn new() -> Self {
         Self {
-            uart: Spin::new(UartRaw::new(VIRT_UART)),
+            uart: UartRaw::new(VIRT_UART),
+            level: LOG_LEVEL,
         }
     }
 
-    pub fn print(&mut self, args: Arguments) {
-        self.write_fmt(args).unwrap();
+    pub fn print(&mut self, level: LogLevel, args: Arguments) {
+        if level <= self.level {
+            self.write_fmt(args).unwrap();
+        }
     }
 }
-
 impl Write for LogManager {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let uart = self.uart.lock();
-        s.as_bytes().iter().for_each(|c| uart.send(*c));
+        s.as_bytes().iter().for_each(|c| self.uart.send(*c));
         Ok(())
     }
 }
@@ -49,69 +51,84 @@ impl Write for LogManager {
 #[macro_export]
 macro_rules! fatal {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(FATAL, $fmt, END)))
+        $crate::io::log_manager().fatal(
+            $crate::io::log::LogLevel::Fatal,
+            format_args!(concat!("\x1b[31m", "[FATAL] ", $fmt, "\x1b[0m")),
+        )
     };
 }
 
 #[macro_export]
 macro_rules! fatalln {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(FATAL, $fmt, END, NEWLINE) $($t)*))
+        $crate::io::log_manager().print($crate::io::log::LogLevel::Fatal, format_args!(concat!("\x1b[31m", "[FATAL] ", $fmt, "\x1b[0m", "\n") $($t)*))
     };
 }
 
 #[macro_export]
 macro_rules! warn {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(WARN, $fmt, END)))
+        $crate::io::log_manager().print(
+            $crate::io::log::LogLevel::Warn,
+            format_args!(concat!("\x1b[93m", "[WARN] ", $fmt, "\x1b[0m")),
+        )
     };
 }
 
 #[macro_export]
 macro_rules! warnln {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(WARN, $fmt, END, NEWLINE) $($t)*))
+        $crate::io::log_manager().print($crate::io::log::LogLevel::Warn, format_args!(concat!("\x1b[93m", "[WARN] ", $fmt, "\x1b[0m", "\n") $($t)*))
     };
 }
 
 #[macro_export]
 macro_rules! info {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(INFO, $fmt, END)))
+        $crate::io::log_manager().print(
+            $crate::io::log::LogLevel::Info,
+            format_args!(concat!("\x1b[34m", "[INFO] ", $fmt, "\x1b[0m")),
+        )
     };
 }
 
 #[macro_export]
 macro_rules! infoln {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(INFO, $fmt, END, NEWLINE) $($t)*))
+        $crate::io::log_manager().print($crate::io::log::LogLevel::Info, format_args!(concat!("\x1b[34m", "[INFO] ", $fmt, "\x1b[0m", "\n") $($t)*))
     };
 }
 
 #[macro_export]
 macro_rules! debug {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(DEBUG, $fmt, END)))
+        $crate::io::log_manager().print(
+            $crate::io::log::LogLevel::Debug,
+            format_args!(concat!("\x1b[32m", "[DEBUG] ", $fmt, "\x1b[0m")),
+        )
     };
 }
 
 #[macro_export]
 macro_rules! debugln {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(DEBUG, $fmt, END, NEWLINE) $($t)*))
+        $crate::io::log_manager().print($crate::io::log::LogLevel::Debug, format_args!(concat!("\x1b[32m", "[DEBUG] ", $fmt, "\x1b[0m", "\n") $($t)*))
     };
 }
 
 #[macro_export]
 macro_rules! trace {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(TRACE, $fmt, END)))
+        $crate::io::log_manager().print(
+            $crate::io::log::LogLevel::trace,
+            format_args!(concat!("\x1b[90m", "[TRACE] ", $fmt, "\x1b[0m")),
+        )
     };
 }
 
 #[macro_export]
 macro_rules! traceln {
     ($fmt: literal $($t: tt)*) => {
-        $crate::io::log::LOG_MANAGER.print(format_args!(concat!(TRACE, $fmt, END, NEWLINE) $($t)*))
+        $crate::io::log_manager().print($crate::io::log::LogLevel::trace, format_args!(concat!("\x1b[90m", "[TRACE] ", $fmt, "\x1b[0m", "\n") $($t)*))
     };
 }

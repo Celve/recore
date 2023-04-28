@@ -2,6 +2,7 @@ use core::cmp::max;
 
 use crate::{
     config::{MIN_EXEC_TIME_SLICE, PELT_ATTENUATION, PELT_PERIOD},
+    task::processor::Processor,
     time::get_time,
 };
 
@@ -61,7 +62,10 @@ impl TaskTime {
             self.running_load += runtime;
         } else {
             if pelt_period(now) != pelt_period(self.last_restore) + 1 {
-                println!("[kernel] One task might run for too long");
+                warnln!(
+                    "Process {} might run for too long.",
+                    Processor::curr_proc().pid()
+                );
             }
             self.history_load = self.history_load / PELT_ATTENUATION
                 + (self.running_load + PELT_PERIOD * pelt_period(now) - self.last_restore);

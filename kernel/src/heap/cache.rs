@@ -16,6 +16,7 @@ impl Cache {
         // if the curr is empty
         if self.curr.is_none() {
             self.curr = if let Some(mut page) = self.next {
+                // find from existed, adjust linked list
                 self.next = if let Some(mut next) = page.next() {
                     next.prev_insert(None);
                     Some(next)
@@ -25,12 +26,13 @@ impl Cache {
                 page.next_insert(None);
                 Some(page)
             } else {
+                // allocate new from buddy allocator
                 let ptr = unsafe {
                     HEAP.buddy_allocator
                         .lock()
                         .alloc(Layout::array::<u8>(1 << self.order).unwrap())
                 };
-                // println!("[buddy] Allocate {:#x}.", ptr as usize);
+                debugln!("Buddy allocates {:#x}.", ptr as usize);
                 let mut page = fetch_page(ptr as usize).unwrap();
                 *page.order_mut() = self.order;
                 page.free = LinkedList::new();
@@ -45,12 +47,10 @@ impl Cache {
         if !page.is_free() {
             self.curr = None;
         }
-        // println!("[slab] Allocate {:#x} with size {}.", ptr, 1 << self.order);
         ptr
     }
 
     pub fn dealloc(&mut self, ptr: usize) {
-        // println!("[slab] Deallocate {}.", 1 << self.order);
         let mut page = fetch_page(ptr).unwrap();
 
         // the page is full previously
@@ -67,7 +67,7 @@ impl Cache {
         // insert a free object inside slab
         page.insert_free(ptr as *mut usize);
 
-        // this piece of code has bugs
+        // if the page is not in used, it should be deallocated
         if page.inuse() == 0 {
             if Some(page) != self.curr {
                 if let Some(mut prev) = page.prev() {
@@ -86,7 +86,7 @@ impl Cache {
                 page.prev_insert(None);
                 page.next_insert(None);
                 unsafe {
-                    // println!("[buddy] Deallocate {:#x}.", page.pa());
+                    debugln!("Buddy deallocates {:#x}.", page.pa());
                     HEAP.buddy_allocator.lock().dealloc(
                         page.pa() as *mut u8,
                         Layout::array::<u8>(1 << self.order).unwrap(),

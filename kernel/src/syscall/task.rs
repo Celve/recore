@@ -15,10 +15,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     PROCESSORS[Processor::hart_id()].lock().push_normal(&task);
 
     let tid = task.lock().tid();
-    println!(
-        "[kernel] Create thread {} with {:#x} and {:#x}.",
-        tid, entry, arg
-    );
+    infoln!("Process {} has created new thread {}", proc.pid(), tid);
     tid as isize
 }
 

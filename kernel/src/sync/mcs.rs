@@ -14,6 +14,7 @@ pub struct Mcs<T> {
 
 pub struct McsGuard<'a, T: 'a> {
     mcs: &'a Mcs<T>,
+    node: *mut McsNode,
     data: &'a mut T,
 }
 
@@ -41,20 +42,20 @@ impl<T> Mcs<T> {
         let prev = self.last.swap(node, Ordering::AcqRel);
         if prev.is_null() {
             // it might be meaningless to modify the `locked`
-            McsGuard::new(self, unsafe { &mut *self.data.get() })
+            McsGuard::new(self, node, unsafe { &mut *self.data.get() })
         } else {
             unsafe {
-                (*node).next.store(prev, Ordering::Release);
+                (*prev).next.store(node, Ordering::Release);
             }
             while unsafe { (*node).locked.load(Ordering::Acquire) } {}
-            McsGuard::new(self, unsafe { &mut *self.data.get() })
+            McsGuard::new(self, node, unsafe { &mut *self.data.get() })
         }
     }
 }
 
 impl<'a, T: 'a> McsGuard<'a, T> {
-    pub fn new(mcs: &'a Mcs<T>, data: &'a mut T) -> Self {
-        Self { mcs, data }
+    pub fn new(mcs: &'a Mcs<T>, node: *mut McsNode, data: &'a mut T) -> Self {
+        Self { mcs, node, data }
     }
 
     pub fn mcs(&self) -> &'a Mcs<T> {
@@ -78,13 +79,36 @@ impl<T> DerefMut for McsGuard<'_, T> {
 
 impl<'a, T: 'a> Drop for McsGuard<'a, T> {
     fn drop(&mut self) {
-        let ptr = self.mcs.last.load(Ordering::Acquire);
-        if ptr != core::ptr::null_mut() {
-            let node = unsafe { Box::from_raw(ptr) };
-            self.mcs
+        let node_ptr = self.node;
+        let node = unsafe { Box::from_raw(node_ptr) };
+        let mut next_ptr = node.next.load(Ordering::Acquire);
+        if next_ptr == core::ptr::null_mut() {
+            if self
+                .mcs
                 .last
-                .store(node.next.load(Ordering::Acquire), Ordering::Release);
-            node.locked.store(false, Ordering::Release);
+                .compare_exchange(
+                    node_ptr,
+                    core::ptr::null_mut(),
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
+                .is_err()
+            {
+                loop {
+                    next_ptr = node.next.load(Ordering::Acquire);
+                    if next_ptr != core::ptr::null_mut() {
+                        break;
+                    }
+                    core::hint::spin_loop();
+                }
+                unsafe {
+                    (*next_ptr).locked.store(false, Ordering::Release);
+                }
+            }
+        } else {
+            unsafe {
+                (*next_ptr).locked.store(false, Ordering::Release);
+            }
         }
     }
 }

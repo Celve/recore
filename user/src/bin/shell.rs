@@ -232,6 +232,15 @@ fn main() {
                         close(input_fd as usize);
                     }
 
+                    // modify cargs[0] to absolute path
+                    // only cargs[0] is modified, args[0] and uargs[0] are unchanged
+                    if !args[0].starts_with('.') && !args[0].starts_with('/') {
+                        let mut path = String::from("/");
+                        path.push_str(args[0]);
+                        path.push('\0');
+                        cargs[0] = path;
+                    }
+
                     if exec(cargs[0].as_str(), &uargs) == -1 {
                         println!("[shell] Exec {} failed", str);
                         return;

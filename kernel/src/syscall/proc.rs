@@ -81,8 +81,9 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
     let mut proc_guard = proc.lock();
 
     // find satisfied children
-    let result = proc_guard.children().iter().position(|proc| {
-        (pid == -1 || pid as usize == proc.pid()) && proc.lock().proc_status() == ProcState::Zombie
+    let result = proc_guard.children().iter().position(|child| {
+        (pid == -1 || pid as usize == child.pid())
+            && child.lock().proc_status() == ProcState::Zombie
     });
 
     return if let Some(pos) = result {

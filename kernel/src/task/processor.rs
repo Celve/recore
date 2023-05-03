@@ -163,13 +163,16 @@ impl Processor {
             // TODO: try to implement steal with balance
         }
 
-        let mut processor = Processor::curr_processor().lock();
-        let now = pelt_period(get_time());
-        if processor.pelt_period != now {
-            processor.pelt_period = now;
-            if now % CPUS == Processor::hart_id() {
-                drop(processor);
-                Processor::balance();
+        // avoid balance when there is only one CPU
+        if CPUS != 1 { 
+            let mut processor = Processor::curr_processor().lock();
+            let now = pelt_period(get_time());
+            if processor.pelt_period != now {
+                processor.pelt_period = now;
+                if now % CPUS == Processor::hart_id() {
+                    drop(processor);
+                    Processor::balance();
+                }
             }
         }
     }

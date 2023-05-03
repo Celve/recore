@@ -93,7 +93,8 @@ pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
 
 pub fn sys_chdir(path: usize) -> isize {
     let path = parse_str(path);
-    let dir = open_dir(Processor::curr_proc().lock().cwd(), &path);
+    let cwd = Processor::curr_proc().lock().cwd();
+    let dir = open_dir(cwd, &path);
     if let Some(dir) = dir {
         let proc = Processor::curr_proc();
         let mut proc_guard = proc.lock();
@@ -105,19 +106,22 @@ pub fn sys_chdir(path: usize) -> isize {
 }
 
 pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
+    let cwd = Processor::curr_proc()
+        .lock()
+        .fd_table()
+        .get(dfd)
+        .unwrap()
+        .as_dir()
+        .unwrap();
+    let dir = open_dir(cwd, ".").unwrap();
+    let dir_entries = dir.lock().to_dir_entries();
+
     let proc = Processor::curr_proc();
     let proc_guard = proc.lock();
     let mut dst_bytes = proc_guard
         .page_table()
         .translate_bytes(des_ptr.into(), des_len * size_of::<DirEntry>());
 
-    let dir = open_dir(
-        proc_guard.fd_table().get(dfd).unwrap().as_dir().unwrap(),
-        ".",
-    )
-    .unwrap();
-
-    let dir_entries = dir.lock().to_dir_entries();
     let mut i = 0;
     for de in dir_entries {
         let src_bytes = de.as_bytes();
@@ -133,15 +137,15 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
+    let dir = Processor::curr_proc().lock().fd_table().get(fd).unwrap();
+    let stat = dir.stat();
+    let src_bytes = stat.as_bytes();
+
     let proc = Processor::curr_proc();
     let proc_guard = proc.lock();
     let mut dst_bytes = proc_guard
         .page_table()
         .translate_bytes(stat_ptr.into(), size_of::<FileStat>());
-
-    let dir = proc_guard.fd_table().get(fd).unwrap();
-    let stat = dir.stat();
-    let src_bytes = stat.as_bytes();
 
     assert_eq!(src_bytes.len(), dst_bytes.len());
     for (i, byte) in dst_bytes.iter_mut().enumerate() {
@@ -152,10 +156,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
-    let proc = Processor::curr_proc();
-    let mut proc_guard = proc.lock();
-    let fd_table = proc_guard.fd_table_mut();
-    let mut fileable = fd_table.get(fd).unwrap();
+    let mut fileable = Processor::curr_proc().lock().fd_table().get(fd).unwrap();
     fileable.seek(offset as usize, SeekFlag::from_bits(flags as u8).unwrap());
     0
 }

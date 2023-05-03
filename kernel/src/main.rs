@@ -81,10 +81,6 @@ unsafe fn rust_start() -> ! {
 
     init_timer();
 
-    mideleg::set_stimer();
-    mideleg::set_sext();
-    mideleg::set_ssoft();
-
     asm!(
         "csrw mideleg, {mideleg}", // some bits could not be set by this method
         "csrw medeleg, {medeleg}",

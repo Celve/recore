@@ -109,7 +109,7 @@ impl Area {
         let len = data.len();
         for frame in self.frames.iter() {
             let src = &data[start..min(len, start + PAGE_SIZE)];
-            let dst = &mut frame.ppn().as_raw_bytes()[..src.len()];
+            let dst = unsafe { &mut frame.ppn().as_raw_bytes()[..src.len()] };
             dst.copy_from_slice(src);
             start += PAGE_SIZE;
             if start >= len {
@@ -123,7 +123,7 @@ impl Area {
         self.frames
             .iter()
             .zip(other.frames.iter())
-            .for_each(|(dst, src)| {
+            .for_each(|(dst, src)| unsafe {
                 let dst_addr = dst.ppn().as_raw_bytes();
                 let src_addr = src.ppn().as_raw_bytes();
                 dst_addr.copy_from_slice(src_addr);

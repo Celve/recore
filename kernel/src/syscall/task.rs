@@ -36,9 +36,11 @@ pub fn sys_waittid(tid: isize, exit_code_ptr: usize) -> isize {
 
     return if let Some(pos) = result {
         let removed_task = proc_guard.tasks_mut().remove(pos);
-        *proc_guard
-            .page_table()
-            .translate_any::<isize>(exit_code_ptr.into()) = removed_task.lock().exit_code();
+        unsafe {
+            *proc_guard
+                .page_table()
+                .translate_any::<isize>(exit_code_ptr.into()) = removed_task.lock().exit_code();
+        }
         let tid = removed_task.lock().tid() as isize;
         tid
     } else if proc_guard

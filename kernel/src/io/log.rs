@@ -30,7 +30,7 @@ pub enum LogLevel {
 impl LogManager {
     pub fn new() -> Self {
         Self {
-            uart: UartRaw::new(VIRT_UART),
+            uart: unsafe { UartRaw::new(VIRT_UART) },
             level: LOG_LEVEL,
         }
     }

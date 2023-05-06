@@ -206,11 +206,11 @@ impl PhyAddr {
         PhyPageNum(truncate_page_num!(self.0) >> PAGE_SIZE_BITS)
     }
 
-    pub fn as_ref<T>(&self) -> Option<&T> {
+    pub unsafe fn as_ref<T>(&self) -> Option<&T> {
         unsafe { (self.0 as *mut T).as_ref() }
     }
 
-    pub fn as_mut<T>(&self) -> Option<&mut T> {
+    pub unsafe fn as_mut<T>(&self) -> Option<&mut T> {
         unsafe { (self.0 as *mut T).as_mut() }
     }
 }
@@ -238,14 +238,16 @@ impl VirAddr {
 }
 
 impl PhyPageNum {
-    pub fn as_raw_ptes(&self) -> &'static mut [PageTableEntry] {
+    /// It's legal only when the page is inside the page table.
+    pub unsafe fn as_raw_ptes(&self) -> &'static mut [PageTableEntry] {
         let start_ptr = usize::from(*self) as *mut PageTableEntry;
         unsafe {
             core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE / size_of::<PageTableEntry>())
         }
     }
 
-    pub fn as_raw_bytes(&self) -> &'static mut [u8] {
+    /// Make sure the following modifications would not make unpredictable consequence.
+    pub unsafe fn as_raw_bytes(&self) -> &'static mut [u8] {
         let start_ptr = usize::from(*self) as *mut u8;
         unsafe { core::slice::from_raw_parts_mut(start_ptr, PAGE_SIZE) }
     }

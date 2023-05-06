@@ -2,7 +2,9 @@ use core::ops::{Deref, DerefMut};
 
 use allocator::linked_list::LinkedList;
 
-use crate::config::PAGE_SIZE;
+use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
+
+use super::{KERNEL_HEAP_SPACE, MEM_MAP};
 
 #[derive(Clone, Copy)]
 pub struct Page {
@@ -17,6 +19,7 @@ pub struct Page {
     inuse: usize,
 }
 
+/// PagePtr is necessary because it would be used across threads.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PagePtr {
     ptr: *mut Page,
@@ -25,6 +28,7 @@ pub struct PagePtr {
 impl Page {
     pub fn make_slab(&mut self) {
         let size = 1 << self.order;
+        self.free = LinkedList::new();
         (0..PAGE_SIZE / size).rev().for_each(|i| {
             unsafe { self.free.push_front((self.pa + i * size) as *mut usize) };
         });
@@ -77,13 +81,16 @@ impl Page {
     }
 
     /// Insert a free object inside slab with `inused` decreased.
-    pub fn insert_free(&mut self, ptr: *mut usize) {
+    ///
+    /// Make sure that the pointer is valid and unique.
+    pub unsafe fn insert_free(&mut self, ptr: *mut usize) {
         self.inuse -= 1;
         unsafe {
             self.free.push_front(ptr);
         }
     }
 
+    /// Check whether the linked list is empty.
     pub fn is_free(&self) -> bool {
         !self.free.is_empty()
     }
@@ -98,8 +105,14 @@ impl Page {
 }
 
 impl PagePtr {
-    pub fn new(ptr: *mut Page) -> Self {
-        Self { ptr }
+    /// Return a page pointer that points to the page governing the given address.
+    pub fn new(ptr: usize) -> Self {
+        unsafe {
+            let start = KERNEL_HEAP_SPACE.as_ptr() as usize;
+            Self {
+                ptr: &mut MEM_MAP[(ptr - start) >> PAGE_SIZE_BITS],
+            }
+        }
     }
 }
 

@@ -34,7 +34,7 @@ pub fn sys_fork() -> isize {
 }
 
 pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
-    let name = parse_str(path);
+    let name = unsafe { parse_str(path.into()) };
     let cwd = Processor::curr_proc().lock().cwd();
     let file = open_file(cwd, &name, OpenFlags::RDONLY);
     if let Some(file) = file {
@@ -49,12 +49,12 @@ pub fn sys_exec(path: usize, mut args_ptr: *const usize) -> isize {
         loop {
             let arg = {
                 let page_table = Processor::curr_proc().lock().page_table();
-                page_table.translate_any::<usize>((args_ptr as usize).into())
+                unsafe { page_table.translate_any::<usize>((args_ptr as usize).into()) }
             };
             if *arg == 0 {
                 break;
             }
-            let mut str = parse_str(*arg);
+            let mut str = unsafe { parse_str((*arg).into()) };
             str.push('\0');
             args.push(str);
             args_ptr = unsafe { args_ptr.add(1) };
@@ -88,11 +88,12 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: usize) -> isize {
 
     return if let Some(pos) = result {
         let removed_proc = proc_guard.children_mut().remove(pos);
-        *proc_guard
-            .page_table()
-            .translate_any::<isize>(exit_code_ptr.into()) = removed_proc.lock().exit_code();
-        let pid = removed_proc.pid() as isize;
-        pid
+        unsafe {
+            *proc_guard
+                .page_table()
+                .translate_any::<isize>(exit_code_ptr.into()) = removed_proc.lock().exit_code();
+        }
+        removed_proc.pid() as isize
     } else if proc_guard
         .children()
         .iter()
@@ -136,8 +137,8 @@ pub fn sys_sigaction(sig_id: usize, new_action_ptr: usize, old_action_ptr: usize
     let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
     let page_table = proc_guard.page_table();
-    let new_action = page_table.translate_any::<SignalAction>(new_action_ptr.into());
-    let old_action = page_table.translate_any::<SignalAction>(old_action_ptr.into());
+    let new_action = unsafe { page_table.translate_any::<SignalAction>(new_action_ptr.into()) };
+    let old_action = unsafe { page_table.translate_any::<SignalAction>(old_action_ptr.into()) };
 
     *old_action = proc_guard.sig_actions()[sig_id];
     proc_guard.sig_actions_mut()[sig_id] = *new_action;

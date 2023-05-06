@@ -9,7 +9,9 @@ use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
 use fs::{dir::Dir, file::File};
 
-use crate::{drivers::blockdev::BlkDev, fs::FUSE, task::processor::Processor};
+use crate::{
+    drivers::blockdev::BlkDev, fs::FUSE, mm::address::VirAddr, task::processor::Processor,
+};
 
 use self::{com::*, debug::*, dev::*, file::*, proc::*, task::*};
 
@@ -111,9 +113,9 @@ fn create_dir(cwd: Dir<BlkDev>, path: &str) -> Option<Dir<BlkDev>> {
     }
 }
 
-fn parse_str(path: usize) -> String {
+unsafe fn parse_str(path: VirAddr) -> String {
     Processor::curr_proc()
         .lock()
         .page_table()
-        .translate_str(path.into())
+        .translate_str(path)
 }

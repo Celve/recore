@@ -25,8 +25,7 @@ pub mod trampoline;
 /// Hence there is no supervisor mode interrupt or exception that could enter the trap handler again.
 #[no_mangle]
 pub fn trap_handler() -> ! {
-    // Yielding should be done after all the traps are handled.
-    // Because the scause is not maintained.
+    // yielding should be done after all the traps are handled, because the scause is not maintained.
     Processor::curr_task().lock().task_time_mut().trap();
 
     set_kernel_stvec();

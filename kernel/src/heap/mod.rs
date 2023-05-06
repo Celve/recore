@@ -3,10 +3,10 @@ mod heap;
 mod page;
 pub mod slab_allocator;
 
-use crate::config::{KERNEL_HEAP_SIZE, PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::config::{KERNEL_HEAP_SIZE, PAGE_SIZE};
 use page::Page;
 
-use self::{heap::Heap, page::PagePtr};
+use self::heap::Heap;
 
 #[link_section = ".data.heap"]
 static mut KERNEL_HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
@@ -26,12 +26,5 @@ pub fn init_heap() {
         });
 
         HEAP.init(start, end);
-    }
-}
-
-pub fn fetch_page(ptr: usize) -> Option<PagePtr> {
-    unsafe {
-        let start = KERNEL_HEAP_SPACE.as_ptr() as usize;
-        Some(PagePtr::new(&mut MEM_MAP[(ptr - start) >> PAGE_SIZE_BITS]))
     }
 }

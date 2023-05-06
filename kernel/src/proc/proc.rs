@@ -155,7 +155,7 @@ impl Proc {
             let offset = (args.len() + 1 - i) * size_of::<usize>();
             let src_bytes = ptr.to_ne_bytes();
             let mut dst_bytes =
-                page_table.translate_bytes((user_sp - offset).into(), src_bytes.len());
+                unsafe { page_table.translate_bytes((user_sp - offset).into(), src_bytes.len()) };
             dst_bytes
                 .iter_mut()
                 .enumerate()
@@ -171,7 +171,8 @@ impl Proc {
         for arg in args.iter().rev() {
             let src_bytes = arg.as_bytes();
             user_sp -= src_bytes.len();
-            let mut dst_bytes = page_table.translate_bytes(user_sp.into(), src_bytes.len());
+            let mut dst_bytes =
+                unsafe { page_table.translate_bytes(user_sp.into(), src_bytes.len()) };
             dst_bytes
                 .iter_mut()
                 .enumerate()

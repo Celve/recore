@@ -13,10 +13,8 @@ pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
         let page_table = proc_guard.page_table();
         let fd_table = proc_guard.fd_table();
         let fileable = fd_table.get(fd).unwrap();
-        (
-            fileable,
-            page_table.translate_segment(buffer_ptr.into(), buffer_len),
-        )
+        let seg = unsafe { page_table.translate_segment(buffer_ptr.into(), buffer_len) };
+        (fileable, seg)
     };
 
     fileable.read_seg(&mut seg) as isize
@@ -29,10 +27,8 @@ pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
         let page_table = proc_guard.page_table();
         let fd_table = proc_guard.fd_table();
         let fileable = fd_table.get(fd).unwrap();
-        (
-            fileable,
-            page_table.translate_segment(buffer_ptr.into(), buffer_len),
-        )
+        let seg = unsafe { page_table.translate_segment(buffer_ptr.into(), buffer_len) };
+        (fileable, seg)
     };
 
     fileable.write_seg(&seg) as isize
@@ -41,15 +37,15 @@ pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
 pub fn sys_open(path: usize, flags: u32) -> isize {
     let flags = OpenFlags::from_bits(flags).unwrap();
     let cwd = Processor::curr_proc().lock().cwd();
+    let path = &unsafe { parse_str(path.into()) };
     let fileable = if flags.contains(OpenFlags::DIR) {
-        let path = &parse_str(path);
         let dir = open_dir(cwd, path);
         if dir.is_none() {
             return -1;
         }
         Fileable::Dir(dir.unwrap())
     } else {
-        let file = open_file(cwd, &parse_str(path), flags);
+        let file = open_file(cwd, path, flags);
         if file.is_none() {
             return -1;
         }
@@ -73,7 +69,7 @@ pub fn sys_close(fd: usize) -> isize {
 }
 
 pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
-    let path = parse_str(path);
+    let path = unsafe { parse_str(path.into()) };
     let dir = create_dir(
         Processor::curr_proc()
             .lock()
@@ -92,7 +88,7 @@ pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
 }
 
 pub fn sys_chdir(path: usize) -> isize {
-    let path = parse_str(path);
+    let path = unsafe { parse_str(path.into()) };
     let cwd = Processor::curr_proc().lock().cwd();
     let dir = open_dir(cwd, &path);
     if let Some(dir) = dir {
@@ -118,9 +114,11 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
 
     let proc = Processor::curr_proc();
     let proc_guard = proc.lock();
-    let mut dst_bytes = proc_guard
-        .page_table()
-        .translate_bytes(des_ptr.into(), des_len * size_of::<DirEntry>());
+    let mut dst_bytes = unsafe {
+        proc_guard
+            .page_table()
+            .translate_bytes(des_ptr.into(), des_len * size_of::<DirEntry>())
+    };
 
     let mut i = 0;
     for de in dir_entries {
@@ -143,9 +141,11 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
 
     let proc = Processor::curr_proc();
     let proc_guard = proc.lock();
-    let mut dst_bytes = proc_guard
-        .page_table()
-        .translate_bytes(stat_ptr.into(), size_of::<FileStat>());
+    let mut dst_bytes = unsafe {
+        proc_guard
+            .page_table()
+            .translate_bytes(stat_ptr.into(), size_of::<FileStat>())
+    };
 
     assert_eq!(src_bytes.len(), dst_bytes.len());
     for (i, byte) in dst_bytes.iter_mut().enumerate() {

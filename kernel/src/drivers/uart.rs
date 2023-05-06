@@ -110,12 +110,12 @@ pub struct Uart {
 }
 
 lazy_static! {
-    pub static ref UART: Uart = Uart::new(VIRT_UART);
-    pub static ref UARTK: UartRaw = UartRaw::new(VIRT_UART);
+    pub static ref UART: Uart = unsafe { Uart::new(VIRT_UART) };
+    pub static ref UARTK: UartRaw = unsafe { UartRaw::new(VIRT_UART) };
 }
 
 impl UartRaw {
-    pub fn new(base: usize) -> Self {
+    pub unsafe fn new(base: usize) -> Self {
         Self { base }
     }
 
@@ -195,7 +195,7 @@ impl UartRaw {
 }
 
 impl UartInner {
-    pub fn new(base: usize) -> Self {
+    pub unsafe fn new(base: usize) -> Self {
         Self {
             raw: UartRaw::new(base),
             read_buffer: VecDeque::new(),
@@ -204,7 +204,8 @@ impl UartInner {
 }
 
 impl Uart {
-    pub fn new(base: usize) -> Self {
+    /// Make sure that the base is the correct address for uart.
+    pub unsafe fn new(base: usize) -> Self {
         Self {
             inner: Mutex::new(UartInner::new(base)),
             cond: Condvar::new(),

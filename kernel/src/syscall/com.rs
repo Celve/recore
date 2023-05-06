@@ -15,9 +15,11 @@ pub fn sys_pipe(pipe_ptr: usize) -> isize {
         core::slice::from_raw_parts(&src_fds as *const _ as *const u8, size_of::<[usize; 2]>())
     };
 
-    let mut dst_bytes = proc_guard
-        .page_table()
-        .translate_bytes(pipe_ptr.into(), size_of::<[usize; 2]>());
+    let mut dst_bytes = unsafe {
+        proc_guard
+            .page_table()
+            .translate_bytes(pipe_ptr.into(), size_of::<[usize; 2]>())
+    };
     dst_bytes
         .iter_mut()
         .enumerate()

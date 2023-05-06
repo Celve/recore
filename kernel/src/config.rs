@@ -33,15 +33,6 @@ pub const MIN_AVG_TIME_SLICE: usize = SCHED_PERIOD / 8;
 pub const MIN_EXEC_TIME_SLICE: usize = SCHED_PERIOD / 1000;
 pub const CLINT: usize = 0x2000000;
 
-pub const CACHE_SIZE: usize = 512;
-pub const BLK_SIZE: usize = 512;
-pub const INODE_SIZE: usize = 32 * 4;
-pub const DNODE_SIZE: usize = 32 * 16;
-pub const INODE_PER_BLK: usize = BLK_SIZE / INODE_SIZE;
-pub const DIR_ENTRY_NAME_LEN: usize = 28;
-pub const FUSE_INODE_NUM: usize = 1024;
-pub const FUSE_DNODE_NUM: usize = 4096;
-
 pub const VIRTIO_ADDR: usize = 0x10_000_000;
 pub const VIRTIO_SIZE: usize = 0x9000;
 
@@ -54,6 +45,7 @@ pub const CLOCK_FREQ: usize = 12500000;
 pub const VIRT_PLIC_ADDR: usize = 0xc00_0000;
 pub const VIRT_PLIC_SIZE: usize = 0x210_000;
 pub const VIRT_UART: usize = 0x10_000_000;
+pub const VIRT_IO_HEADER: usize = 0x1000_1000;
 pub const VIRT_TEST: usize = 0x100000;
 pub const VIRT_TEST_SIZE: usize = 0x2000;
 

@@ -1,8 +1,6 @@
 use core::alloc::{GlobalAlloc, Layout};
 
-use allocator::linked_list::LinkedList;
-
-use super::{fetch_page, page::PagePtr, HEAP};
+use super::{page::PagePtr, HEAP};
 
 #[derive(Clone, Copy)]
 pub struct Cache {
@@ -33,9 +31,8 @@ impl Cache {
                         .alloc(Layout::array::<u8>(1 << self.order).unwrap())
                 };
                 debugln!("Buddy allocates {:#x}.", ptr as usize);
-                let mut page = fetch_page(ptr as usize).unwrap();
+                let mut page = PagePtr::new(ptr as usize);
                 *page.order_mut() = self.order;
-                page.free = LinkedList::new();
                 page.make_slab();
                 Some(page)
             }
@@ -50,8 +47,9 @@ impl Cache {
         ptr
     }
 
-    pub fn dealloc(&mut self, ptr: usize) {
-        let mut page = fetch_page(ptr).unwrap();
+    /// This function is unsafe. Things would become out of control when ptr is invalid.
+    pub unsafe fn dealloc(&mut self, ptr: usize) {
+        let mut page = PagePtr::new(ptr);
 
         // the page is full previously
         if !page.is_free() {

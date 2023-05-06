@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use virtio_drivers::{BlkResp, Hal, RespStatus, VirtIOBlk, VirtIOHeader};
 
 use crate::{
+    config::VIRT_IO_HEADER,
     mm::{frame::Frame, page_table::KERNEL_PAGE_TABLE},
     sync::{condvar::Condvar, mcs::Mcs},
 };
@@ -72,7 +73,7 @@ impl BlkDev {
 
 impl BlkDev {
     pub fn new() -> Self {
-        let blk = unsafe { VirtIOBlk::new(&mut *(0x10001000 as *mut VirtIOHeader)).unwrap() };
+        let blk = unsafe { VirtIOBlk::new(&mut *(VIRT_IO_HEADER as *mut VirtIOHeader)).unwrap() };
         let mut condvars = Vec::new();
         let num_channel = blk.virt_queue_size();
         (0..num_channel).for_each(|_| condvars.push(Condvar::new()));

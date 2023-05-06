@@ -302,7 +302,7 @@ impl PageTable {
     /// Find the page table entry with given virtual page number, creating new page table entry when necessary.
     fn create_pte(&self, vpn: VirPageNum) -> &mut PageTableEntry {
         let indices = vpn.indices();
-        let mut ptes = self.root.as_raw_ptes();
+        let mut ptes = unsafe { self.root.as_raw_ptes() };
         for (i, idx) in indices.iter().enumerate() {
             let pte = &mut ptes[*idx];
             if i == 2 {
@@ -314,7 +314,7 @@ impl PageTable {
                 pte.set_flags(PTEFlags::V);
                 self.frames.lock().push(frame);
             }
-            ptes = pte.get_ppn().as_raw_ptes();
+            ptes = unsafe { pte.get_ppn().as_raw_ptes() };
         }
         unreachable!();
     }
@@ -322,7 +322,7 @@ impl PageTable {
     /// Find the page table entry with given virtual page number without creating new page table entry on the way.
     fn find_pte(&self, vpn: VirPageNum) -> Option<&mut PageTableEntry> {
         let indices = vpn.indices();
-        let mut ptes = self.root.as_raw_ptes();
+        let mut ptes = unsafe { self.root.as_raw_ptes() };
         for (i, idx) in indices.iter().enumerate() {
             let pte = &mut ptes[*idx];
             if !pte.is_valid() {
@@ -331,7 +331,7 @@ impl PageTable {
             if i == 2 {
                 return Some(pte);
             }
-            ptes = pte.get_ppn().as_raw_ptes();
+            ptes = unsafe { pte.get_ppn().as_raw_ptes() };
         }
         unreachable!();
     }
@@ -349,7 +349,8 @@ impl PageTable {
         self.find_pte(vpn).map(|pte| *pte)
     }
 
-    pub fn translate_bytes(&self, ptr: VirAddr, len: usize) -> Vec<&'static mut u8> {
+    /// Please provide a correct pointer, otherwise it will cause undefined behavior.
+    pub unsafe fn translate_bytes(&self, ptr: VirAddr, len: usize) -> Vec<&'static mut u8> {
         let ptr = usize::from(ptr);
         let mut vpn = VirPageNum::from(ptr);
         let mut result: Vec<&'static mut u8> = Vec::new();
@@ -357,15 +358,18 @@ impl PageTable {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
             let start = max(ptr - usize::from(vpn), 0);
             let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
-            ppn.as_raw_bytes()[start..end]
-                .iter_mut()
-                .for_each(|byte| result.push(byte));
+            unsafe {
+                ppn.as_raw_bytes()[start..end]
+                    .iter_mut()
+                    .for_each(|byte| result.push(byte));
+            }
             vpn += 1;
         }
         result
     }
 
-    pub fn translate_segment(&self, ptr: VirAddr, len: usize) -> Segment {
+    /// Please provide a correct pointer, otherwise it will cause undefined behavior.
+    pub unsafe fn translate_segment(&self, ptr: VirAddr, len: usize) -> Segment {
         let ptr = usize::from(ptr);
         let mut vpn = VirPageNum::from(ptr);
         let mut result: Vec<&'static mut [u8]> = Vec::new();
@@ -373,20 +377,21 @@ impl PageTable {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
             let start = max(ptr - usize::from(vpn), 0);
             let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
-            result.push(&mut ppn.as_raw_bytes()[start..end]);
+            result.push(unsafe { &mut ppn.as_raw_bytes()[start..end] });
             vpn += 1;
         }
         Segment::new(result)
     }
 
-    pub fn translate_str(&self, ptr: VirAddr) -> String {
+    /// Please provide a correct pointer, otherwise it will cause undefined behavior.
+    pub unsafe fn translate_str(&self, ptr: VirAddr) -> String {
         let mut ptr = usize::from(ptr);
         let mut vpn = VirPageNum::from(ptr);
         ptr -= usize::from(vpn);
         let mut result = String::new();
         loop {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
-            let bytes = ppn.as_raw_bytes();
+            let bytes = unsafe { ppn.as_raw_bytes() };
             let mut c = bytes[ptr];
             loop {
                 if c == '\0' as u8 {
@@ -404,17 +409,20 @@ impl PageTable {
         }
     }
 
-    pub fn translate_ptr(&self, ptr: VirAddr) -> &'static mut u8 {
+    /// Please provide a correct pointer, otherwise it will cause undefined behavior.
+    pub unsafe fn translate_ptr(&self, ptr: VirAddr) -> &'static mut u8 {
         let vpn = VirPageNum::from(ptr);
         let ppn = self.find_pte(vpn).unwrap().get_ppn();
         let offset = usize::from(ptr) - usize::from(vpn);
-        &mut ppn.as_raw_bytes()[offset]
+        unsafe { &mut ppn.as_raw_bytes()[offset] }
     }
 
     /// This function translate a piece of virtual memory into the type specified within just one page.
     ///
     /// It doesn't support translation across pages.  
-    pub fn translate_any<T>(&self, ptr: VirAddr) -> &'static mut T {
+    ///
+    /// Please provide a correct pointer, otherwise it will cause undefined behavior.
+    pub unsafe fn translate_any<T>(&self, ptr: VirAddr) -> &'static mut T {
         let size = size_of::<T>();
         let vpn = VirPageNum::from(ptr);
         let ppn = self.find_pte(vpn).unwrap().get_ppn();
@@ -427,7 +435,8 @@ impl PageTable {
         }
     }
 
-    pub fn translate_array<T>(&self, ptr: VirAddr, len: usize) -> Vec<&'static mut T> {
+    /// Please provide a correct pointer, otherwise it will cause undefined behavior.
+    pub unsafe fn translate_array<T>(&self, ptr: VirAddr, len: usize) -> Vec<&'static mut T> {
         let mut res = Vec::new();
         for i in 0..len {
             let ptr = ptr + i * size_of::<T>();

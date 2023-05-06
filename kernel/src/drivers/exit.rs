@@ -28,7 +28,7 @@ impl QemuExit {
     /// Exit qemu with specified exit code.
     pub fn exit(&self, code: u32) -> ! {
         // If code is not a special value, we need to encode it with EXIT_FAILURE_FLAG.
-        let code_new = match code {
+        let code = match code {
             EXIT_SUCCESS | EXIT_FAILURE | EXIT_RESET => code,
             _ => exit_code_encode(code),
         };
@@ -36,11 +36,12 @@ impl QemuExit {
         unsafe {
             asm!(
                 "sw {0}, 0({1})",
-                in(reg)code_new, in(reg)self.addr
+                in(reg) code,
+                in(reg) self.addr
             );
-
-            panic!("[kernel] Fail to shutdown.");
         }
+
+        panic!("[kernel] Fail to shutdown.");
     }
 
     fn exit_success(&self) -> ! {

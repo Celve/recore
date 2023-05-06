@@ -19,9 +19,13 @@ pub struct BuddyAllocatorInner {
     /// Granularity is used for the minimum memory space that it can allocate.
     gran: usize,
 
-    // statistics
+    /// The size of memory that user acquired.
     user: usize,
+
+    /// The size of memory that allocator really allocated.
     allocated: usize,
+
+    /// The total size of memory that allocator can allocate.
     total: usize,
 }
 
@@ -36,6 +40,7 @@ impl BuddyAllocator {
         self.allocator.lock()
     }
 
+    /// Caller should make sure that memory [start, end) is available and not intersected with other segments.
     pub unsafe fn add_segment(&self, start: usize, end: usize) {
         self.allocator.lock().add_segment(start, end);
     }
@@ -52,6 +57,7 @@ unsafe impl GlobalAlloc for BuddyAllocator {
 }
 
 impl BuddyAllocatorInner {
+    /// Create an empty buddy allocator with granularity specified.
     pub const fn empty(gran: usize) -> Self {
         Self {
             free_lists: [LinkedList::new(); BUDDY_ALLOCATOR_LEVEL],
@@ -64,7 +70,7 @@ impl BuddyAllocatorInner {
 
     /// Create a buddy allocator with a range of memory [start, end).
     ///
-    /// This function is unsafe because user has to make sure that all segments provided are not intersected and are available from memory.
+    /// Caller should make sure that memory [start, end) is available and not intersected with other segments.
     pub unsafe fn new(gran: usize, start: usize, end: usize) -> Self {
         let mut allocator = Self::empty(gran);
         allocator.add_segment(start, end);
@@ -73,7 +79,7 @@ impl BuddyAllocatorInner {
 
     /// Make a range of memory [start, end) to become available for buddy allocator.
     ///
-    /// This function is unsafe because user has to make sure that all segments provided are not intersected and are available from memory.
+    /// Caller should make sure that memory [start, end) is available and not intersected with other segments.
     pub unsafe fn add_segment(&mut self, mut start: usize, mut end: usize) {
         start = (start + self.gran - 1) & (!self.gran + 1);
         end = end & (!self.gran + 1);
@@ -112,7 +118,7 @@ impl BuddyAllocatorInner {
 
     /// Deallocate memory according to the address provided.
     ///
-    /// It's unsafe because the address given should be the one that buddy allocator provided, otherwise some fatal error might occur.s
+    /// It's unsafe because the address given should be the one that buddy allocator provided, otherwise some fatal error might occur.
     pub unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
         let size = self.calculate_size(&layout);
         let level = size.trailing_zeros() as usize;

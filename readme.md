@@ -18,3 +18,7 @@ $ make run
 ```
 
 There should be an interactive shell that provide similar interface like the normal shell on your operating system. Use it to explore the functionality of this simple OS.
+
+## Wiki
+
+For more details, please check the [wiki](https://github.com/Celve/recore/wiki).

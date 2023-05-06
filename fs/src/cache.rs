@@ -5,7 +5,7 @@ use lru::LruCache;
 use spin::Spin;
 
 use crate::{
-    config::{BLK_SIZE, CACHE_SIZE},
+    config::{BLK_LEN, CACHE_LEN},
     disk::DiskManager,
 };
 
@@ -24,7 +24,7 @@ pub struct Cache<D: DiskManager> {
 impl<D: DiskManager> CacheManager<D> {
     pub fn new(disk_manager: Arc<D>) -> Self {
         Self {
-            caches: Spin::new(LruCache::new(NonZeroUsize::new(CACHE_SIZE).unwrap())),
+            caches: Spin::new(LruCache::new(NonZeroUsize::new(CACHE_LEN).unwrap())),
             disk_manager,
         }
     }
@@ -58,7 +58,7 @@ impl<D: DiskManager> CacheManager<D> {
 
 impl<D: DiskManager> Cache<D> {
     pub fn new(bid: usize, disk_manager: Arc<D>) -> Self {
-        let mut data = vec![0; BLK_SIZE];
+        let mut data = vec![0; BLK_LEN];
         disk_manager.read(bid, &mut data);
         Self {
             data,

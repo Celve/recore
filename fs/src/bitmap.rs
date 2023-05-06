@@ -32,7 +32,7 @@ impl<D: DiskManager> BitMap<D> {
                     let bit_id = bytes.trailing_ones() as usize;
                     *bytes |= 1 << bit_id;
                     self.available -= 1;
-                    return Some((bid - self.start_bid) * BLK_SIZE * 8 + bytes_id * 64 + bit_id);
+                    return Some((bid - self.start_bid) * BLK_SIZE + bytes_id * 64 + bit_id);
                 }
             }
         }
@@ -95,9 +95,9 @@ impl<D: DiskManager> BitMap<D> {
     }
 
     fn locate(&self, iid: usize) -> (usize, usize, usize) {
-        let blk = iid / (BLK_SIZE * 8);
-        let bytes = iid % (BLK_SIZE * 8) / 64;
-        let bit = iid % (BLK_SIZE * 8) % 64;
+        let blk = iid / BLK_SIZE;
+        let bytes = iid % BLK_SIZE / 64;
+        let bit = iid % BLK_SIZE % 64;
 
         if blk < self.start_bid || blk >= self.start_bid + self.len {
             panic!("Invalid inode id {}", iid);

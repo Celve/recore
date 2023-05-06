@@ -4,7 +4,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use fs::disk::DiskManager;
 use spin::Spin;
 
-use fs::config::BLK_SIZE;
+use fs::config::BLK_LEN;
 
 pub struct FileDev {
     file: Spin<File>,
@@ -14,11 +14,11 @@ impl DiskManager for FileDev {
     fn read(&self, bid: usize, buf: &mut [u8]) {
         self.file
             .lock()
-            .seek(SeekFrom::Start((bid * BLK_SIZE) as u64))
+            .seek(SeekFrom::Start((bid * BLK_LEN) as u64))
             .expect("Error when seeking!");
         assert_eq!(
             self.file.lock().read(buf).unwrap(),
-            BLK_SIZE,
+            BLK_LEN,
             "Not a complete block!"
         );
     }
@@ -26,11 +26,11 @@ impl DiskManager for FileDev {
     fn write(&self, bid: usize, buf: &[u8]) {
         self.file
             .lock()
-            .seek(SeekFrom::Start((bid * BLK_SIZE) as u64))
+            .seek(SeekFrom::Start((bid * BLK_LEN) as u64))
             .expect("Error when seeking!");
         assert_eq!(
             self.file.lock().write(buf).unwrap(),
-            BLK_SIZE,
+            BLK_LEN,
             "Not a complete block!"
         );
     }

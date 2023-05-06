@@ -1,4 +1,4 @@
-use crate::config::{BLK_SIZE, INODE_PER_BLK};
+use crate::config::{BLK_LEN, INODE_PER_BLK};
 
 #[derive(Clone, Copy)]
 pub struct SuperBlock {
@@ -15,9 +15,9 @@ pub struct SuperBlock {
 impl SuperBlock {
     pub fn new(num_inode: usize, num_dnode: usize) -> Self {
         let magic = 7;
-        let num_inode_bitmap_blks = (num_inode / 8 - 1) / BLK_SIZE + 1;
+        let num_inode_bitmap_blks = (num_inode / 8 - 1) / BLK_LEN + 1;
         let num_inode_area_blks = (num_inode - 1) / INODE_PER_BLK + 1; // because every block could hold up to 3 inodes
-        let num_dnode_bitmap_blks = (num_dnode / 8 - 1) / BLK_SIZE + 1;
+        let num_dnode_bitmap_blks = (num_dnode / 8 - 1) / BLK_LEN + 1;
         let num_dnode_area_blks = num_dnode;
         let num_blks = 1
             + num_inode_bitmap_blks

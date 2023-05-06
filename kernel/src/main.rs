@@ -67,9 +67,11 @@ unsafe extern "C" fn _start() {
 ///
 /// The stack it used is the bootloader stack, which is still in used afterwards for scheduler.
 unsafe fn rust_start() -> ! {
+    // mstatus set for privilege change, mepc set for correct jumping
     mstatus::set_mpp(riscv::register::mstatus::MPP::Supervisor);
     mepc::write(rust_main as usize);
 
+    // disable page table for the supervisor mode
     satp::write(0);
 
     // the following two lines are necessary, but I don't know why

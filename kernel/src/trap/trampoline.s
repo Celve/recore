@@ -29,11 +29,13 @@ _alltraps:
     ld t0, 36*8(sp) # load satp of kernel 
     ld t1, 35*8(sp) # load pc of kernel
     ld sp, 34*8(sp) # load sp of kernel
+    sfence.vma # according to xv6, this is necessary because the existence of write buffer
     csrw satp, t0
     sfence.vma
     jr t1
 
 _restore: 
+    sfence.vma
     csrw satp, a1
     sfence.vma
     csrw sscratch, a0

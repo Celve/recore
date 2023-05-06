@@ -4,7 +4,6 @@ use alloc::{sync::Arc, vec::Vec};
 use fosix::fs::DirEntry;
 
 use crate::{
-    cache::CacheManager,
     config::{DNODE_SIZE, INODE_PER_BLK, INODE_SIZE},
     disk::DiskManager,
     fuse::Fuse,
@@ -82,7 +81,7 @@ impl Inode {
         for (i, blk_id) in blk_ids.iter().enumerate() {
             let blk = fuse.cache_manager().get(*blk_id as usize);
             let blk_guard = blk.lock();
-            let bytes = blk_guard.as_array::<u8>();
+            let bytes = unsafe { blk_guard.as_array::<u8>() };
             let start = if i == 0 { offset % DNODE_SIZE } else { 0 };
             let end = if i == blk_ids.len() - 1 {
                 (min(offset + buf.len(), self.size()) - 1) % DNODE_SIZE + 1

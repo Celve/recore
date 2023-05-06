@@ -12,6 +12,7 @@ pub struct BitMap<D: DiskManager> {
     /// The number of availabe bits.
     available: usize,
 
+    /// The manager that handles caches.
     cache_manager: Arc<CacheManager<D>>,
 }
 
@@ -20,8 +21,9 @@ impl<D: DiskManager> BitMap<D> {
         if self.available > 0 {
             for bid in self.start_bid..self.start_bid + self.len {
                 let cache = self.cache_manager.get(bid);
-                let mut cache_guard = cache.try_lock().unwrap();
+                let mut cache_guard = cache.lock();
                 let data = cache_guard.as_array_mut::<u64>();
+
                 let bytes_pair = data
                     .iter_mut()
                     .enumerate()
@@ -37,6 +39,7 @@ impl<D: DiskManager> BitMap<D> {
         None
     }
 
+    /// This function is safe, because if the bid is invalid, it will panic.
     pub fn dealloc(&mut self, bid: usize) {
         self.available += 1;
         assert!(self.clear(bid));
@@ -60,7 +63,7 @@ impl<D: DiskManager> BitMap<D> {
 
     /// Get the bit that indicates the flag of given inode id.
     pub fn get(&self, bid: usize) -> bool {
-        let (blk, byte, bit) = Self::locate(bid);
+        let (blk, byte, bit) = self.locate(bid);
 
         let cache = self.cache_manager.get(self.start_bid + blk);
         let mut cache_guard = cache.lock();
@@ -69,7 +72,7 @@ impl<D: DiskManager> BitMap<D> {
 
     /// Set the bit that indicates the flag of given inode id; return the old value.
     pub fn set(&self, bid: usize) -> bool {
-        let (blk, byte, bit) = Self::locate(bid);
+        let (blk, byte, bit) = self.locate(bid);
 
         let cache = self.cache_manager.get(self.start_bid + blk);
         let mut data = cache.lock();
@@ -81,7 +84,7 @@ impl<D: DiskManager> BitMap<D> {
 
     /// Clear the bit that indicates the flag of given inode id; return the old value.
     pub fn clear(&self, bid: usize) -> bool {
-        let (blk, byte, bit) = Self::locate(bid);
+        let (blk, byte, bit) = self.locate(bid);
 
         let cache = self.cache_manager.get(self.start_bid + blk);
         let mut data = cache.lock();
@@ -91,10 +94,15 @@ impl<D: DiskManager> BitMap<D> {
         old
     }
 
-    fn locate(iid: usize) -> (usize, usize, usize) {
+    fn locate(&self, iid: usize) -> (usize, usize, usize) {
         let blk = iid / (BLK_SIZE * 8);
         let bytes = iid % (BLK_SIZE * 8) / 64;
         let bit = iid % (BLK_SIZE * 8) % 64;
+
+        if blk < self.start_bid || blk >= self.start_bid + self.len {
+            panic!("Invalid inode id {}", iid);
+        }
+
         (blk, bytes, bit)
     }
 }

@@ -56,7 +56,7 @@ impl<D: DiskManager> FileInner<D> {
 
         let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
+        let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
         inode.read_at(buf, offset, self.fuse.clone())
     }
@@ -89,7 +89,7 @@ impl<D: DiskManager> FileInner<D> {
     pub fn size(&self) -> usize {
         let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
+        let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
         inode.size()
     }

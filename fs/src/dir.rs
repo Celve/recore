@@ -44,7 +44,7 @@ impl<D: DiskManager> DirInner<D> {
     pub fn ls(&self) -> Vec<String> {
         let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
+        let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
         let num_de = inode.size() / size_of::<DirEntry>();
         let mut names = Vec::new();
@@ -67,7 +67,7 @@ impl<D: DiskManager> DirInner<D> {
 
         let blk = self.fuse.cache_manager().get(inode_ptr.bid());
         let blk_guard = blk.lock();
-        let inode = &blk_guard.as_array::<Inode>()[inode_ptr.offset()];
+        let inode = unsafe { &blk_guard.as_array::<Inode>()[inode_ptr.offset()] };
         if inode.is_dir() {
             Some(Dir::new(inode_ptr, self.fuse.clone()))
         } else {
@@ -118,7 +118,7 @@ impl<D: DiskManager> DirInner<D> {
     pub fn to_dir_entries(&self) -> Vec<DirEntry> {
         let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
+        let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
         let num_de = inode.size() / size_of::<DirEntry>();
         let mut des = Vec::new();
@@ -138,7 +138,7 @@ impl<D: DiskManager> DirInner<D> {
     fn get_de(&self, name: &str) -> Option<DirEntry> {
         let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
+        let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
         let num_de = inode.size() / size_of::<DirEntry>();
         assert_eq!(num_de * size_of::<DirEntry>(), inode.size());
@@ -196,7 +196,7 @@ impl<D: DiskManager> DirInner<D> {
     pub fn stat(&self) -> FileStat {
         let cache = self.fuse.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
-        let inode = &cache_guard.as_array::<Inode>()[self.myself.offset()];
+        let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
         FileStat::new(inode.size())
     }

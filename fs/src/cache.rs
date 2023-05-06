@@ -32,6 +32,7 @@ impl<D: DiskManager> CacheManager<D> {
     pub fn get(&self, bid: usize) -> Arc<Spin<Cache<D>>> {
         let mut caches = self.caches.lock();
         if !caches.contains(&bid) {
+            // caches is dropped here, because the creation of cache may be time-consuming
             drop(caches);
             let cache = Cache::new(bid, self.disk_manager.clone());
             caches = self.caches.lock();
@@ -67,6 +68,7 @@ impl<D: DiskManager> Cache<D> {
         }
     }
 
+    /// Flush the block in the cache back to disk.
     pub fn sync(&mut self) {
         if self.dirt {
             self.disk_manager.write(self.bid, &mut self.data);
@@ -74,16 +76,19 @@ impl<D: DiskManager> Cache<D> {
         }
     }
 
-    pub fn as_any<T>(&self) -> &T {
+    /// Caller must make sure that the data could be interpreted in this way.
+    pub unsafe fn as_any<T>(&self) -> &T {
         unsafe { &*(self.data.as_ptr() as *const T) }
     }
 
+    /// Caller must make sure that the data could be interpreted in this way.
     pub fn as_any_mut<T>(&mut self) -> &mut T {
         self.dirt = true;
         unsafe { &mut *(self.data.as_ptr() as *mut T) }
     }
 
-    pub fn as_array<T>(&self) -> &[T] {
+    /// Caller must make sure that the data could be interpreted in this way.
+    pub unsafe fn as_array<T>(&self) -> &[T] {
         unsafe {
             slice::from_raw_parts(
                 self.data.as_ptr() as *mut T,
@@ -92,6 +97,7 @@ impl<D: DiskManager> Cache<D> {
         }
     }
 
+    /// Caller must make sure that the data could be interpreted in this way.
     pub fn as_array_mut<T>(&mut self) -> &mut [T] {
         self.dirt = true;
         unsafe {

@@ -7,7 +7,9 @@ use fs::{cache::CacheManager, fuse::Fuse};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    pub static ref FUSE: Arc<Fuse<BlkDev>> = Arc::new(Fuse::from_existed(Arc::new(
-        CacheManager::new(Arc::new(BlkDev::new()))
-    )));
+    pub static ref FUSE: Arc<Fuse<BlkDev>> = unsafe {
+        Arc::new(Fuse::from_existed(Arc::new(CacheManager::new(Arc::new(
+            BlkDev::new(),
+        )))))
+    };
 }

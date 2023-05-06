@@ -78,6 +78,7 @@ impl<D: DiskManager> Fuse<D> {
         }
     }
 
+    /// The allocation of root should be done at the start of the intialization.
     pub fn alloc_root(self: &Arc<Self>) {
         let iid = self.alloc_iid().unwrap();
         assert_eq!(iid, 0);
@@ -88,10 +89,11 @@ impl<D: DiskManager> Fuse<D> {
         *inode = Inode::empty_dir(iid, iid, self.clone());
     }
 
-    pub fn from_existed(cache_manager: Arc<CacheManager<D>>) -> Self {
+    // The caller has to make sure that there is a real fs image on the disk.
+    pub unsafe fn from_existed(cache_manager: Arc<CacheManager<D>>) -> Self {
         let cache = cache_manager.get(0);
         let cache_guard = cache.lock();
-        let super_block = cache_guard.as_any::<SuperBlock>();
+        let super_block = unsafe { cache_guard.as_any::<SuperBlock>() };
         let bitmap_inode = BitMap::new(
             1,
             super_block.num_inode_bitmap_blks,
@@ -128,7 +130,7 @@ impl<D: DiskManager> Fuse<D> {
     pub fn super_block(&self) -> SuperBlock {
         let cache = self.cache_manager.get(0);
         let cache_guard = cache.lock();
-        cache_guard.as_any::<SuperBlock>().clone()
+        unsafe { cache_guard.as_any::<SuperBlock>().clone() }
     }
 
     pub fn disk_manager(&self) -> Arc<D> {

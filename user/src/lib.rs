@@ -25,6 +25,8 @@ use syscall::{
 
 const USER_HEAP_SIZE: usize = 0x4000;
 const USER_HEAP_GRANULARITY: usize = 8;
+const STDIN: usize = 0;
+const STDOUT: usize = 1;
 
 static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
@@ -65,7 +67,7 @@ pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code);
 }
 
-pub fn yield_now() {
+pub extern "C" fn yield_now() {
     sys_yield();
 }
 
@@ -230,4 +232,24 @@ pub fn procdump() -> isize {
 
 pub fn time() -> isize {
     sys_time()
+}
+
+pub extern "C" fn putchar(c: u8) {
+    sys_write(STDOUT, &[c]);
+}
+
+pub extern "C" fn getchar() -> u8 {
+    let mut buf = [0u8; 1];
+    sys_read(STDIN, &mut buf);
+    buf[0]
+}
+
+pub extern "C" fn putint(value: i32) {
+    sys_write(STDIN, &value.to_ne_bytes());
+}
+
+pub extern "C" fn getint() -> i32 {
+    let mut buf = [0u8; 4];
+    sys_read(STDIN, &mut buf);
+    i32::from_ne_bytes(buf)
 }

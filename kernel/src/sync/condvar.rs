@@ -12,21 +12,21 @@ impl Condvar {
     pub fn wait_mutex<'a, T>(&'a self, guard: MutexGuard<'a, T>) -> MutexGuard<T> {
         let lock = guard.mutex();
         drop(guard);
-        self.inner.wait(&Processor::curr_task());
+        self.inner.wait(Processor::curr_task());
         lock.lock()
     }
 
     pub fn wait_spin<'a, T>(&'a self, guard: SpinGuard<'a, T>) -> SpinGuard<T> {
         let lock = guard.spin();
         drop(guard);
-        self.inner.wait(&Processor::curr_task());
+        self.inner.wait(Processor::curr_task());
         lock.lock()
     }
 
     pub fn wait_mcs<'a, T>(&'a self, guard: McsGuard<'a, T>) -> McsGuard<T> {
         let lock = guard.mcs();
         drop(guard);
-        self.inner.wait(&Processor::curr_task());
+        self.inner.wait(Processor::curr_task());
         lock.lock()
     }
 

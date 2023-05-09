@@ -66,30 +66,28 @@ impl Cache {
         page.insert_free(ptr as *mut usize);
 
         // if the page is not in used, it should be deallocated
-        if page.inuse() == 0 {
-            if Some(page) != self.curr {
-                if let Some(mut prev) = page.prev() {
-                    // it's not the head of slabs
-                    prev.next_insert(page.next());
-                    if let Some(mut next) = page.next() {
-                        next.prev_insert(Some(prev));
-                    }
-                } else {
-                    // it's the head of slabs
-                    if let Some(mut next) = page.next() {
-                        next.prev_insert(None);
-                    }
-                    self.next = None;
+        if page.inuse() == 0 && Some(page) != self.curr {
+            if let Some(mut prev) = page.prev() {
+                // it's not the head of slabs
+                prev.next_insert(page.next());
+                if let Some(mut next) = page.next() {
+                    next.prev_insert(Some(prev));
                 }
-                page.prev_insert(None);
-                page.next_insert(None);
-                unsafe {
-                    debugln!("Buddy deallocates {:#x}.", page.pa());
-                    HEAP.buddy_allocator.lock().dealloc(
-                        page.pa() as *mut u8,
-                        Layout::array::<u8>(1 << self.order).unwrap(),
-                    );
+            } else {
+                // it's the head of slabs
+                if let Some(mut next) = page.next() {
+                    next.prev_insert(None);
                 }
+                self.next = None;
+            }
+            page.prev_insert(None);
+            page.next_insert(None);
+            unsafe {
+                debugln!("Buddy deallocates {:#x}.", page.pa());
+                HEAP.buddy_allocator.lock().dealloc(
+                    page.pa() as *mut u8,
+                    Layout::array::<u8>(1 << self.order).unwrap(),
+                );
             }
         }
     }

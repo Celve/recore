@@ -1,10 +1,5 @@
-use core::{
-    alloc::{GlobalAlloc, Layout},
-    cmp::max,
-    mem::size_of,
-};
+use core::{alloc::GlobalAlloc, cmp::max, mem::size_of};
 
-use alloc::vec::Vec;
 use spin::Spin;
 
 use crate::config::PAGE_SIZE_BITS;

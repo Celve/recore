@@ -25,7 +25,7 @@ impl Pipe {
         };
         let pipe_write = Self {
             perm: FilePerm::WRITEABLE,
-            buf: ring_buf.clone(),
+            buf: ring_buf,
         };
         (pipe_read, pipe_write)
     }

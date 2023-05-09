@@ -16,7 +16,7 @@ impl Observable {
         }
     }
 
-    pub fn wait(&self, task: &Arc<Task>) {
+    pub fn wait(&self, task: Arc<Task>) {
         self.waitings.lock().push(&task);
         drop(task);
         Processor::suspend();

@@ -12,6 +12,8 @@ use spin::{Spin, SpinGuard};
 use crate::{
     config::NUM_SIGNAL,
     drivers::blockdev::BlkDev,
+    fs::fileable::Fileable,
+    io::{stdin::Stdin, stdout::Stdout},
     mm::{address::VirAddr, memory::MemSet, page_table::PageTable},
     proc::{
         id::{GID_ALLOCATOR, PID_ALLOCATOR},
@@ -23,9 +25,8 @@ use crate::{
 
 use super::{
     alloc_table::AllocTable,
-    fd_table::FdTable,
     id::{Id, IdAllocator},
-    lock_table::LockTable,
+    lockable::Lockable,
 };
 
 pub struct Proc {
@@ -41,12 +42,12 @@ pub struct ProcInner {
     parent: Option<Weak<Proc>>,
     children: Vec<Arc<Proc>>,
     tasks: Vec<Arc<Task>>,
-    fd_table: FdTable,
+    fd_table: AllocTable<Fileable>,
     exit_code: isize,
     cwd: Dir<BlkDev>,
     sig_actions: [SignalAction; NUM_SIGNAL],
     base: VirAddr,
-    lock_table: LockTable,
+    lock_table: AllocTable<Arc<Lockable>>,
     sema_table: AllocTable<Arc<Semaphore>>,
     condvar_table: AllocTable<Arc<Observable>>,
     niceness: isize,
@@ -80,13 +81,13 @@ impl Proc {
                 children: Vec::new(),
                 tasks: Vec::new(),
                 exit_code: 0,
-                fd_table: FdTable::new(),
+                fd_table: Proc::new_fd_table(),
                 cwd: file.lock().parent(),
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 base,
-                lock_table: LockTable::new(),
-                sema_table: AllocTable::new(),
-                condvar_table: AllocTable::new(),
+                lock_table: AllocTable::default(),
+                sema_table: AllocTable::default(),
+                condvar_table: AllocTable::default(),
                 niceness,
             }),
         });
@@ -270,9 +271,9 @@ impl Proc {
                 cwd,
                 sig_actions: [SignalAction::default(); NUM_SIGNAL],
                 base,
-                lock_table: LockTable::new(),
-                sema_table: AllocTable::new(),
-                condvar_table: AllocTable::new(),
+                lock_table: AllocTable::default(),
+                sema_table: AllocTable::default(),
+                condvar_table: AllocTable::default(),
                 niceness,
             }),
         });
@@ -292,6 +293,14 @@ impl Proc {
             .collect();
         forked.inner.lock().tasks = tasks;
         forked
+    }
+
+    fn new_fd_table() -> AllocTable<Fileable> {
+        AllocTable::new(vec![
+            Some(Fileable::Stdin(Stdin)),
+            Some(Fileable::Stdout(Stdout)),
+            Some(Fileable::Stdout(Stdout)),
+        ])
     }
 }
 
@@ -344,11 +353,11 @@ impl ProcInner {
         &mut self.cwd
     }
 
-    pub fn fd_table(&self) -> &FdTable {
+    pub fn fd_table(&self) -> &AllocTable<Fileable> {
         &self.fd_table
     }
 
-    pub fn fd_table_mut(&mut self) -> &mut FdTable {
+    pub fn fd_table_mut(&mut self) -> &mut AllocTable<Fileable> {
         &mut self.fd_table
     }
 
@@ -372,11 +381,11 @@ impl ProcInner {
         &mut self.tasks
     }
 
-    pub fn lock_table(&self) -> &LockTable {
+    pub fn lock_table(&self) -> &AllocTable<Arc<Lockable>> {
         &self.lock_table
     }
 
-    pub fn lock_table_mut(&mut self) -> &mut LockTable {
+    pub fn lock_table_mut(&mut self) -> &mut AllocTable<Arc<Lockable>> {
         &mut self.lock_table
     }
 

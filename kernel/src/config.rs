@@ -26,7 +26,7 @@ pub const TRAMPOLINE_ADDR: usize = usize::MAX - PAGE_SIZE + 1; // `usize::MAX` i
 pub const USER_STACK_SIZE: usize = 0x10000;
 pub const KERNEL_STACK_SIZE: usize = 0x10000;
 
-pub const SCHED_PERIOD: usize = 1000_000;
+pub const SCHED_PERIOD: usize = 1_000_000;
 pub const PELT_PERIOD: usize = 2 * SCHED_PERIOD; // the only requirement is that it should be larger than SCHED_PERIOD
 pub const PELT_ATTENUATION: usize = 10;
 pub const MIN_AVG_TIME_SLICE: usize = SCHED_PERIOD / 8;

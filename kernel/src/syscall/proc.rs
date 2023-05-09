@@ -5,8 +5,12 @@ use fosix::{
 };
 
 use crate::{
-    proc::{manager::PROC_MANAGER, proc::ProcState},
-    sync::{observable::Observable, semaphore::Semaphore},
+    proc::{lockable::Lockable, manager::PROC_MANAGER, proc::ProcState},
+    sync::{
+        basic::{BlockLock, SpinLock},
+        observable::Observable,
+        semaphore::Semaphore,
+    },
     task::processor::{Processor, PROCESSORS},
 };
 
@@ -160,7 +164,11 @@ pub fn sys_sigprocmask(mask: u32) -> isize {
 pub fn sys_mutex_create(blocked: bool) -> isize {
     let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
-    proc_guard.lock_table_mut().alloc(blocked) as isize
+    proc_guard.lock_table_mut().alloc(Arc::new(if blocked {
+        Lockable::BlockMutex(BlockLock::new())
+    } else {
+        Lockable::SpinMutex(SpinLock::new())
+    })) as isize
 }
 
 pub fn sys_mutex_lock(id: usize) -> isize {
@@ -250,7 +258,7 @@ pub fn sys_condvar_wait(condvar_id: usize, lock_id: usize) -> isize {
     if let (Some(condvar), Some(lock)) = (condvar, lock) {
         if lock.is_locked() {
             lock.unlock();
-            condvar.wait(&task);
+            condvar.wait(task);
             lock.lock();
             0
         } else {

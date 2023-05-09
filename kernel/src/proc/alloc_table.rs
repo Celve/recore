@@ -5,11 +5,17 @@ pub struct AllocTable<T: Clone> {
     entries: Vec<Option<T>>,
 }
 
-impl<T: Clone> AllocTable<T> {
-    pub fn new() -> Self {
+impl<T: Clone> Default for AllocTable<T> {
+    fn default() -> Self {
         Self {
-            entries: Vec::new(),
+            entries: Default::default(),
         }
+    }
+}
+
+impl<T: Clone> AllocTable<T> {
+    pub fn new(entries: Vec<Option<T>>) -> Self {
+        Self { entries }
     }
 
     pub fn alloc(&mut self, item: T) -> usize {
@@ -31,8 +37,14 @@ impl<T: Clone> AllocTable<T> {
         &mut self.entries[id]
     }
 
-    pub fn dealloc(&mut self, id: usize) {
-        self.entries[id] = None;
+    pub fn dealloc(&mut self, id: usize) -> bool {
+        if id >= self.entries.len() {
+            false
+        } else {
+            let flag = self.entries[id].is_some();
+            self.entries[id] = None;
+            flag
+        }
     }
 
     pub fn len(&self) -> usize {

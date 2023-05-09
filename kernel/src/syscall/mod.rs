@@ -29,7 +29,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
         SYSCALL_READ => sys_read(args[0], args[1], args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1], args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as isize),
-        SYSCALL_SLEEP => sys_sleep(args[0] as usize),
+        SYSCALL_SLEEP => sys_sleep(args[0]),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_KILL => sys_kill(args[0], args[1]),
         SYSCALL_SIGACTION => sys_sigaction(args[0], args[1], args[2]),
@@ -60,7 +60,7 @@ pub fn syscall(id: usize, args: [usize; 3]) -> isize {
 }
 
 fn normalize_path(path: &str) -> &str {
-    if path.ends_with("/") {
+    if path.ends_with('/') {
         &path[..path.len() - 1]
     } else {
         path

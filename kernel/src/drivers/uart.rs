@@ -234,7 +234,7 @@ impl Uart {
         while let Some(data) = inner.raw.recv() {
             inner.read_buffer.push_back(data);
         }
-        if inner.read_buffer.len() > 0 {
+        if !inner.read_buffer.is_empty() {
             self.cond.notify_one(); // there would be at most one that is waiting
         }
     }

@@ -25,25 +25,25 @@ pub struct GenOffset(pub usize);
 
 macro_rules! truncate_phy_addr {
     ($e: expr) => {
-        ($e & ((1 << PA_WIDTH) - 1))
+        $e & ((1 << PA_WIDTH) - 1)
     };
 }
 
 macro_rules! truncate_vir_addr {
     ($e: expr) => {
-        ($e & ((1 << VA_WIDTH) - 1))
+        $e & ((1 << VA_WIDTH) - 1)
     };
 }
 
 macro_rules! truncate_page_num {
     ($e: expr) => {
-        ($e & !((1 << PAGE_SIZE_BITS) - 1))
+        $e & !((1 << PAGE_SIZE_BITS) - 1)
     };
 }
 
 macro_rules! truncate_offset {
     ($e: expr) => {
-        ($e & ((1 << PAGE_SIZE_BITS) - 1))
+        $e & ((1 << PAGE_SIZE_BITS) - 1)
     };
 }
 

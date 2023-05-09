@@ -91,7 +91,7 @@ impl Area {
             MappingType::Framed => {
                 let res =
                     Self::new_framed(self.range.start, self.range.end, self.map_perm, page_table);
-                res.copy_from_existed(&self);
+                res.copy_from_existed(self);
                 res
             }
             MappingType::Linear => Self::new_linear(
@@ -142,7 +142,7 @@ impl Area {
 
 impl Drop for Area {
     fn drop(&mut self) {
-        self.page_table.unmap_area(&self);
+        self.page_table.unmap_area(self);
     }
 }
 

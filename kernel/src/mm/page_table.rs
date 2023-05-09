@@ -245,7 +245,7 @@ impl PageTable {
         UserStack::new(base, tid, self)
     }
 
-    pub fn map_trampoline(self: &Self) {
+    pub fn map_trampoline(&self) {
         extern "C" {
             fn strampoline();
         }
@@ -373,7 +373,7 @@ impl PageTable {
         let ptr = usize::from(ptr);
         let mut vpn = VirPageNum::from(ptr);
         let mut result: Vec<&'static mut [u8]> = Vec::new();
-        while usize::from(vpn) < ptr as usize + len {
+        while usize::from(vpn) < ptr + len {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
             let start = max(ptr - usize::from(vpn), 0);
             let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
@@ -394,7 +394,7 @@ impl PageTable {
             let bytes = unsafe { ppn.as_raw_bytes() };
             let mut c = bytes[ptr];
             loop {
-                if c == '\0' as u8 {
+                if c == b'\0' {
                     return result;
                 }
                 if ptr == PAGE_SIZE {
@@ -448,7 +448,7 @@ impl PageTable {
 
 impl Drop for PageTable {
     fn drop(&mut self) {
-        self.frames.lock().iter().for_each(|frame| drop(frame));
+        self.frames.lock().iter().for_each(drop);
     }
 }
 

@@ -57,14 +57,11 @@ pub fn sys_open(path: usize, flags: u32) -> isize {
 pub fn sys_close(fd: usize) -> isize {
     let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
-    let fd_table = proc_guard.fd_table_mut();
-    if fd > fd_table.len() {
-        -1
-    } else if fd_table.get(fd).is_none() {
-        -1
-    } else {
-        fd_table.get_mut(fd).take();
+    let flag = proc_guard.fd_table_mut().dealloc(fd);
+    if flag {
         0
+    } else {
+        -1
     }
 }
 
@@ -80,7 +77,7 @@ pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
             .unwrap(),
         &path,
     );
-    if let Some(_) = dir {
+    if dir.is_some() {
         0
     } else {
         -1
@@ -131,7 +128,7 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
             }
         }
     }
-    return i as isize;
+    i as isize
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {

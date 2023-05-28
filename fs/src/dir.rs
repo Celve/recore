@@ -1,7 +1,7 @@
 use core::mem::size_of;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use fosix::fs::{DirEntry, FileStat, OpenFlags};
+use fosix::fs::{DirEntry, FileStat, OpenFlags, DIR_ENTRY_NAME_LEN};
 use spin::{Spin, SpinGuard};
 
 use crate::{disk::DiskManager, fuse::Fuse};
@@ -108,7 +108,7 @@ impl<D: DiskManager> DirInner<D> {
     }
 
     fn is_valid_name(name: &str) -> bool {
-        name != "." && name != ".." && !name.contains('/')
+        name != "." && name != ".." && !name.contains('/') && name.len() <= DIR_ENTRY_NAME_LEN
     }
 
     pub fn mkdir(&self, name: &str) -> Result<(), ()> {

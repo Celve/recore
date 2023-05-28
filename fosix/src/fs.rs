@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 use bitflags::bitflags;
 
-const DIR_ENTRY_NAME_LEN: usize = 28;
+pub const DIR_ENTRY_NAME_LEN: usize = 28;
 
 pub struct DirEntry {
     name: [u8; DIR_ENTRY_NAME_LEN],

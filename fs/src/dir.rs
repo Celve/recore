@@ -95,7 +95,7 @@ impl<D: DiskManager> DirInner<D> {
                 ));
             }
         } else if flags.contains(OpenFlags::CREATE) {
-            self.touch(name).unwrap();
+            self.touch(name).ok()?;
             let de = self.get_de(name).unwrap();
             return Some(File::new(
                 InodePtr::new(de.iid(), self.fuse.clone()),
@@ -105,6 +105,10 @@ impl<D: DiskManager> DirInner<D> {
             ));
         }
         None
+    }
+
+    fn is_valid_name(name: &str) -> bool {
+        name != "." && name != ".." && !name.contains('/')
     }
 
     pub fn mkdir(&self, name: &str) -> Result<(), ()> {
@@ -157,7 +161,7 @@ impl<D: DiskManager> DirInner<D> {
     }
 
     fn create(&self, name: &str, ty: InodeType) -> Result<(), ()> {
-        if self.ls().iter().any(|s| s == name) {
+        if !Self::is_valid_name(name) || self.ls().iter().any(|s| s == name) {
             Err(())
         } else {
             let iid = self.fuse.alloc_iid().unwrap();

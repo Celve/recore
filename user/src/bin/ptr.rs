@@ -41,11 +41,8 @@ fn main() {
         stack2[1] = FND[69];
     }
     unsafe {
-        println!("{}", FND2[25]);
-        println!(
-            "{}",
-            (((stack.as_ptr() as usize) + 2050) as *const u8).read_volatile()
-        );
+        println!("{}", FND2[65]);
+        println!("{}", *(((stack.as_ptr() as usize) + 2050) as *const u8));
         println!("{}", *(((stack.as_ptr() as usize) - 1) as *const u8));
     }
 }

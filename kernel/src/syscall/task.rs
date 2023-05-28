@@ -2,7 +2,7 @@ use crate::{
     config::CLOCK_FREQ,
     task::{
         processor::{Processor, PROCESSORS},
-        task::TaskState,
+        task::TaskStatus,
         timer::TIMER,
     },
     time::get_time,
@@ -29,22 +29,22 @@ pub fn sys_waittid(tid: isize, exit_code_ptr: usize) -> isize {
     let mut proc_guard = proc.lock();
 
     // find satisfied children
-    let result = proc_guard.tasks().iter().position(|task| {
+    let result = proc_guard.tasks.iter().position(|task| {
         (tid == -1 || tid as usize == task.lock().tid())
-            && task.lock().task_state() == TaskState::Zombie
+            && task.lock().task_status == TaskStatus::Zombie
     });
 
     return if let Some(pos) = result {
-        let removed_task = proc_guard.tasks_mut().remove(pos);
+        let removed_task = proc_guard.tasks.remove(pos);
         unsafe {
             *proc_guard
                 .page_table()
-                .translate_any::<isize>(exit_code_ptr.into()) = removed_task.lock().exit_code();
+                .translate_any::<isize>(exit_code_ptr.into()) = removed_task.lock().exit_code;
         }
         let tid = removed_task.lock().tid() as isize;
         tid
     } else if proc_guard
-        .tasks()
+        .tasks
         .iter()
         .any(|task| tid == -1 || task.lock().tid() == tid as usize)
     {

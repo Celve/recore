@@ -8,7 +8,7 @@ use crate::{
     config::{CPUS, PELT_PERIOD, SCHED_PERIOD},
     proc::proc::Proc,
     sync::mcs::Mcs,
-    task::{task::TaskState, timer::TIMER},
+    task::{task::TaskStatus, timer::TIMER},
     time::{get_time, sleep},
 };
 
@@ -69,7 +69,7 @@ impl Processor {
     pub fn yield_now() {
         {
             let task = Processor::curr_task();
-            task.lock().task_time_mut().runout();
+            task.lock().task_time.runout();
         }
         Processor::switch();
     }
@@ -81,7 +81,7 @@ impl Processor {
     pub fn suspend() {
         {
             let task = Processor::curr_task();
-            *task.lock().task_state_mut() = TaskState::Stopped;
+            task.lock().task_status = TaskStatus::Stopped;
         }
         Processor::switch();
     }
@@ -131,12 +131,12 @@ impl Processor {
     pub fn schedule() {
         let task = Processor::curr_processor().lock().pop();
         if let Some((task, time, _)) = task {
-            if task.lock().task_state() == TaskState::Ready {
-                *task.lock().task_state_mut() = TaskState::Running;
+            if task.lock().task_status == TaskStatus::Ready {
+                task.lock().task_status = TaskStatus::Running;
             }
 
             // set up rest time
-            task.lock().task_time_mut().setup(time);
+            task.lock().task_time.setup(time);
 
             let task_ctx = task.lock().task_ctx_ptr();
             let idle_task_ctx = {
@@ -153,7 +153,7 @@ impl Processor {
             }
 
             let mut processor = PROCESSORS[Processor::hart_id()].lock();
-            if task.lock().task_state() == TaskState::Running {
+            if task.lock().task_status == TaskStatus::Running {
                 processor.push_normal(&task);
             }
 
@@ -164,7 +164,7 @@ impl Processor {
         }
 
         // avoid balance when there is only one CPU
-        if CPUS != 1 { 
+        if CPUS != 1 {
             let mut processor = Processor::curr_processor().lock();
             let now = pelt_period(get_time());
             if processor.pelt_period != now {
@@ -196,8 +196,8 @@ impl Processor {
 
         // really naive implementation
         while let Some((task, _, is_realtime)) = send.pop() {
-            if task.lock().task_time().history_load() + recv.load() <= send.load() {
-                task.lock().task_time_mut().clear(); // to make it the first
+            if task.lock().task_time.history_load() + recv.load() <= send.load() {
+                task.lock().task_time.clear(); // to make it the first
                 recv.push(&task, is_realtime);
             } else {
                 send.push(&task, is_realtime);
@@ -216,8 +216,8 @@ impl Processor {
                 println!(
                     "\t\tRunning: pid {} vruntime {} load {}",
                     task.proc().pid(),
-                    task_guard.task_time().vruntime(),
-                    task_guard.task_time().history_load()
+                    task_guard.task_time.vruntime(),
+                    task_guard.task_time.history_load()
                 );
             }
             processor.scheduler.iter().for_each(|sched_entity| {
@@ -227,8 +227,8 @@ impl Processor {
                     println!(
                         "\t\tWaiting: pid {} vruntime {} load {}",
                         task.proc().pid(),
-                        task_guard.task_time().vruntime(),
-                        task_guard.task_time().history_load()
+                        task_guard.task_time.vruntime(),
+                        task_guard.task_time.history_load()
                     );
                 }
             })

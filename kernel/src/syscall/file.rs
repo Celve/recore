@@ -11,8 +11,7 @@ pub fn sys_read(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
         let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         let page_table = proc_guard.page_table();
-        let fd_table = proc_guard.fd_table();
-        let fileable = fd_table.get(fd).unwrap();
+        let fileable = proc_guard.fd_table.get(fd).unwrap();
         let seg = unsafe { page_table.translate_segment(buffer_ptr.into(), buffer_len) };
         (fileable, seg)
     };
@@ -25,8 +24,7 @@ pub fn sys_write(fd: usize, buffer_ptr: usize, buffer_len: usize) -> isize {
         let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
         let page_table = proc_guard.page_table();
-        let fd_table = proc_guard.fd_table();
-        let fileable = fd_table.get(fd).unwrap();
+        let fileable = proc_guard.fd_table.get(fd).unwrap();
         let seg = unsafe { page_table.translate_segment(buffer_ptr.into(), buffer_len) };
         (fileable, seg)
     };
@@ -51,13 +49,13 @@ pub fn sys_open(path: usize, flags: u32) -> isize {
         }
         Fileable::File(file.unwrap())
     };
-    Processor::curr_proc().lock().fd_table_mut().alloc(fileable) as isize
+    Processor::curr_proc().lock().fd_table.alloc(fileable) as isize
 }
 
 pub fn sys_close(fd: usize) -> isize {
     let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
-    let flag = proc_guard.fd_table_mut().dealloc(fd);
+    let flag = proc_guard.fd_table.dealloc(fd);
     if flag {
         0
     } else {
@@ -70,7 +68,7 @@ pub fn sys_mkdir(dfd: usize, path: usize) -> isize {
     let dir = create_dir(
         Processor::curr_proc()
             .lock()
-            .fd_table()
+            .fd_table
             .get(dfd)
             .unwrap()
             .as_dir()
@@ -101,7 +99,7 @@ pub fn sys_chdir(path: usize) -> isize {
 pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
     let cwd = Processor::curr_proc()
         .lock()
-        .fd_table()
+        .fd_table
         .get(dfd)
         .unwrap()
         .as_dir()
@@ -132,7 +130,7 @@ pub fn sys_getdents(dfd: usize, des_ptr: usize, des_len: usize) -> isize {
 }
 
 pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
-    let dir = Processor::curr_proc().lock().fd_table().get(fd).unwrap();
+    let dir = Processor::curr_proc().lock().fd_table.get(fd).unwrap();
     let stat = dir.stat();
     let src_bytes = stat.as_bytes();
 
@@ -153,7 +151,7 @@ pub fn sys_fstat(fd: usize, stat_ptr: usize) -> isize {
 }
 
 pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
-    let mut fileable = Processor::curr_proc().lock().fd_table().get(fd).unwrap();
+    let mut fileable = Processor::curr_proc().lock().fd_table.get(fd).unwrap();
     fileable.seek(offset as usize, SeekFlag::from_bits(flags as u8).unwrap());
     0
 }
@@ -161,7 +159,7 @@ pub fn sys_lseek(fd: usize, offset: isize, flags: usize) -> isize {
 pub fn sys_dup(fd: usize) -> isize {
     let proc = Processor::curr_proc();
     let mut proc_guard = proc.lock();
-    let fd_table = proc_guard.fd_table_mut();
+    let fd_table = &mut proc_guard.fd_table;
     let fileable = fd_table.get(fd);
     if let Some(fileable) = fileable {
         fd_table.alloc(fileable) as isize

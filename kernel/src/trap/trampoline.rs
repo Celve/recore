@@ -9,7 +9,7 @@ global_asm!(include_str!("trampoline.s"));
 fn should_yield() -> bool {
     let task = Processor::curr_task();
     let task_guard = task.lock();
-    let task_time = task_guard.task_time();
+    let task_time = &task_guard.task_time;
     if task_time.remaining() < MIN_EXEC_TIME_SLICE {
         // if the remaining time is less or there is a blocked task wake up
         true
@@ -39,7 +39,7 @@ pub fn restore() -> ! {
     set_user_stvec();
 
     // set the timer
-    Processor::curr_task().lock().task_time_mut().restore();
+    Processor::curr_task().lock().task_time.restore();
 
     unsafe {
         asm! {

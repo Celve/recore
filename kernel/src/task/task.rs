@@ -13,7 +13,6 @@ use crate::{
         proc::Proc,
         stack::{KernelStack, UserStack},
     },
-    time::get_time,
     trap::{
         context::{TrapCtx, TrapCtxHandle},
         trampoline::restore,
@@ -37,21 +36,21 @@ pub struct TaskInner {
     tid: Arc<Id>,
     gid: Arc<Id>,
     page_table: Arc<PageTable>,
-    pub task_state: TaskState,
+    pub task_status: TaskStatus,
     task_ctx: TaskContext,
     trap_ctx_handle: TrapCtxHandle,
-    trap_ctx_backup: Option<TrapCtx>,
-    user_stack: UserStack,
+    pub trap_ctx_backup: Option<TrapCtx>,
+    pub user_stack: UserStack,
     kernel_stack: KernelStack,
     pub exit_code: isize,
-    sigs: SignalFlags,
-    sig_mask: SignalFlags,
-    sig_handling: Option<usize>,
-    task_time: TaskTime,
+    pub sigs: SignalFlags,
+    pub sig_mask: SignalFlags,
+    pub sig_handling: Option<usize>,
+    pub task_time: TaskTime,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
-pub enum TaskState {
+pub enum TaskStatus {
     Ready,
     Running,
     Stopped,
@@ -90,7 +89,7 @@ impl Task {
                 tid,
                 gid,
                 page_table,
-                task_state: TaskState::Running,
+                task_status: TaskStatus::Running,
                 task_ctx,
                 trap_ctx_handle,
                 trap_ctx_backup: None,
@@ -129,7 +128,7 @@ impl Task {
                 tid,
                 gid,
                 page_table,
-                task_state: TaskState::Running,
+                task_status: TaskStatus::Running,
                 task_ctx,
                 trap_ctx_handle,
                 trap_ctx_backup,
@@ -191,13 +190,13 @@ impl Task {
     /// When the `suspend()` is called, the caller is reponsible to maintain the task elsewhere.
     /// Then the caller should wake up the task by calling this function, which would put the task into task manager again.
     pub fn wakeup(self: &Arc<Self>) {
-        self.lock().task_state = TaskState::Running;
+        self.lock().task_status = TaskStatus::Running;
         Processor::curr_processor().lock().push_realtime(self);
     }
 
     pub fn exit(&self, exit_code: isize) {
         let mut guard = self.lock();
-        guard.task_state = TaskState::Zombie;
+        guard.task_status = TaskStatus::Zombie;
         guard.exit_code = exit_code;
         infoln!(
             "Process {} thread {} exits with code {}.",
@@ -226,7 +225,7 @@ impl Task {
             sig.bits()
         );
 
-        if sig.contains(SignalFlags::SIGCONT) && task.task_state() == TaskState::Stopped {
+        if sig.contains(SignalFlags::SIGCONT) && task.task_status == TaskStatus::Stopped {
             infoln!("Process {} thread 1 is continued.", self.proc().pid());
             drop(task);
             PROCESSORS[Processor::hart_id()].lock().push_normal(self);
@@ -245,23 +244,7 @@ impl Task {
 }
 
 impl TaskInner {
-    pub fn task_state(&self) -> TaskState {
-        self.task_state
-    }
-
-    pub fn task_state_mut(&mut self) -> &mut TaskState {
-        &mut self.task_state
-    }
-
-    pub fn task_ctx(&self) -> &TaskContext {
-        &self.task_ctx
-    }
-
     pub fn task_ctx_ptr(&mut self) -> *mut TaskContext {
-        &mut self.task_ctx
-    }
-
-    pub fn task_ctx_mut(&mut self) -> &mut TaskContext {
         &mut self.task_ctx
     }
 
@@ -277,48 +260,8 @@ impl TaskInner {
         self.trap_ctx_handle.trap_ctx_ptr()
     }
 
-    pub fn trap_ctx_backup(&self) -> Option<&TrapCtx> {
-        self.trap_ctx_backup.as_ref()
-    }
-
-    pub fn trap_ctx_backup_mut(&mut self) -> &mut Option<TrapCtx> {
-        &mut self.trap_ctx_backup
-    }
-
-    pub fn sigs(&self) -> SignalFlags {
-        self.sigs
-    }
-
-    pub fn sigs_mut(&mut self) -> &mut SignalFlags {
-        &mut self.sigs
-    }
-
-    pub fn sig_mask(&self) -> SignalFlags {
-        self.sig_mask
-    }
-
-    pub fn sig_mask_mut(&mut self) -> &mut SignalFlags {
-        &mut self.sig_mask
-    }
-
-    pub fn user_stack(&self) -> &UserStack {
-        &self.user_stack
-    }
-
     pub fn page_table(&self) -> Arc<PageTable> {
         self.page_table.clone()
-    }
-
-    pub fn sig_handling(&self) -> Option<usize> {
-        self.sig_handling
-    }
-
-    pub fn sig_handling_mut(&mut self) -> &mut Option<usize> {
-        &mut self.sig_handling
-    }
-
-    pub fn exit_code(&self) -> isize {
-        self.exit_code
     }
 
     pub fn tid(&self) -> usize {
@@ -327,13 +270,5 @@ impl TaskInner {
 
     pub fn gid(&self) -> usize {
         self.gid.id()
-    }
-
-    pub fn task_time(&self) -> &TaskTime {
-        &self.task_time
-    }
-
-    pub fn task_time_mut(&mut self) -> &mut TaskTime {
-        &mut self.task_time
     }
 }

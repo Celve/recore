@@ -2,12 +2,12 @@ use fosix::signal::SignalFlags;
 
 use crate::{
     config::NUM_SIGNAL,
-    task::{processor::Processor, task::TaskState},
+    task::{processor::Processor, task::TaskStatus},
 };
 
 /// The handler that handles all signals.
 pub fn signal_handler() {
-    if Processor::curr_task().lock().sig_handling().is_none() {
+    if Processor::curr_task().lock().sig_handling.is_none() {
         loop {
             let sigs = {
                 // always lock proc first
@@ -15,11 +15,11 @@ pub fn signal_handler() {
                 let proc_guard = proc.lock();
                 let task = Processor::curr_task();
                 let task_guard = task.lock();
-                let sig = task_guard.sigs();
-                let sig_mask = task_guard.sig_mask();
+                let sig = task_guard.sigs;
+                let sig_mask = task_guard.sig_mask;
 
-                if let Some(sig_handling) = task_guard.sig_handling() {
-                    sig & !sig_mask & !proc_guard.sig_actions()[sig_handling].mask()
+                if let Some(sig_handling) = task_guard.sig_handling {
+                    sig & !sig_mask & !proc_guard.sig_actions[sig_handling].mask()
                 } else {
                     sig & !sig_mask
                 }
@@ -33,7 +33,7 @@ pub fn signal_handler() {
                         Processor::curr_proc().pid(),
                         i
                     );
-                    *Processor::curr_task().lock().sigs_mut() ^= sig;
+                    Processor::curr_task().lock().sigs ^= sig;
                     if sig == SignalFlags::SIGKILL
                         || sig == SignalFlags::SIGSTOP
                         || sig == SignalFlags::SIGCONT
@@ -50,8 +50,8 @@ pub fn signal_handler() {
                 }
             }
 
-            let status = Processor::curr_task().lock().task_state();
-            if status != TaskState::Stopped {
+            let status = Processor::curr_task().lock().task_status;
+            if status != TaskStatus::Stopped {
                 break;
             }
 
@@ -66,12 +66,10 @@ fn kernel_signal_handler(sigid: usize) {
     let sig = SignalFlags::from_bits(1 << sigid).unwrap();
     match sig {
         SignalFlags::SIGKILL => Processor::exit(-2), // yield immediately
-        SignalFlags::SIGSTOP => {
-            *Processor::curr_task().lock().task_state_mut() = TaskState::Stopped
-        } // do not yield immediately
+        SignalFlags::SIGSTOP => Processor::curr_task().lock().task_status = TaskStatus::Stopped, // do not yield immediately
         SignalFlags::SIGCONT => {
             // the task would be waken up in other process
-            assert!(Processor::curr_task().lock().task_state() == TaskState::Running)
+            assert!(Processor::curr_task().lock().task_status == TaskStatus::Running)
         }
         _ => {
             panic!("Unhandled kernel signal.")
@@ -84,16 +82,16 @@ fn user_signal_handler(sigid: usize) {
     let handler = {
         let proc = Processor::curr_proc();
         let proc_guard = proc.lock();
-        proc_guard.sig_actions()[sigid].handler()
+        proc_guard.sig_actions[sigid].handler()
     };
 
     if handler != 0 {
         let task = Processor::curr_task();
         let mut task_guard = task.lock();
 
-        assert!(task_guard.trap_ctx_backup().is_none());
-        *task_guard.trap_ctx_backup_mut() = Some(task_guard.trap_ctx().clone());
-        *task_guard.sig_handling_mut() = Some(sigid);
+        assert!(task_guard.trap_ctx_backup.is_none());
+        task_guard.trap_ctx_backup = Some(task_guard.trap_ctx().clone());
+        task_guard.sig_handling = Some(sigid);
 
         task_guard.trap_ctx_mut().user_sepc = handler;
         *task_guard.trap_ctx_mut().a0_mut() = sigid as usize;

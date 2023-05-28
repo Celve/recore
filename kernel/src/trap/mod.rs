@@ -26,7 +26,7 @@ pub mod trampoline;
 #[no_mangle]
 pub fn trap_handler() -> ! {
     // yielding should be done after all the traps are handled, because the scause is not maintained.
-    Processor::curr_task().lock().task_time_mut().trap();
+    Processor::curr_task().lock().task_time.trap();
 
     set_kernel_stvec();
     let trap = scause::read().cause();

@@ -38,23 +38,23 @@ pub struct ProcInner {
     tid_allocator: Arc<IdAllocator>,
     user_mem: MemSet,
     page_table: Arc<PageTable>,
-    proc_staus: ProcState,
+    pub proc_status: ProcStatus,
     parent: Option<Weak<Proc>>,
-    children: Vec<Arc<Proc>>,
-    tasks: Vec<Arc<Task>>,
-    fd_table: AllocTable<Fileable>,
-    exit_code: isize,
+    pub children: Vec<Arc<Proc>>,
+    pub tasks: Vec<Arc<Task>>,
+    pub fd_table: AllocTable<Fileable>,
+    pub exit_code: isize,
     cwd: Dir<BlkDev>,
-    sig_actions: [SignalAction; NUM_SIGNAL],
+    pub sig_actions: [SignalAction; NUM_SIGNAL],
     base: VirAddr,
-    lock_table: AllocTable<Arc<Lockable>>,
-    sema_table: AllocTable<Arc<Semaphore>>,
-    condvar_table: AllocTable<Arc<Observable>>,
+    pub lock_table: AllocTable<Arc<Lockable>>,
+    pub sema_table: AllocTable<Arc<Semaphore>>,
+    pub condvar_table: AllocTable<Arc<Observable>>,
     niceness: isize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ProcState {
+pub enum ProcStatus {
     Running,
     Zombie,
 }
@@ -76,7 +76,7 @@ impl Proc {
                 tid_allocator: tid_allocator.clone(),
                 user_mem,
                 page_table: page_table.clone(),
-                proc_staus: ProcState::Running,
+                proc_status: ProcStatus::Running,
                 parent,
                 children: Vec::new(),
                 tasks: Vec::new(),
@@ -125,7 +125,7 @@ impl Proc {
         let new_proc = self.renew();
 
         // make new process the original's children
-        self.lock().children_mut().push(new_proc.clone());
+        self.lock().children.push(new_proc.clone());
         *new_proc.lock().parent_mut() = Some(Arc::downgrade(&self));
 
         new_proc
@@ -143,7 +143,7 @@ impl Proc {
         let tid_allocator = Arc::new(IdAllocator::new());
         let task = proc.main_task();
         task.exec(tid_allocator.alloc(), base, user_sepc, page_table.clone());
-        let mut user_sp: usize = task.lock().user_stack().top().into();
+        let mut user_sp: usize = task.lock().user_stack.top().into();
 
         // push args
         let mut acc = 0;
@@ -213,15 +213,15 @@ impl Proc {
         let mut proc = self.lock();
         let pid = self.pid();
 
-        proc.proc_staus = ProcState::Zombie;
+        proc.proc_status = ProcStatus::Zombie;
         proc.exit_code = exit_code;
         proc.tasks = vec![];
 
         PROC_MANAGER.remove(pid);
 
-        for child in proc.children().iter() {
+        for child in proc.children.iter() {
             *child.lock().parent_mut() = Some(INITPROC.phantom());
-            INITPROC.lock().children_mut().push(child.clone());
+            INITPROC.lock().children.push(child.clone());
         }
         let parent = proc.parent().unwrap();
         parent.kill(SignalFlags::SIGCHLD);
@@ -249,7 +249,7 @@ impl Proc {
         page_table.map_trampoline();
 
         let cwd = proc.cwd.clone();
-        let fd_table = proc.fd_table().clone();
+        let fd_table = proc.fd_table.clone();
         let tid_allocator = Arc::new(IdAllocator::new());
         let parent = proc.parent.clone();
         let niceness = proc.niceness;
@@ -262,7 +262,7 @@ impl Proc {
                 tid_allocator: tid_allocator.clone(),
                 user_mem,
                 page_table: page_table.clone(),
-                proc_staus: ProcState::Running,
+                proc_status: ProcStatus::Running,
                 parent,
                 children: Vec::new(),
                 tasks: Vec::new(),
@@ -305,32 +305,8 @@ impl Proc {
 }
 
 impl ProcInner {
-    pub fn proc_status_mut(&mut self) -> &mut ProcState {
-        &mut self.proc_staus
-    }
-
-    pub fn proc_status(&self) -> ProcState {
-        self.proc_staus
-    }
-
-    pub fn exit_code_mut(&mut self) -> &mut isize {
-        &mut self.exit_code
-    }
-
-    pub fn user_mem(&self) -> &MemSet {
-        &self.user_mem
-    }
-
     pub fn page_table(&self) -> Arc<PageTable> {
         self.page_table.clone()
-    }
-
-    pub fn children_mut(&mut self) -> &mut Vec<Arc<Proc>> {
-        &mut self.children
-    }
-
-    pub fn children(&self) -> &Vec<Arc<Proc>> {
-        &self.children
     }
 
     pub fn parent(&self) -> Option<Arc<Proc>> {
@@ -341,10 +317,6 @@ impl ProcInner {
         &mut self.parent
     }
 
-    pub fn exit_code(&self) -> isize {
-        self.exit_code
-    }
-
     pub fn cwd(&self) -> Dir<BlkDev> {
         self.cwd.clone()
     }
@@ -353,56 +325,8 @@ impl ProcInner {
         &mut self.cwd
     }
 
-    pub fn fd_table(&self) -> &AllocTable<Fileable> {
-        &self.fd_table
-    }
-
-    pub fn fd_table_mut(&mut self) -> &mut AllocTable<Fileable> {
-        &mut self.fd_table
-    }
-
-    pub fn sig_actions(&self) -> &[SignalAction; NUM_SIGNAL] {
-        &self.sig_actions
-    }
-
-    pub fn sig_actions_mut(&mut self) -> &mut [SignalAction; NUM_SIGNAL] {
-        &mut self.sig_actions
-    }
-
     pub fn main_task(&self) -> Arc<Task> {
         self.tasks[0].clone()
-    }
-
-    pub fn tasks(&self) -> &Vec<Arc<Task>> {
-        &self.tasks
-    }
-
-    pub fn tasks_mut(&mut self) -> &mut Vec<Arc<Task>> {
-        &mut self.tasks
-    }
-
-    pub fn lock_table(&self) -> &AllocTable<Arc<Lockable>> {
-        &self.lock_table
-    }
-
-    pub fn lock_table_mut(&mut self) -> &mut AllocTable<Arc<Lockable>> {
-        &mut self.lock_table
-    }
-
-    pub fn sema_table(&self) -> &AllocTable<Arc<Semaphore>> {
-        &self.sema_table
-    }
-
-    pub fn sema_table_mut(&mut self) -> &mut AllocTable<Arc<Semaphore>> {
-        &mut self.sema_table
-    }
-
-    pub fn condvar_table(&self) -> &AllocTable<Arc<Observable>> {
-        &self.condvar_table
-    }
-
-    pub fn condvar_table_mut(&mut self) -> &mut AllocTable<Arc<Observable>> {
-        &mut self.condvar_table
     }
 
     pub fn weight(&self) -> usize {

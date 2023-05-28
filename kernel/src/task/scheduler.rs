@@ -30,7 +30,7 @@ impl Scheduler {
     pub fn push(&mut self, task: &Arc<Task>, is_realtime: bool) {
         // calibrate with the saturating sub to avoid blocked task to be hold on for too long
         task.lock()
-            .task_time_mut()
+            .task_time
             .calibrate(self.calibration().saturating_sub(1));
 
         let sched_entity = task.to_sched_entity();
@@ -113,7 +113,7 @@ impl Scheduler {
 
     pub fn calibration(&mut self) -> usize {
         if let Some(task) = self.peek() {
-            task.lock().task_time().vruntime()
+            task.lock().task_time.vruntime()
         } else {
             0
         }

@@ -1,6 +1,6 @@
 use core::ptr::null_mut;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct LinkedList {
     pub head: *mut usize,
 }

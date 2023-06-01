@@ -1,17 +1,13 @@
 mod cache;
 mod heap;
-mod page;
 pub mod slab_allocator;
 
-use crate::config::{KERNEL_HEAP_SIZE, PAGE_SIZE};
-use page::Page;
+use crate::config::KERNEL_HEAP_SIZE;
 
 use self::heap::Heap;
 
 #[link_section = ".data.heap"]
 static mut KERNEL_HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
-static mut MEM_MAP: [Page; KERNEL_HEAP_SIZE / PAGE_SIZE] =
-    [Page::empty(); KERNEL_HEAP_SIZE / PAGE_SIZE];
 
 #[global_allocator]
 static HEAP: Heap = Heap::default();
@@ -20,10 +16,6 @@ pub fn init_heap() {
     unsafe {
         let start = KERNEL_HEAP_SPACE.as_ptr() as usize;
         let end = start + KERNEL_HEAP_SPACE.len();
-
-        MEM_MAP.iter_mut().enumerate().for_each(|(i, page)| {
-            *page.pa_mut() = i * PAGE_SIZE + start;
-        });
 
         HEAP.init(start, end);
     }

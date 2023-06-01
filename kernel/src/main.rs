@@ -1,6 +1,14 @@
 #![no_std]
 #![no_main]
-#![feature(naked_functions, asm_const, const_cmp, fn_align, inline_const)]
+#![feature(
+    naked_functions,
+    asm_const,
+    const_cmp,
+    fn_align,
+    inline_const,
+    maybe_uninit_uninit_array,
+    const_maybe_uninit_uninit_array
+)]
 
 #[macro_use]
 extern crate alloc;
@@ -15,6 +23,7 @@ mod fs;
 mod heap;
 mod ipc;
 mod mm;
+mod page;
 mod proc;
 mod sync;
 mod syscall;
@@ -38,7 +47,7 @@ use riscv::register::*;
 use task::processor::{Processor, PROCESSORS};
 use time::init_timer;
 
-use crate::{fs::FUSE, time::get_time, trap::set_kernel_stvec};
+use crate::{fs::FUSE, page::Page, time::get_time, trap::set_kernel_stvec};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [[u8; BOOTLOADER_STACK_SIZE]; CPUS] =
@@ -104,6 +113,9 @@ extern "C" fn rust_main() {
         init_uart();
         infoln!("Cleared .bss section.");
         infoln!("Initialized UART.");
+
+        Page::init_mem_map();
+        infoln!("Initialized mem map.");
 
         init_heap();
         infoln!("Initialized buddy allocator and slab allocator.");

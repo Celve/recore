@@ -1,5 +1,3 @@
-use core::mem::size_of;
-
 use crate::io::log::LogLevel;
 
 pub const BOOTLOADER_STACK_SIZE: usize = 0x10000;
@@ -20,6 +18,9 @@ pub const VPN_WIDTH: usize = VA_WIDTH - PAGE_SIZE_BITS;
 pub const PTE_FLAG_WIDTH: usize = 10;
 
 pub const MEMORY_END: usize = 0x88_000_000;
+pub const KERNEL_START: usize = 0x8000_0000;
+pub const KERNEL_SIZE: usize = MEMORY_END - KERNEL_START;
+pub const KERNEL_PAGE_NUM: usize = KERNEL_SIZE / PAGE_SIZE;
 
 pub const TRAMPOLINE_ADDR: usize = usize::MAX - PAGE_SIZE + 1; // `usize::MAX` is included.
 

@@ -1,9 +1,4 @@
-use core::{
-    ops::{Deref, DerefMut},
-    sync::atomic::{AtomicUsize, Ordering},
-};
-
-use super::Page;
+use core::sync::atomic::AtomicUsize;
 
 /// One possible representation of metadata of page, when the page is used by user.
 #[derive(Debug)]

@@ -1,10 +1,6 @@
-use core::mem::MaybeUninit;
-
-use spin::Spin;
-
 use crate::mm::address::PhyPageNum;
 
-use super::{allocator::PageAllocator, Page, Pageable};
+use super::allocator::PageAllocator;
 
 /// This struct must be allocated statically. It's the corner stone of whole memory management.
 ///

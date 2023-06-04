@@ -5,7 +5,7 @@ use spin::SpinGuard;
 
 use crate::{
     config::PAGE_SIZE,
-    mem::{Page, Pageable},
+    mem::page::{Page, Pageable},
     mm::address::PhyPageNum,
 };
 

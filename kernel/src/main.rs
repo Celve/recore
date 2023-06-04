@@ -51,12 +51,7 @@ use riscv::register::*;
 use task::processor::{Processor, PROCESSORS};
 use time::init_timer;
 
-use crate::{
-    fs::FUSE,
-    mem::{slab::init_slab, Page},
-    time::get_time,
-    trap::set_kernel_stvec,
-};
+use crate::{fs::FUSE, mem::slab::init_slab, time::get_time, trap::set_kernel_stvec};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [[u8; BOOTLOADER_STACK_SIZE]; CPUS] =
@@ -122,9 +117,6 @@ extern "C" fn rust_main() {
         init_uart();
         infoln!("Cleared .bss section.");
         infoln!("Initialized UART.");
-
-        Page::init_mem_map();
-        infoln!("Initialized mem map.");
 
         init_slab();
         infoln!("Initialized buddy allocator and slab allocator.");

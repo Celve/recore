@@ -1,13 +1,11 @@
-use core::{
-    mem::MaybeUninit,
-    ops::{Deref, DerefMut},
-};
+use core::ops::{Deref, DerefMut};
 
 use allocator::linked_list::LinkedList;
+use spin::SpinGuard;
 
 use crate::{
     config::PAGE_SIZE,
-    mem::{section::MemSec, Page, Pageable},
+    mem::{Page, Pageable},
     mm::address::PhyPageNum,
 };
 
@@ -20,27 +18,25 @@ pub struct SlabPage {
 
     order: u8,
 
-    pub prev: SlabPagePtr,
-    pub next: SlabPagePtr,
+    pub prev: PhyPageNum,
+    pub next: PhyPageNum,
     pub free: LinkedList,
     pub inuse: u8,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct SlabPagePtr {
-    pa: usize,
+/// Automatically fetch the lock, returning the guard.
+pub struct SlabPageGuard<'a> {
+    pub ppn: PhyPageNum,
+    guard: SpinGuard<'a, Page>,
 }
-
-/// It's guaranteed that the slab page would only be accessed by one thread at a time.
-unsafe impl Sync for SlabPage {}
 
 impl SlabPage {
     pub fn new(pa: usize, order: u8) -> SlabPage {
         let mut slab_page = Self {
             pa,
             order,
-            prev: SlabPagePtr::null(),
-            next: SlabPagePtr::null(),
+            prev: PhyPageNum::null(),
+            next: PhyPageNum::null(),
             free: LinkedList::new(),
             inuse: 0,
         };
@@ -48,19 +44,17 @@ impl SlabPage {
         slab_page
     }
 
-    pub fn alloc(pa: usize, order: u8) -> SlabPagePtr {
+    pub fn alloc(pa: usize, order: u8) {
         let mut slab_page = Self {
             pa,
             order,
-            prev: SlabPagePtr::null(),
-            next: SlabPagePtr::null(),
+            prev: PhyPageNum::null(),
+            next: PhyPageNum::null(),
             free: LinkedList::new(),
             inuse: 0,
         };
         slab_page.init();
-        *Page::from_addr_mut(pa) = Page::Slab(slab_page);
-
-        SlabPagePtr { pa }
+        *Page::from_pa(pa).lock() = Page::Slab(slab_page);
     }
 
     pub fn init(&mut self) {
@@ -101,36 +95,23 @@ impl Pageable for SlabPage {
     }
 }
 
-impl SlabPagePtr {
-    pub fn new(pa: usize) -> Self {
-        Self { pa }
+impl<'a> SlabPageGuard<'a> {
+    pub fn new(ppn: PhyPageNum) -> Self {
+        let guard = Page::from_ppn(ppn).lock();
+        Self { ppn, guard }
     }
 }
 
-impl SlabPagePtr {
-    pub const fn null() -> Self {
-        Self { pa: 0 }
-    }
-
-    pub fn pa(&self) -> usize {
-        self.pa
-    }
-
-    pub fn is_null(&self) -> bool {
-        self.pa == 0
-    }
-}
-
-impl Deref for SlabPagePtr {
+impl<'a> Deref for SlabPageGuard<'a> {
     type Target = SlabPage;
 
     fn deref(&self) -> &Self::Target {
-        Page::from_addr(self.pa).as_slab()
+        self.guard.as_slab()
     }
 }
 
-impl DerefMut for SlabPagePtr {
+impl<'a> DerefMut for SlabPageGuard<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        Page::from_addr_mut(self.pa).as_slab_mut()
+        self.guard.as_slab_mut()
     }
 }

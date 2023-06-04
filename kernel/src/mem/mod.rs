@@ -17,7 +17,7 @@ pub mod section;
 pub mod slab;
 pub mod user;
 
-pub static mut MEM_MAP: [MaybeUninit<Page>; KERNEL_PAGE_NUM] =
+pub static mut MEM_MAP: [MaybeUninit<Spin<Page>>; KERNEL_PAGE_NUM] =
     MaybeUninit::uninit_array::<KERNEL_PAGE_NUM>();
 
 #[derive(Debug)]
@@ -45,11 +45,12 @@ impl Page {
 }
 
 impl Page {
-    pub fn from_addr(pa: usize) -> &'static Page {
+    pub fn from_pa(pa: usize) -> &'static Spin<Page> {
         unsafe { MEM_MAP[(pa - KERNEL_START) / PAGE_SIZE].assume_init_ref() }
     }
-    pub fn from_addr_mut(pa: usize) -> &'static mut Page {
-        unsafe { MEM_MAP[(pa - KERNEL_START) / PAGE_SIZE].assume_init_mut() }
+
+    pub fn from_ppn(ppn: PhyPageNum) -> &'static Spin<Page> {
+        unsafe { MEM_MAP[ppn.0 - KERNEL_START / PAGE_SIZE].assume_init_ref() }
     }
 }
 

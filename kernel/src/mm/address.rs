@@ -14,7 +14,7 @@ pub struct PhyAddr(pub usize);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VirAddr(pub usize);
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct PhyPageNum(pub usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -45,6 +45,16 @@ macro_rules! truncate_offset {
     ($e: expr) => {
         $e & ((1 << PAGE_SIZE_BITS) - 1)
     };
+}
+
+impl PhyPageNum {
+    pub const fn null() -> Self {
+        Self(0)
+    }
+
+    pub const fn is_null(&self) -> bool {
+        self.0 == 0
+    }
 }
 
 // from usize to any

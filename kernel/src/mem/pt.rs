@@ -13,15 +13,3 @@ pub struct PtPage {
 pub struct PtPagePtr {
     pa: usize,
 }
-
-impl PtPage {
-    pub fn new(pa: usize) -> PtPagePtr {
-        let pt_page = PtPage {
-            pa: AtomicUsize::new(pa),
-        };
-        unsafe {
-            *Page::from_addr_mut(pa) = Page::Pt(pt_page);
-        }
-        PtPagePtr { pa }
-    }
-}

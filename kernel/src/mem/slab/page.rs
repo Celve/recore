@@ -4,11 +4,12 @@ use core::{
 };
 
 use allocator::linked_list::LinkedList;
-use spin::Spin;
 
-use crate::config::PAGE_SIZE;
-
-use super::Page;
+use crate::{
+    config::PAGE_SIZE,
+    mem::{section::MemSec, Page, Pageable},
+    mm::address::PhyPageNum,
+};
 
 /// One possible representation of metadata of page, when the page is used by slab allocator.
 ///
@@ -34,6 +35,19 @@ pub struct SlabPagePtr {
 unsafe impl Sync for SlabPage {}
 
 impl SlabPage {
+    pub fn new(pa: usize, order: u8) -> SlabPage {
+        let mut slab_page = Self {
+            pa,
+            order,
+            prev: SlabPagePtr::null(),
+            next: SlabPagePtr::null(),
+            free: LinkedList::new(),
+            inuse: 0,
+        };
+        slab_page.init();
+        slab_page
+    }
+
     pub fn alloc(pa: usize, order: u8) -> SlabPagePtr {
         let mut slab_page = Self {
             pa,
@@ -78,6 +92,12 @@ impl SlabPage {
 
     pub fn is_available(&mut self) -> bool {
         !self.free.is_empty()
+    }
+}
+
+impl Pageable for SlabPage {
+    fn new_page(pa: PhyPageNum) -> Page {
+        Page::Slab(SlabPage::new(pa.into(), 0))
     }
 }
 

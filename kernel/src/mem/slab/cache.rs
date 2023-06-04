@@ -1,8 +1,9 @@
-use core::alloc::{GlobalAlloc, Layout};
+use core::alloc::Layout;
 
-use crate::page::slab::{SlabPage, SlabPagePtr};
-
-use super::HEAP;
+use crate::mem::slab::{
+    page::{SlabPage, SlabPagePtr},
+    SLAB_MEM_SECTION,
+};
 
 #[derive(Clone, Copy)]
 pub struct Cache {
@@ -29,13 +30,9 @@ impl Cache {
                 page
             } else {
                 // allocate new from buddy allocator
-                let ptr = unsafe {
-                    HEAP.buddy_allocator
-                        .lock()
-                        .alloc(Layout::array::<u8>(1 << self.order).unwrap())
-                };
-                debugln!("Buddy allocates {:#x}.", ptr as usize);
-                SlabPage::alloc(ptr as usize, self.order as u8)
+                let ptr = usize::from(unsafe { SLAB_MEM_SECTION.alloc() });
+                debugln!("Buddy allocates {:#x}.", ptr);
+                SlabPage::alloc(ptr, self.order as u8)
             };
         }
 
@@ -83,13 +80,8 @@ impl Cache {
             }
             page.prev = SlabPagePtr::null();
             page.next = SlabPagePtr::null();
-            unsafe {
-                debugln!("Buddy deallocates {:#x}.", page.pa());
-                HEAP.buddy_allocator.lock().dealloc(
-                    page.pa() as *mut u8,
-                    Layout::array::<u8>(1 << self.order).unwrap(),
-                );
-            }
+            debugln!("Buddy deallocates {:#x}.", page.pa());
+            SLAB_MEM_SECTION.dealloc(page.pa().into());
         }
     }
 }

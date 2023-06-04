@@ -1,11 +1,19 @@
 use core::mem::MaybeUninit;
 
-use crate::config::{KERNEL_PAGE_NUM, KERNEL_START, PAGE_SIZE};
+use spin::Spin;
 
-use self::{empty::EmptyPage, pt::PtPage, slab::SlabPage, user::UserPage};
+use crate::{
+    config::{KERNEL_PAGE_NUM, KERNEL_START, PAGE_SIZE},
+    mm::address::PhyPageNum,
+};
 
+use self::{empty::EmptyPage, pt::PtPage, slab::page::SlabPage, user::UserPage};
+
+pub mod allocator;
 pub mod empty;
+pub mod page;
 pub mod pt;
+pub mod section;
 pub mod slab;
 pub mod user;
 
@@ -20,23 +28,26 @@ pub enum Page {
     User(UserPage),
 }
 
+pub trait Pageable {
+    fn new_page(pa: PhyPageNum) -> Page;
+}
+
 impl Page {
     /// Init the `MEM_MAP`. Otherwise, it's uninit.
     pub fn init_mem_map() {
-        for i in 0..KERNEL_PAGE_NUM {
-            let pa = KERNEL_START + i * PAGE_SIZE;
-            unsafe {
-                MEM_MAP[i] = MaybeUninit::new(Page::Empty(EmptyPage::new(pa)));
-            }
-        }
+        // for i in 0..KERNEL_PAGE_NUM {
+        //     let pa = KERNEL_START + i * PAGE_SIZE;
+        //     unsafe {
+        //         MEM_MAP[i] = MaybeUninit::new(Page::Empty(EmptyPage::new(pa)));
+        //     }
+        // }
     }
 }
 
 impl Page {
     pub fn from_addr(pa: usize) -> &'static Page {
-        unsafe { &MEM_MAP[(pa - KERNEL_START) / PAGE_SIZE].assume_init_ref() }
+        unsafe { MEM_MAP[(pa - KERNEL_START) / PAGE_SIZE].assume_init_ref() }
     }
-
     pub fn from_addr_mut(pa: usize) -> &'static mut Page {
         unsafe { MEM_MAP[(pa - KERNEL_START) / PAGE_SIZE].assume_init_mut() }
     }

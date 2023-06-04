@@ -7,7 +7,13 @@
     fn_align,
     inline_const,
     maybe_uninit_uninit_array,
-    const_maybe_uninit_uninit_array
+    const_maybe_uninit_uninit_array,
+    const_trait_impl,
+    const_for,
+    const_mut_refs,
+    const_convert,
+    const_default_impls,
+    sync_unsafe_cell
 )]
 
 #[macro_use]
@@ -20,10 +26,9 @@ mod complement;
 mod config;
 mod drivers;
 mod fs;
-mod heap;
 mod ipc;
+mod mem;
 mod mm;
-mod page;
 mod proc;
 mod sync;
 mod syscall;
@@ -40,14 +45,18 @@ use drivers::{
     plic::{TargetPriority, PLIC},
     uart::UART,
 };
-use heap::init_heap;
 use mm::{frame::init_frame_allocator, page_table::activate_page_table};
 use proc::manager::PROC_MANAGER;
 use riscv::register::*;
 use task::processor::{Processor, PROCESSORS};
 use time::init_timer;
 
-use crate::{fs::FUSE, page::Page, time::get_time, trap::set_kernel_stvec};
+use crate::{
+    fs::FUSE,
+    mem::{slab::init_slab, Page},
+    time::get_time,
+    trap::set_kernel_stvec,
+};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [[u8; BOOTLOADER_STACK_SIZE]; CPUS] =
@@ -117,7 +126,7 @@ extern "C" fn rust_main() {
         Page::init_mem_map();
         infoln!("Initialized mem map.");
 
-        init_heap();
+        init_slab();
         infoln!("Initialized buddy allocator and slab allocator.");
 
         init_frame_allocator();

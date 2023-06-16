@@ -95,7 +95,7 @@ pub fn trap_handler() -> ! {
             }
             scause::Exception::InstructionMisaligned => todo!(),
             scause::Exception::InstructionFault => todo!(),
-            scause::Exception::IllegalInstruction => todo!(),
+            scause::Exception::IllegalInstruction => Processor::exit(-1),
             scause::Exception::Breakpoint => todo!(),
             scause::Exception::LoadFault => todo!(),
             scause::Exception::StoreMisaligned => todo!(),

@@ -30,8 +30,8 @@ impl Cache {
                 page.ppn
             } else {
                 // allocate new from buddy allocator
-                let ptr = usize::from(unsafe { SLAB_MEM_SECTION.alloc() });
-                debugln!("Buddy allocates {:#x}.", ptr);
+                let ptr = unsafe { SLAB_MEM_SECTION.alloc() };
+                debugln!("Buddy allocates {:#x}.", usize::from(ptr));
                 SlabPage::alloc(ptr, self.order as u8);
                 ptr.into()
             };

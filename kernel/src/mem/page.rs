@@ -7,7 +7,7 @@ use crate::{
     mm::address::PhyPageNum,
 };
 
-use super::{pt::PtPage, slab::page::SlabPage, user::UserPage};
+use super::{normal::page::NormalPage, slab::page::SlabPage, user::UserPage};
 
 pub static mut MEM_MAP: [MaybeUninit<Spin<Page>>; KERNEL_PAGE_NUM] =
     MaybeUninit::uninit_array::<KERNEL_PAGE_NUM>();
@@ -15,12 +15,8 @@ pub static mut MEM_MAP: [MaybeUninit<Spin<Page>>; KERNEL_PAGE_NUM] =
 #[derive(Debug)]
 pub enum Page {
     Slab(SlabPage),
-    Pt(PtPage),
+    Normal(NormalPage),
     User(UserPage),
-}
-
-pub trait Pageable {
-    fn new_page(pa: PhyPageNum) -> Page;
 }
 
 impl Page {
@@ -48,17 +44,17 @@ impl Page {
         }
     }
 
-    pub fn as_pt(&self) -> &PtPage {
+    pub fn as_normal(&self) -> &NormalPage {
         match self {
-            Page::Pt(pt) => pt,
-            _ => panic!("Page is not a page table page"),
+            Page::Normal(normal) => normal,
+            _ => panic!("Page is not a normal page"),
         }
     }
 
-    pub fn as_pt_mut(&mut self) -> &mut PtPage {
+    pub fn as_normal_mut(&mut self) -> &mut NormalPage {
         match self {
-            Page::Pt(pt) => pt,
-            _ => panic!("Page is not a page table page"),
+            Page::Normal(normal) => normal,
+            _ => panic!("Page is not a normal page"),
         }
     }
 

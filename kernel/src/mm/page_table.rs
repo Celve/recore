@@ -14,7 +14,6 @@ use super::area::Area;
 use super::memory::MemSet;
 use super::{
     address::{PhyPageNum, VirPageNum},
-    frame::Frame,
     memory::MappingPermission,
 };
 use crate::config::{
@@ -23,6 +22,7 @@ use crate::config::{
     VIRT_TEST_SIZE,
 };
 use crate::fs::segment::Segment;
+use crate::mem::normal::page::NormalPageHandle;
 use crate::mm::memory::KERNEL_MEMSET;
 use crate::proc::stack::UserStack;
 use crate::trap::context::TrapCtxHandle;
@@ -59,7 +59,7 @@ pub struct PageTableEntry {
 /// RAII is used here. The frame collections control when to free those allocated frames used by page tables.
 pub struct PageTable {
     root: PhyPageNum,
-    frames: Spin<Vec<Frame>>,
+    frames: Spin<Vec<NormalPageHandle>>,
 }
 
 impl PageTable {
@@ -259,10 +259,10 @@ impl PageTable {
 
 impl PageTable {
     pub fn new() -> Self {
-        let frame = Frame::new();
-        infoln!("Created a new page table {}.", usize::from(frame.ppn()));
+        let frame = NormalPageHandle::new();
+        infoln!("Created a new page table {}.", usize::from(frame.ppn));
         Self {
-            root: frame.ppn(),
+            root: frame.ppn,
             frames: Spin::new(vec![frame]),
         }
     }
@@ -279,7 +279,7 @@ impl PageTable {
             .iter()
             .zip(area.frames().iter())
             .for_each(|(vpn, frame)| {
-                self.map(vpn, frame.ppn(), flags);
+                self.map(vpn, frame.ppn, flags);
             });
     }
 
@@ -309,8 +309,8 @@ impl PageTable {
                 return pte;
             }
             if !pte.is_valid() {
-                let frame = Frame::new();
-                pte.set_ppn(frame.ppn());
+                let frame = NormalPageHandle::new();
+                pte.set_ppn(frame.ppn);
                 pte.set_flags(PTEFlags::V);
                 self.frames.lock().push(frame);
             }
@@ -356,7 +356,7 @@ impl PageTable {
         let mut result: Vec<&'static mut u8> = Vec::new();
         while usize::from(vpn) < ptr as usize + len {
             let ppn = self.find_pte(vpn).unwrap().get_ppn();
-            let start = max(ptr - usize::from(vpn), 0);
+            let start = ptr.saturating_sub(usize::from(vpn));
             let end = min(ptr + len - usize::from(vpn), PAGE_SIZE);
             unsafe {
                 ppn.as_raw_bytes()[start..end]

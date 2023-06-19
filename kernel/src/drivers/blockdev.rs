@@ -7,7 +7,8 @@ use virtio_drivers::{BlkResp, Hal, RespStatus, VirtIOBlk, VirtIOHeader};
 
 use crate::{
     config::VIRT_IO_HEADER,
-    mm::{frame::Frame, page_table::KERNEL_PAGE_TABLE},
+    mem::normal::page::NormalPageHandle,
+    mm::page_table::KERNEL_PAGE_TABLE,
     sync::{condvar::Condvar, mcs::Mcs},
 };
 
@@ -20,7 +21,8 @@ pub struct BlkDev {
 pub struct VirIoHal;
 
 lazy_static! {
-    pub static ref VIRT_IO_FRAMES: Mcs<BTreeMap<usize, Vec<Frame>>> = Mcs::new(BTreeMap::new());
+    pub static ref VIRT_IO_FRAMES: Mcs<BTreeMap<usize, Vec<NormalPageHandle>>> =
+        Mcs::new(BTreeMap::new());
 }
 
 impl DiskManager for BlkDev {
@@ -88,8 +90,8 @@ impl BlkDev {
 
 impl Hal for VirIoHal {
     fn dma_alloc(pages: usize) -> virtio_drivers::PhysAddr {
-        let frames: Vec<Frame> = (0..pages).map(|_| Frame::fresh()).collect();
-        let ptr = frames[0].ppn().into();
+        let frames: Vec<NormalPageHandle> = (0..pages).map(|_| NormalPageHandle::new()).collect();
+        let ptr = frames[0].ppn.into();
         VIRT_IO_FRAMES.lock().insert(ptr, frames);
         ptr
     }

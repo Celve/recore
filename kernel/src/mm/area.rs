@@ -2,11 +2,10 @@ use core::cmp::min;
 
 use alloc::{sync::Arc, vec::Vec};
 
-use crate::config::PAGE_SIZE;
+use crate::{config::PAGE_SIZE, mem::normal::page::NormalPageHandle};
 
 use super::{
     address::{PhyPageNum, VirPageNum},
-    frame::Frame,
     memory::{MappingPermission, MappingType},
     page_table::PageTable,
     range::Range,
@@ -14,7 +13,7 @@ use super::{
 
 pub struct Area {
     range: Range<VirPageNum>,
-    frames: Vec<Frame>,
+    frames: Vec<NormalPageHandle>,
     map_type: MappingType,
     map_perm: MappingPermission,
     page_table: Arc<PageTable>,
@@ -33,15 +32,19 @@ impl Area {
         let range = Range::new(start, end);
         let res = Self {
             range,
-            frames: range
-                .iter()
-                .map(|vpn| Frame::from_existed(vpn.into()))
-                .collect(),
+            // frames: range
+            //     .iter()
+            //     .map(|vpn| NormalPageHandle::from_unalloc(vpn.into()))
+            //     .collect(),
+            frames: Default::default(),
             map_type: MappingType::Identical,
             map_perm,
             page_table: page_table.clone(),
         };
-        page_table.map_area(&res);
+        // page_table.map_area(&res);
+        range
+            .iter()
+            .for_each(|vpn| page_table.map(vpn.into(), vpn.into(), map_perm.into()));
         res
     }
 
@@ -54,7 +57,7 @@ impl Area {
         let range = Range::new(start, end);
         let res = Self {
             range,
-            frames: range.iter().map(|_| Frame::new()).collect(),
+            frames: range.iter().map(|_| NormalPageHandle::new()).collect(),
             map_type: MappingType::Framed,
             map_perm,
             page_table: page_table.clone(),
@@ -70,17 +73,18 @@ impl Area {
         map_perm: MappingPermission,
         page_table: &Arc<PageTable>,
     ) -> Self {
-        let res = Self {
-            range: Range::new(start_vpn, start_vpn + len),
-            frames: (0..len)
-                .map(|offset| Frame::from_existed(start_ppn + offset))
-                .collect(),
-            map_type: MappingType::Linear,
-            map_perm,
-            page_table: page_table.clone(),
-        };
-        page_table.map_area(&res);
-        res
+        // let res = Self {
+        //     range: Range::new(start_vpn, start_vpn + len),
+        //     frames: (0..len)
+        //         .map(|offset| NormalPageHandle::from_unalloc(start_ppn + offset))
+        //         .collect(),
+        //     map_type: MappingType::Linear,
+        //     map_perm,
+        //     page_table: page_table.clone(),
+        // };
+        // page_table.map_area(&res);
+        // res
+        todo!()
     }
 
     pub fn renew(&self, page_table: &Arc<PageTable>) -> Self {
@@ -96,7 +100,7 @@ impl Area {
             }
             MappingType::Linear => Self::new_linear(
                 self.range.start,
-                self.frames[0].ppn(),
+                self.frames[0].ppn,
                 self.len(),
                 self.map_perm,
                 page_table,
@@ -109,7 +113,7 @@ impl Area {
         let len = data.len();
         for frame in self.frames.iter() {
             let src = &data[start..min(len, start + PAGE_SIZE)];
-            let dst = unsafe { &mut frame.ppn().as_raw_bytes()[..src.len()] };
+            let dst = unsafe { &mut frame.ppn.as_raw_bytes()[..src.len()] };
             dst.copy_from_slice(src);
             start += PAGE_SIZE;
             if start >= len {
@@ -124,15 +128,15 @@ impl Area {
             .iter()
             .zip(other.frames.iter())
             .for_each(|(dst, src)| unsafe {
-                let dst_addr = dst.ppn().as_raw_bytes();
-                let src_addr = src.ppn().as_raw_bytes();
+                let dst_addr = dst.ppn.as_raw_bytes();
+                let src_addr = src.ppn.as_raw_bytes();
                 dst_addr.copy_from_slice(src_addr);
             });
     }
 
     pub fn init(&self) {
         self.frames.iter().for_each(|frame| {
-            let ptr = usize::from(frame.ppn()) as *mut u8;
+            let ptr = usize::from(frame.ppn) as *mut u8;
             unsafe {
                 core::slice::from_raw_parts_mut(ptr, PAGE_SIZE).fill(0);
             }
@@ -142,16 +146,16 @@ impl Area {
 
 impl Drop for Area {
     fn drop(&mut self) {
-        self.page_table.unmap_area(self);
+        // self.page_table.unmap_area(self);
     }
 }
 
 impl Area {
-    pub fn frames(&self) -> &Vec<Frame> {
+    pub fn frames(&self) -> &Vec<NormalPageHandle> {
         &self.frames
     }
 
-    pub fn frame(&self, index: usize) -> &Frame {
+    pub fn frame(&self, index: usize) -> &NormalPageHandle {
         &self.frames[index]
     }
 

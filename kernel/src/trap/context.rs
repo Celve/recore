@@ -88,11 +88,11 @@ impl TrapCtxHandle {
     }
 
     pub fn trap_ctx(&self) -> &TrapCtx {
-        unsafe { &*(usize::from(self.area.frames().first().unwrap().ppn()) as *const TrapCtx) }
+        unsafe { &*(usize::from(self.area.frames().first().unwrap().ppn) as *const TrapCtx) }
     }
 
     pub fn trap_ctx_mut(&self) -> &mut TrapCtx {
-        unsafe { &mut *(usize::from(self.area.frames().first().unwrap().ppn()) as *mut TrapCtx) }
+        unsafe { &mut *(usize::from(self.area.frames().first().unwrap().ppn) as *mut TrapCtx) }
     }
 
     pub fn trap_ctx_ptr(&self) -> usize {

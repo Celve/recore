@@ -8,7 +8,6 @@ use core::alloc::GlobalAlloc;
 use core::cmp::{max, min};
 use core::mem::size_of;
 use core::ptr::null_mut;
-use core::sync::atomic::AtomicUsize;
 use spin::{Spin, SpinGuard};
 
 const BUDDY_ALLOCATOR_LEVEL: usize = 32;

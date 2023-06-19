@@ -7,6 +7,7 @@ use crate::{
 };
 
 pub struct TaskTime {
+    // CFS related
     vruntime: usize,
     weight: usize,
 

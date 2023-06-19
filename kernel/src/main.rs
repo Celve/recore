@@ -45,13 +45,18 @@ use drivers::{
     plic::{TargetPriority, PLIC},
     uart::UART,
 };
-use mm::{frame::init_frame_allocator, page_table::activate_page_table};
+use mm::page_table::activate_page_table;
 use proc::manager::PROC_MANAGER;
 use riscv::register::*;
 use task::processor::{Processor, PROCESSORS};
 use time::init_timer;
 
-use crate::{fs::FUSE, mem::slab::init_slab, time::get_time, trap::set_kernel_stvec};
+use crate::{
+    fs::FUSE,
+    mem::{normal::init_frame_allocator, slab::init_slab},
+    time::get_time,
+    trap::set_kernel_stvec,
+};
 
 #[link_section = ".bss.stack"]
 static mut BOOTLOADER_STACK_SPACE: [[u8; BOOTLOADER_STACK_SIZE]; CPUS] =

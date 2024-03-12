@@ -71,7 +71,7 @@ impl From<usize> for VirAddr {
     }
 }
 
-impl const From<usize> for PhyPageNum {
+impl From<usize> for PhyPageNum {
     fn from(value: usize) -> Self {
         Self(truncate_page_num!(truncate_phy_addr!(value)) >> PAGE_SIZE_BITS)
     }
@@ -91,7 +91,7 @@ impl From<usize> for GenOffset {
 
 // from any to usize
 
-impl const From<PhyAddr> for usize {
+impl From<PhyAddr> for usize {
     fn from(value: PhyAddr) -> Self {
         value.0
     }
@@ -372,7 +372,7 @@ impl ops::Sub<usize> for PhyPageNum {
     }
 }
 
-impl const ops::Sub<PhyPageNum> for PhyPageNum {
+impl ops::Sub<PhyPageNum> for PhyPageNum {
     type Output = usize;
 
     fn sub(self, rhs: PhyPageNum) -> Self::Output {

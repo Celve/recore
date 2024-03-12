@@ -1,11 +1,14 @@
-use crate::{config::MEMORY_END, mem::allocator::PageAllocator};
+use lazy_static::lazy_static;
 
 use self::allocator::FrameAllocator;
+use crate::{config::MEMORY_END, mem::allocator::PageAllocator};
 
 pub mod allocator;
 pub mod page;
 
-pub static FRAME_ALLOCATOR: FrameAllocator = FrameAllocator::default();
+lazy_static! {
+    pub static ref FRAME_ALLOCATOR: FrameAllocator = FrameAllocator::default();
+}
 
 pub fn init_frame_allocator() {
     extern "C" {

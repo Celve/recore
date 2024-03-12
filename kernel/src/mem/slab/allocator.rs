@@ -88,7 +88,11 @@ impl BuddyAllocatorInner {
             user: 0,
             allocated: 0,
             total: 0,
-            gran: max(gran, size_of::<usize>()),
+            gran: if gran > size_of::<usize>() {
+                gran
+            } else {
+                size_of::<usize>()
+            },
         }
     }
 

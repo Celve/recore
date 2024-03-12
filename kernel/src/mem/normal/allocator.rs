@@ -14,7 +14,7 @@ pub struct FrameAllocatorInner {
     recycled: Vec<PhyPageNum>,
 }
 
-impl const Default for FrameAllocatorInner {
+impl Default for FrameAllocatorInner {
     fn default() -> Self {
         Self {
             start: PhyPageNum(0),
@@ -24,7 +24,7 @@ impl const Default for FrameAllocatorInner {
     }
 }
 
-impl const Default for FrameAllocator {
+impl Default for FrameAllocator {
     fn default() -> Self {
         Self {
             inner: Spin::new(FrameAllocatorInner::default()),

@@ -36,7 +36,7 @@ impl MemTable {
     }
 }
 
-impl const Default for MemTable {
+impl Default for MemTable {
     fn default() -> Self {
         Self {
             units: Default::default(),
@@ -59,7 +59,7 @@ impl MemUnit {
     }
 }
 
-impl const Default for MemUnit {
+impl Default for MemUnit {
     fn default() -> Self {
         Self {
             start_ppn: PhyPageNum(0),

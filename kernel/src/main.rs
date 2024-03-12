@@ -11,8 +11,6 @@
     const_trait_impl,
     const_for,
     const_mut_refs,
-    const_convert,
-    const_default_impls,
     sync_unsafe_cell
 )]
 

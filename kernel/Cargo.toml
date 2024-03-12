@@ -15,8 +15,8 @@ buddy_system_allocator = "0.6"
 spin = { path = "../spin" }
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
 lru = "0.10.0"
-fosix = { path = "../fosix"}
-fs = { path = "../fs" }
+fosix = { path = "../fosix" }
+simplefs = { path = "../simplefs" }
 volatile = "0.3"
 
 [profile.release]

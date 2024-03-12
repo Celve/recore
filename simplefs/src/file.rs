@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use fosix::fs::{FilePerm, FileStat, SeekFlag};
 use spin::Spin;
 
-use crate::{disk::DiskManager, fuse::Fuse};
+use crate::{disk::DiskManager, fs::FileSys};
 
 use super::{
     dir::Dir,
@@ -20,7 +20,7 @@ pub struct FileInner<D: DiskManager> {
     parent: InodePtr<D>,
     offset: usize,
     perm: FilePerm,
-    fuse: Arc<Fuse<D>>,
+    fs: Arc<FileSys<D>>,
 }
 
 impl<D: DiskManager> Clone for File<D> {
@@ -36,10 +36,10 @@ impl<D: DiskManager> File<D> {
         myself: InodePtr<D>,
         parent: InodePtr<D>,
         perm: FilePerm,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) -> Self {
         Self {
-            inner: Arc::new(Spin::new(FileInner::new(myself, parent, perm, fuse))),
+            inner: Arc::new(Spin::new(FileInner::new(myself, parent, perm, fs))),
         }
     }
 
@@ -54,11 +54,11 @@ impl<D: DiskManager> FileInner<D> {
             return 0;
         }
 
-        let cache = self.fuse.cache_manager().get(self.myself.bid());
+        let cache = self.fs.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
         let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
-        inode.read_at(buf, offset, self.fuse.clone())
+        inode.read_at(buf, offset, self.fs.clone())
     }
 
     pub fn write_at(&self, buf: &[u8], offset: usize) -> usize {
@@ -66,11 +66,11 @@ impl<D: DiskManager> FileInner<D> {
             return 0;
         }
 
-        let cache = self.fuse.cache_manager().get(self.myself.bid());
+        let cache = self.fs.cache_manager().get(self.myself.bid());
         let mut cache_guard = cache.lock();
         let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
 
-        inode.write_at(buf, offset, self.fuse.clone())
+        inode.write_at(buf, offset, self.fs.clone())
     }
 
     pub fn trunc(&mut self) -> usize {
@@ -78,16 +78,16 @@ impl<D: DiskManager> FileInner<D> {
             return 0;
         }
 
-        let cache = self.fuse.cache_manager().get(self.myself.bid());
+        let cache = self.fs.cache_manager().get(self.myself.bid());
         let mut cache_guard = cache.lock();
         let inode = &mut cache_guard.as_array_mut::<Inode>()[self.myself.offset()];
 
         self.offset = 0;
-        inode.trunc(self.fuse.clone())
+        inode.trunc(self.fs.clone())
     }
 
     pub fn size(&self) -> usize {
-        let cache = self.fuse.cache_manager().get(self.myself.bid());
+        let cache = self.fs.cache_manager().get(self.myself.bid());
         let cache_guard = cache.lock();
         let inode = unsafe { &cache_guard.as_array::<Inode>()[self.myself.offset()] };
 
@@ -95,7 +95,7 @@ impl<D: DiskManager> FileInner<D> {
     }
 
     pub fn parent(&self) -> Dir<D> {
-        Dir::new(self.parent.clone(), self.fuse.clone())
+        Dir::new(self.parent.clone(), self.fs.clone())
     }
 }
 
@@ -131,14 +131,14 @@ impl<D: DiskManager> FileInner<D> {
         myself: InodePtr<D>,
         parent: InodePtr<D>,
         perm: FilePerm,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) -> Self {
         Self {
             myself,
             parent,
             offset: 0,
             perm,
-            fuse,
+            fs,
         }
     }
 }

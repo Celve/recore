@@ -50,7 +50,7 @@ use task::processor::{Processor, PROCESSORS};
 use time::init_timer;
 
 use crate::{
-    fs::FUSE,
+    fs::FS,
     mem::{normal::init_frame_allocator, slab::init_slab},
     time::get_time,
     trap::set_kernel_stvec,
@@ -200,5 +200,5 @@ fn init_devices() {
 fn init_tasks() {
     let task = PROC_MANAGER.get(1).unwrap().lock().main_task();
     PROCESSORS[Processor::hart_id()].lock().push_normal(&task);
-    FUSE.disk_manager().enable_non_blocking();
+    FS.disk_manager().enable_non_blocking();
 }

@@ -8,7 +8,7 @@ use std::{
 
 use clap::{App, Arg};
 use fosix::fs::OpenFlags;
-use fs::{cache::CacheManager, fuse::Fuse, superblock::SuperBlock};
+use simplefs::{cache::CacheManager, fs::FileSys, superblock::SuperBlock};
 
 use crate::disk::FileDev;
 
@@ -17,7 +17,7 @@ const NUM_DNODE: usize = 65536;
 const FILE_LEN: usize = 1 + NUM_INODE / 4096 + NUM_DNODE / 4096 + NUM_INODE / 4 + NUM_DNODE;
 
 fn main() {
-    let matches = App::new("Fuse packer")
+    let matches = App::new("File system packer")
         .arg(
             Arg::with_name("source")
                 .short("s")
@@ -46,13 +46,13 @@ fn main() {
         f
     }));
 
-    let fuse = Arc::new(Fuse::new(
+    let fs = Arc::new(FileSys::new(
         SuperBlock::new(NUM_INODE, NUM_DNODE),
         Arc::new(CacheManager::new(disk_manager)),
     ));
 
-    fuse.alloc_root();
-    let root = fuse.root();
+    fs.alloc_root();
+    let root = fs.root();
 
     let src_path = matches.value_of("source").unwrap();
     let target_path = matches.value_of("target").unwrap();
@@ -82,7 +82,7 @@ fn main() {
     }
 
     drop(root);
-    let cache_manager = fuse.cache_manager();
+    let cache_manager = fs.cache_manager();
     cache_manager.clear();
     assert_eq!(cache_manager.len(), 0);
 }
@@ -100,13 +100,13 @@ fn test() {
         f
     }));
 
-    let fuse = Arc::new(Fuse::new(
+    let fs = Arc::new(FileSys::new(
         SuperBlock::new(4096, 32768),
         Arc::new(CacheManager::new(disk_manager)),
     ));
 
-    fuse.alloc_root();
-    let root = fuse.root();
+    fs.alloc_root();
+    let root = fs.root();
 
     for i in 0..129 {
         root.lock().mkdir(format!("{i}").as_str());

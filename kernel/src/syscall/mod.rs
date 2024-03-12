@@ -7,11 +7,9 @@ mod task;
 
 use alloc::{string::String, vec::Vec};
 use fosix::{fs::OpenFlags, syscall::*};
-use fs::{dir::Dir, file::File};
+use simplefs::{dir::Dir, file::File};
 
-use crate::{
-    drivers::blockdev::BlkDev, fs::FUSE, mm::address::VirAddr, task::processor::Processor,
-};
+use crate::{drivers::blockdev::BlkDev, fs::FS, mm::address::VirAddr, task::processor::Processor};
 
 use self::{com::*, debug::*, dev::*, file::*, proc::*, task::*};
 
@@ -72,7 +70,7 @@ fn split_path(cwd: Dir<BlkDev>, path: &str) -> (Dir<BlkDev>, Vec<&str>) {
     if path.starts_with("/") {
         // absolute path
         let steps: Vec<&str> = path[1..].split("/").collect();
-        let cwd = FUSE.root();
+        let cwd = FS.root();
         (cwd, steps)
     } else {
         // relative path

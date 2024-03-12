@@ -6,7 +6,7 @@ use fosix::fs::DirEntry;
 use crate::{
     config::{DNODE_SIZE, INODE_PER_BLK, INODE_SIZE},
     disk::DiskManager,
-    fuse::Fuse,
+    fs::FileSys,
 };
 
 /// The length of dnode when it's seen as an array of u32.
@@ -42,7 +42,7 @@ pub struct InodePtr<D: DiskManager> {
     iid: usize,
     bid: usize,
     offset: usize,
-    fuse: Arc<Fuse<D>>,
+    fs: Arc<FileSys<D>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -57,7 +57,7 @@ impl<D: DiskManager> Clone for InodePtr<D> {
             iid: self.iid,
             bid: self.bid,
             offset: self.offset,
-            fuse: self.fuse.clone(),
+            fs: self.fs.clone(),
         }
     }
 }
@@ -68,12 +68,12 @@ impl Inode {
         &self,
         buf: &mut [u8],
         offset: usize,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) -> usize {
-        let blk_ids = self.find(offset, buf.len(), fuse.clone());
+        let blk_ids = self.find(offset, buf.len(), fs.clone());
         let mut cnt = 0;
         for (i, blk_id) in blk_ids.iter().enumerate() {
-            let blk = fuse.cache_manager().get(*blk_id as usize);
+            let blk = fs.cache_manager().get(*blk_id as usize);
             let blk_guard = blk.lock();
             let bytes = unsafe { blk_guard.as_array::<u8>() };
             let start = if i == 0 { offset % DNODE_SIZE } else { 0 };
@@ -97,17 +97,17 @@ impl Inode {
         &mut self,
         buf: &[u8],
         offset: usize,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) -> usize {
         let end = offset + buf.len();
         if end > self.size as usize {
-            self.expand(end, fuse.clone());
+            self.expand(end, fs.clone());
         }
 
-        let blk_ids = self.find(offset, buf.len(), fuse.clone());
+        let blk_ids = self.find(offset, buf.len(), fs.clone());
         let mut cnt = 0;
         for (i, blk_id) in blk_ids.iter().enumerate() {
-            let blk = fuse.cache_manager().get(*blk_id as usize);
+            let blk = fs.cache_manager().get(*blk_id as usize);
             let mut blk_guard = blk.lock();
             let bytes = blk_guard.as_array_mut::<u8>();
             let start = if i == 0 { offset % DNODE_SIZE } else { 0 };
@@ -125,29 +125,29 @@ impl Inode {
         cnt
     }
 
-    pub fn write_at_end<D: DiskManager>(&mut self, buf: &[u8], fuse: Arc<Fuse<D>>) -> usize {
-        self.write_at(buf, self.size as usize, fuse)
+    pub fn write_at_end<D: DiskManager>(&mut self, buf: &[u8], fs: Arc<FileSys<D>>) -> usize {
+        self.write_at(buf, self.size as usize, fs)
     }
 
-    pub fn trunc<D: DiskManager>(&mut self, fuse: Arc<Fuse<D>>) -> usize {
+    pub fn trunc<D: DiskManager>(&mut self, fs: Arc<FileSys<D>>) -> usize {
         let old_size = self.size as usize;
-        self.adjust(0, fuse);
+        self.adjust(0, fs);
         old_size
     }
 
     /// Adjust the file to the given size.
     ///
     /// If the new size is bigger than the current one, then it's an expansion; otherwise it's an shrinkage with extra bytes discarded.
-    pub fn adjust<D: DiskManager>(&mut self, new_size: usize, fuse: Arc<Fuse<D>>) {
+    pub fn adjust<D: DiskManager>(&mut self, new_size: usize, fs: Arc<FileSys<D>>) {
         let old_size = self.size as usize;
         if new_size > old_size {
-            self.expand(new_size, fuse);
+            self.expand(new_size, fs);
         } else if new_size < old_size {
-            self.shrink(new_size, fuse);
+            self.shrink(new_size, fs);
         }
     }
 
-    fn expand<D: DiskManager>(&mut self, new_size: usize, fuse: Arc<Fuse<D>>) {
+    fn expand<D: DiskManager>(&mut self, new_size: usize, fs: Arc<FileSys<D>>) {
         assert!(new_size > self.size());
         let start_blk_id = if self.size == 0 {
             0
@@ -156,10 +156,10 @@ impl Inode {
         }; // inclusive
         let end_blk_id = (new_size - 1) / DNODE_SIZE + 1; // exclusive
         self.size = new_size as u32;
-        self.set(start_blk_id, end_blk_id, true, fuse);
+        self.set(start_blk_id, end_blk_id, true, fs);
     }
 
-    fn shrink<D: DiskManager>(&mut self, new_size: usize, fuse: Arc<Fuse<D>>) {
+    fn shrink<D: DiskManager>(&mut self, new_size: usize, fs: Arc<FileSys<D>>) {
         assert!(new_size < self.size());
         let start_blk_id = if new_size == 0 {
             0
@@ -168,7 +168,7 @@ impl Inode {
         }; // inclusive
         let end_blk_id = (self.size as usize - 1) / DNODE_SIZE + 1; // exclusive
         self.size = new_size as u32;
-        self.set(start_blk_id, end_blk_id, false, fuse);
+        self.set(start_blk_id, end_blk_id, false, fs);
     }
 
     fn set<D: DiskManager>(
@@ -176,15 +176,15 @@ impl Inode {
         mut start_blk_id: usize,
         end_blk_id: usize,
         flag: bool,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) {
         if start_blk_id < end_blk_id && start_blk_id < DIRECT_INDEXING_MAX_LEN {
             let end_blk_id = min(end_blk_id, DIRECT_INDEXING_MAX_LEN);
             for i in start_blk_id..end_blk_id {
                 if flag {
-                    self.directs[i] = fuse.alloc_bid().unwrap() as u32;
+                    self.directs[i] = fs.alloc_bid().unwrap() as u32;
                 } else {
-                    fuse.dealloc_bid(self.directs[i] as usize);
+                    fs.dealloc_bid(self.directs[i] as usize);
                 }
             }
         }
@@ -195,11 +195,11 @@ impl Inode {
             let start_blk_id = start_blk_id - offset;
             let end_blk_id = min(end_blk_id, INDIRECT1_INDEXING_MAX_LEN) - offset;
             if start_blk_id == 0 && flag {
-                self.indirect1 = fuse.alloc_bid().unwrap() as u32;
+                self.indirect1 = fs.alloc_bid().unwrap() as u32;
             }
-            self.set_primary(start_blk_id, end_blk_id, flag, fuse.clone());
+            self.set_primary(start_blk_id, end_blk_id, flag, fs.clone());
             if start_blk_id == 0 && !flag {
-                fuse.dealloc_bid(self.indirect1 as usize);
+                fs.dealloc_bid(self.indirect1 as usize);
             }
         }
         start_blk_id = max(start_blk_id, INDIRECT1_INDEXING_MAX_LEN);
@@ -209,16 +209,16 @@ impl Inode {
             let start_blk_id = start_blk_id - offset;
             let end_blk_id = min(end_blk_id, INDIRECT2_INDEXING_MAX_LEN) - offset;
             if start_blk_id == 0 && flag {
-                self.indirect2 = fuse.alloc_bid().unwrap() as u32;
+                self.indirect2 = fs.alloc_bid().unwrap() as u32;
             }
-            self.set_secondary(start_blk_id, end_blk_id, flag, fuse.clone());
+            self.set_secondary(start_blk_id, end_blk_id, flag, fs.clone());
             if start_blk_id == 0 && !flag {
-                fuse.dealloc_bid(self.indirect2 as usize);
+                fs.dealloc_bid(self.indirect2 as usize);
             }
         }
     }
 
-    pub fn find<D: DiskManager>(&self, start: usize, len: usize, fuse: Arc<Fuse<D>>) -> Vec<u32> {
+    pub fn find<D: DiskManager>(&self, start: usize, len: usize, fs: Arc<FileSys<D>>) -> Vec<u32> {
         let end = min(start + len, self.size as usize); // exclusive
         let mut start_blk_id = start / DNODE_SIZE;
         let end_blk_id = if end == 0 {
@@ -238,7 +238,7 @@ impl Inode {
             let offset = DIRECT_INDEXING_MAX_LEN;
             let start_blk_id = start_blk_id - offset;
             let end_blk_id = min(end_blk_id, INDIRECT1_INDEXING_MAX_LEN) - offset;
-            res.append(&mut self.get_primary(start_blk_id, end_blk_id, fuse.clone()));
+            res.append(&mut self.get_primary(start_blk_id, end_blk_id, fs.clone()));
         }
         start_blk_id = max(start_blk_id, INDIRECT1_INDEXING_MAX_LEN);
 
@@ -246,7 +246,7 @@ impl Inode {
             let offset = INDIRECT1_INDEXING_MAX_LEN;
             let start_blk_id = start_blk_id - offset;
             let end_blk_id = min(end_blk_id, INDIRECT2_INDEXING_MAX_LEN) - offset;
-            res.append(&mut self.get_secondary(start_blk_id, end_blk_id, fuse.clone()));
+            res.append(&mut self.get_secondary(start_blk_id, end_blk_id, fs.clone()));
         }
         assert!(res.iter().all(|id| *id != 0));
         res
@@ -256,9 +256,9 @@ impl Inode {
         &self,
         start_blk_id: usize,
         end_blk_id: usize,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) -> Vec<u32> {
-        let pri = fuse.cache_manager().get(self.indirect1 as usize);
+        let pri = fs.cache_manager().get(self.indirect1 as usize);
         let mut pri_guard = pri.lock();
         let blk_ids = pri_guard.as_array_mut::<u32>();
 
@@ -271,16 +271,16 @@ impl Inode {
         &self,
         start_blk_id: usize,
         end_blk_id: usize,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) -> Vec<u32> {
-        let sec = fuse.cache_manager().get(self.indirect2 as usize);
+        let sec = fs.cache_manager().get(self.indirect2 as usize);
         let mut sec_guard = sec.lock();
         let pri_ids = sec_guard.as_array_mut::<u32>();
         let start_pri_offset = start_blk_id / DNODE_LEN;
         let end_pri_offset = (end_blk_id - 1) / DNODE_LEN + 1;
         let mut res = Vec::new();
         for i in start_pri_offset..end_pri_offset {
-            let pri = fuse.cache_manager().get(pri_ids[i] as usize);
+            let pri = fs.cache_manager().get(pri_ids[i] as usize);
             let mut pri_guard = pri.lock();
             let blk_ids = pri_guard.as_array_mut::<u32>();
             let start_blk_id = if i == start_pri_offset {
@@ -303,9 +303,9 @@ impl Inode {
         start_blk_id: usize,
         end_blk_id: usize,
         flag: bool,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) {
-        let pri = fuse.cache_manager().get(self.indirect1 as usize);
+        let pri = fs.cache_manager().get(self.indirect1 as usize);
         let mut pri_guard = pri.lock();
         let blk_ids = pri_guard.as_array_mut::<u32>();
 
@@ -313,9 +313,9 @@ impl Inode {
             .iter_mut()
             .for_each(|blk_id| {
                 if flag {
-                    *blk_id = fuse.alloc_bid().unwrap() as u32;
+                    *blk_id = fs.alloc_bid().unwrap() as u32;
                 } else {
-                    fuse.dealloc_bid(*blk_id as usize);
+                    fs.dealloc_bid(*blk_id as usize);
                 }
             });
     }
@@ -325,23 +325,23 @@ impl Inode {
         start_blk_id: usize,
         end_blk_id: usize,
         flag: bool,
-        fuse: Arc<Fuse<D>>,
+        fs: Arc<FileSys<D>>,
     ) {
-        let sec = fuse.cache_manager().get(self.indirect2 as usize);
+        let sec = fs.cache_manager().get(self.indirect2 as usize);
         let mut sec_guard = sec.lock();
         let pri_ids = sec_guard.as_array_mut::<u32>();
         let start_pri_offset = start_blk_id / DNODE_LEN;
         let end_pri_offset = (end_blk_id - 1) / DNODE_LEN + 1;
         for i in start_pri_offset..end_pri_offset {
             let pri_id = if flag {
-                let bid = fuse.alloc_bid().unwrap();
+                let bid = fs.alloc_bid().unwrap();
                 pri_ids[i] = bid as u32;
                 bid
             } else {
                 pri_ids[i] as usize
             };
 
-            let pri = fuse.cache_manager().get(pri_id);
+            let pri = fs.cache_manager().get(pri_id);
             let mut pri_guard = pri.lock();
             let blk_ids = pri_guard.as_array_mut::<u32>();
             let start_blk_id = if i == start_pri_offset {
@@ -359,14 +359,14 @@ impl Inode {
                 .iter_mut()
                 .for_each(|blk_id| {
                     if flag {
-                        *blk_id = fuse.alloc_bid().unwrap() as u32;
+                        *blk_id = fs.alloc_bid().unwrap() as u32;
                     } else {
-                        fuse.dealloc_bid(*blk_id as usize);
+                        fs.dealloc_bid(*blk_id as usize);
                     }
                 });
 
             if !flag {
-                fuse.dealloc_bid(pri_id);
+                fs.dealloc_bid(pri_id);
             }
         }
     }
@@ -387,10 +387,10 @@ impl Inode {
         Self::empty(InodeType::File)
     }
 
-    pub fn empty_dir<D: DiskManager>(myself: usize, parent: usize, fuse: Arc<Fuse<D>>) -> Self {
+    pub fn empty_dir<D: DiskManager>(myself: usize, parent: usize, fs: Arc<FileSys<D>>) -> Self {
         let mut inode = Self::empty(InodeType::Directory);
-        inode.write_at_end(DirEntry::new(".", myself).as_bytes(), fuse.clone());
-        inode.write_at_end(DirEntry::new("..", parent).as_bytes(), fuse.clone());
+        inode.write_at_end(DirEntry::new(".", myself).as_bytes(), fs.clone());
+        inode.write_at_end(DirEntry::new("..", parent).as_bytes(), fs.clone());
         inode
     }
 
@@ -408,12 +408,12 @@ impl Inode {
 }
 
 impl<D: DiskManager> InodePtr<D> {
-    pub fn new(iid: usize, fuse: Arc<Fuse<D>>) -> Self {
+    pub fn new(iid: usize, fs: Arc<FileSys<D>>) -> Self {
         Self {
             iid,
-            bid: iid / INODE_PER_BLK + fuse.area_inode_start_bid(),
+            bid: iid / INODE_PER_BLK + fs.area_inode_start_bid(),
             offset: iid % INODE_PER_BLK,
-            fuse,
+            fs,
         }
     }
 

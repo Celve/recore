@@ -1,8 +1,8 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use alloc::{collections::BTreeMap, vec::Vec};
-use fs::disk::DiskManager;
 use lazy_static::lazy_static;
+use simplefs::disk::DiskManager;
 use virtio_drivers::{BlkResp, Hal, RespStatus, VirtIOBlk, VirtIOHeader};
 
 use crate::{

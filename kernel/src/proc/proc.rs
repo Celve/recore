@@ -3,7 +3,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use fs::{dir::Dir, file::File};
+use simplefs::{dir::Dir, file::File};
 
 use core::mem::size_of;
 use fosix::signal::{SignalAction, SignalFlags};

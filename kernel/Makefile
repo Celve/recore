@@ -4,7 +4,7 @@ MODE := release
 KERNEL_ELF := target/$(TARGET)/$(MODE)/kernel
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
-FS_IMG := ../fuse/fs.img
+FS_IMG := ../packfs/fs.img
 APPS := ../user/src/bin/*
 CPUS := 4
 
@@ -31,7 +31,7 @@ $(KERNEL_BIN): kernel
 
 fsimg: $(APPS)
 	@cd ../user && make build && cd ../kernel
-	@cd ../fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/
+	@cd ../packfs && cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/
 
 kernel:
 	@cargo build --release

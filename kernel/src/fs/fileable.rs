@@ -1,5 +1,5 @@
 use fosix::fs::{FileStat, SeekFlag};
-use fs::{dir::Dir, file::File};
+use simplefs::{dir::Dir, file::File};
 
 use crate::{
     drivers::blockdev::BlkDev,

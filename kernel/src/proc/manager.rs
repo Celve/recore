@@ -1,4 +1,4 @@
-use crate::{fs::FUSE, sync::mcs::Mcs};
+use crate::{fs::FS, sync::mcs::Mcs};
 
 use super::proc::Proc;
 
@@ -47,7 +47,7 @@ impl ProcManager {
 
 lazy_static! {
     pub static ref INITPROC: Arc<Proc> = Proc::from_elf(
-        FUSE.root().lock().open("initproc", OpenFlags::RDONLY).unwrap(),
+        FS.root().lock().open("initproc", OpenFlags::RDONLY).unwrap(),
         None,
         0,
     );

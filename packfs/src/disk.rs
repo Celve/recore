@@ -1,10 +1,10 @@
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 
-use fs::disk::DiskManager;
+use simplefs::disk::DiskManager;
 use spin::Spin;
 
-use fs::config::BLK_LEN;
+use simplefs::config::BLK_LEN;
 
 pub struct FileDev {
     file: Spin<File>,

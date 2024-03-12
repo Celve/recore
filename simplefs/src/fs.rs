@@ -10,7 +10,7 @@ use super::{
     superblock::SuperBlock,
 };
 
-pub struct Fuse<D: DiskManager> {
+pub struct FileSys<D: DiskManager> {
     bitmap_inode: Spin<BitMap<D>>,
     area_inode_start_bid: usize,
     bitmap_dnode: Spin<BitMap<D>>,
@@ -19,13 +19,13 @@ pub struct Fuse<D: DiskManager> {
     cache_manager: Arc<CacheManager<D>>,
 }
 
-impl<D: DiskManager> Fuse<D> {
+impl<D: DiskManager> FileSys<D> {
     pub fn root(self: &Arc<Self>) -> Dir<D> {
         Dir::new(InodePtr::new(0, self.clone()), self.clone())
     }
 }
 
-impl<D: DiskManager> Fuse<D> {
+impl<D: DiskManager> FileSys<D> {
     pub fn alloc_bid(&self) -> Option<usize> {
         Some(self.bitmap_dnode.lock().alloc()? + self.area_dnode_start_bid)
     }
@@ -45,7 +45,7 @@ impl<D: DiskManager> Fuse<D> {
     }
 }
 
-impl<D: DiskManager> Fuse<D> {
+impl<D: DiskManager> FileSys<D> {
     pub fn new(super_block: SuperBlock, cache_manager: Arc<CacheManager<D>>) -> Self {
         let cache = cache_manager.get(0);
         let mut cache_guard = cache.lock();
